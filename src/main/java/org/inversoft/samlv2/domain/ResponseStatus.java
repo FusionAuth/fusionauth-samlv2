@@ -1,3 +1,18 @@
+/*
+ * Copyright (c) 2013, Inversoft Inc., All Rights Reserved
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing,
+ * software distributed under the License is distributed on an
+ * "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+ * either express or implied. See the License for the specific
+ * language governing permissions and limitations under the License.
+ */
 package org.inversoft.samlv2.domain;
 
 /**
@@ -128,10 +143,34 @@ public enum ResponseStatus {
    * The SAML responder could not process the request because the version of the request message was incorrect.
    */
   VersionMismatch("urn:oasis:names:tc:SAML:2.0:status:VersionMismatch");
+  /**
+   * The SAML string.
+   */
   private final String samlFormat;
 
   private ResponseStatus(String samlFormat) {
     this.samlFormat = samlFormat;
+  }
+
+  /**
+   * Locates the ResponseStatus using the given SAML String. This is the value from the StatusCode element's value.
+   *
+   * @param samlFormat The SAML string.
+   * @return The ResponseStatus enum instance.
+   * @throws IllegalArgumentException If the samlFormat String is not a valid status code.
+   */
+  public static ResponseStatus fromSAMLFormat(String samlFormat) {
+    if (samlFormat == null) {
+      return null;
+    }
+
+    for (ResponseStatus status : ResponseStatus.values()) {
+      if (status.toSAMLFormat().equals(samlFormat)) {
+        return status;
+      }
+    }
+
+    throw new IllegalArgumentException("Invalid SAML v2.0 status value [" + samlFormat + "]");
   }
 
   public String toSAMLFormat() {

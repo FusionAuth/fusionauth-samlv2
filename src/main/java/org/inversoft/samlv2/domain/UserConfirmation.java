@@ -15,31 +15,21 @@
  */
 package org.inversoft.samlv2.domain;
 
-import java.util.ArrayList;
-import java.util.List;
-
 import org.joda.time.DateTime;
 
 /**
  * @author Brian Pontarelli
  */
-public class AuthenticationResponse {
-  public UserConfirmation confirmation;
+public class UserConfirmation {
+  public String address;
 
-  public String destination;
+  public String inResponseTo;
 
-  public String id;
+  public ConfirmationMethod method;
 
-  public DateTime instant;
+  public DateTime notBefore;
 
-  public String issuer;
+  public DateTime notOnOrAfter;
 
-  public ResponseStatus status;
-
-  public User user;
-
-  public List<Condition> conditions = new ArrayList<Condition>();
-
-  public AuthenticationResponse() {
-  }
+  public String recipient;
 }

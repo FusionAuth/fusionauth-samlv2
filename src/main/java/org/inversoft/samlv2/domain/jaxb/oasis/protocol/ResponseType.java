@@ -23,9 +23,9 @@ import org.inversoft.samlv2.domain.jaxb.oasis.assertion.EncryptedElementType;
 
 /**
  * <p>Java class for ResponseType complex type.
- * 
+ * <p/>
  * <p>The following schema fragment specifies the expected content contained within this class.
- * 
+ * <p/>
  * <pre>
  * &lt;complexType name="ResponseType">
  *   &lt;complexContent>
@@ -38,8 +38,6 @@ import org.inversoft.samlv2.domain.jaxb.oasis.assertion.EncryptedElementType;
  *   &lt;/complexContent>
  * &lt;/complexType>
  * </pre>
- * 
- * 
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "ResponseType", propOrder = {
@@ -47,43 +45,37 @@ import org.inversoft.samlv2.domain.jaxb.oasis.assertion.EncryptedElementType;
 })
 @XmlRootElement
 public class ResponseType
-    extends StatusResponseType
-{
+    extends StatusResponseType {
 
-    @XmlElements({
-        @XmlElement(name = "EncryptedAssertion", namespace = "urn:oasis:names:tc:SAML:2.0:assertion", type = EncryptedElementType.class),
-        @XmlElement(name = "Assertion", namespace = "urn:oasis:names:tc:SAML:2.0:assertion", type = AssertionType.class)
-    })
-    protected List<Object> assertionOrEncryptedAssertion;
+  @XmlElements({
+      @XmlElement(name = "EncryptedAssertion", namespace = "urn:oasis:names:tc:SAML:2.0:assertion", type = EncryptedElementType.class),
+      @XmlElement(name = "Assertion", namespace = "urn:oasis:names:tc:SAML:2.0:assertion", type = AssertionType.class)
+  })
+  protected List<Object> assertionOrEncryptedAssertion;
 
-    /**
-     * Gets the value of the assertionOrEncryptedAssertion property.
-     * 
-     * <p>
-     * This accessor method returns a reference to the live list,
-     * not a snapshot. Therefore any modification you make to the
-     * returned list will be present inside the JAXB object.
-     * This is why there is not a <CODE>set</CODE> method for the assertionOrEncryptedAssertion property.
-     * 
-     * <p>
-     * For example, to add a new item, do as follows:
-     * <pre>
-     *    getAssertionOrEncryptedAssertion().add(newItem);
-     * </pre>
-     * 
-     * 
-     * <p>
-     * Objects of the following type(s) are allowed in the list
-     * {@link EncryptedElementType }
-     * {@link AssertionType }
-     * 
-     * 
-     */
-    public List<Object> getAssertionOrEncryptedAssertion() {
-        if (assertionOrEncryptedAssertion == null) {
-            assertionOrEncryptedAssertion = new ArrayList<Object>();
-        }
-        return this.assertionOrEncryptedAssertion;
+  /**
+   * Gets the value of the assertionOrEncryptedAssertion property.
+   * <p/>
+   * <p/>
+   * This accessor method returns a reference to the live list, not a snapshot. Therefore any modification you make to
+   * the returned list will be present inside the JAXB object. This is why there is not a <CODE>set</CODE> method for
+   * the assertionOrEncryptedAssertion property.
+   * <p/>
+   * <p/>
+   * For example, to add a new item, do as follows:
+   * <pre>
+   *    getAssertionOrEncryptedAssertion().add(newItem);
+   * </pre>
+   * <p/>
+   * <p/>
+   * <p/>
+   * Objects of the following type(s) are allowed in the list {@link EncryptedElementType } {@link AssertionType }
+   */
+  public List<Object> getAssertionOrEncryptedAssertion() {
+    if (assertionOrEncryptedAssertion == null) {
+      assertionOrEncryptedAssertion = new ArrayList<Object>();
     }
+    return this.assertionOrEncryptedAssertion;
+  }
 
 }
