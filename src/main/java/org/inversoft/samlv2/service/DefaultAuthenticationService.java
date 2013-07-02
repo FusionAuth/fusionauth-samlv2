@@ -52,7 +52,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.Key;
 import java.security.KeyPair;
-import java.security.KeyPairGenerator;
 import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.List;
@@ -90,7 +89,7 @@ import sun.misc.BASE64Encoder;
  */
 public class DefaultAuthenticationService implements AuthenticationService {
   @Override
-  public AuthenticationRequest buildRequest(String issuer, NameIDFormat format, boolean sign) {
+  public AuthenticationRequest buildRequest(String issuer, NameIDFormat format, boolean sign, KeyPair keyPair) {
     String id = UUID.randomUUID().toString();
 
     AuthnRequestType jaxbRequest = new AuthnRequestType();
@@ -105,7 +104,7 @@ public class DefaultAuthenticationService implements AuthenticationService {
 
     Document document = marshallToDocument(jaxbRequest, AuthnRequestType.class);
     if (sign) {
-      sign(document.getDocumentElement());
+      sign(document.getDocumentElement(), keyPair);
     }
 
     byte[] rawResult = documentToBytes(document);
@@ -128,7 +127,7 @@ public class DefaultAuthenticationService implements AuthenticationService {
     }
 
     AuthenticationResponse response = new AuthenticationResponse();
-    ResponseType jaxbResponse = unmarshallFromBytes(decodedResponse, ResponseType.class);
+    ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
     response.status = ResponseStatus.fromSAMLFormat(jaxbResponse.getStatus().getStatusCode().getValue());
     response.id = jaxbResponse.getID();
     response.issuer = parseIssuer(jaxbResponse.getIssuer());
@@ -173,7 +172,8 @@ public class DefaultAuthenticationService implements AuthenticationService {
     deflater.setInput(result);
     deflater.finish();
     int length = deflater.deflate(deflatedResult);
-    return new BASE64Encoder().encode(ByteBuffer.wrap(deflatedResult, 0, length));
+    String base64 = new BASE64Encoder().encode(ByteBuffer.wrap(deflatedResult, 0, length));
+    return base64.replaceAll("\n", "").replaceAll("\r", "");
   }
 
   private byte[] documentToBytes(Document document) {
@@ -251,7 +251,7 @@ public class DefaultAuthenticationService implements AuthenticationService {
     return new User(format, id, qualifier, spProviderID, spQualifier);
   }
 
-  private void sign(Node node) {
+  private void sign(Node node, KeyPair keyPair) {
     try {
       XMLSignatureFactory fac = XMLSignatureFactory.getInstance("DOM");
 
@@ -265,16 +265,12 @@ public class DefaultAuthenticationService implements AuthenticationService {
           fac.newSignatureMethod(SignatureMethod.DSA_SHA1, null),
           Collections.singletonList(ref));
 
-      KeyPairGenerator kpg = KeyPairGenerator.getInstance("DSA");
-      kpg.initialize(512);
-      KeyPair kp = kpg.generateKeyPair();
-
       KeyInfoFactory kif = fac.getKeyInfoFactory();
-      KeyValue kv = kif.newKeyValue(kp.getPublic());
+      KeyValue kv = kif.newKeyValue(keyPair.getPublic());
 
       KeyInfo ki = kif.newKeyInfo(Collections.singletonList(kv));
 
-      DOMSignContext dsc = new DOMSignContext(kp.getPrivate(), node);
+      DOMSignContext dsc = new DOMSignContext(keyPair.getPrivate(), node);
 
       XMLSignature signature = fac.newXMLSignature(si, ki);
       signature.sign(dsc);
@@ -292,11 +288,11 @@ public class DefaultAuthenticationService implements AuthenticationService {
   }
 
   @SuppressWarnings("unchecked")
-  private <T> T unmarshallFromBytes(byte[] bytes, Class<T> type) {
+  private <T> T unmarshallFromDocument(Document document, Class<T> type) {
     try {
       JAXBContext context = JAXBContext.newInstance(type);
       Unmarshaller unmarshaller = context.createUnmarshaller();
-      return (T) unmarshaller.unmarshal(new ByteArrayInputStream(bytes));
+      return (T) unmarshaller.unmarshal(document.getDocumentElement());
     } catch (JAXBException e) {
       throw new RuntimeException("Unable to unmarshall SAML response", e);
     }

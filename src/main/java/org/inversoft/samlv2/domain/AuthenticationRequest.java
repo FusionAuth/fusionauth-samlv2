@@ -15,6 +15,11 @@
  */
 package org.inversoft.samlv2.domain;
 
+import java.io.UnsupportedEncodingException;
+import java.net.MalformedURLException;
+import java.net.URL;
+import java.net.URLEncoder;
+
 /**
  * This class models a SAML v2.0 authentication request from a SP to an IDP.
  *
@@ -29,5 +34,18 @@ public class AuthenticationRequest {
     this.id = id;
     this.encodedRequest = encodedRequest;
     this.rawResult = rawResult;
+  }
+
+  public URL toRedirectURL(URL baseURL) {
+    String urlString = baseURL.toString();
+    try {
+      String encodedParameter = URLEncoder.encode(encodedRequest, "UTF-8");
+      urlString = urlString.contains("?") ? urlString + "&SAMLRequest=" + encodedParameter : urlString + "?SAMLRequest=" + encodedParameter;
+      return new URL(urlString);
+    } catch (MalformedURLException e) {
+      throw new RuntimeException("Unable to build SAML v2.0 redirect URL", e);
+    } catch (UnsupportedEncodingException e) {
+      throw new RuntimeException("Unable to build SAML v2.0 redirect URL", e);
+    }
   }
 }

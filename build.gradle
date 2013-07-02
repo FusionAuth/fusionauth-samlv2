@@ -2,7 +2,7 @@
  * Copyright (c) 2012, Inversoft Inc., All Rights Reserved
  */
 // Project Info
-group = "com.inversoft"
+group = "org.inversoft"
 version = "0.1"
 description = "The SAML v2.0 Project"
 
@@ -38,7 +38,9 @@ buildscript {
 
 dependencies {
   compile(
-      "joda-time:joda-time:2.1",
+      "com.google.inject:guice:3.0",
+      "javax.inject:javax.inject:1",
+      "joda-time:joda-time:2.1"
   )
   testCompile(
       "org.easymock:easymock:3.1",
