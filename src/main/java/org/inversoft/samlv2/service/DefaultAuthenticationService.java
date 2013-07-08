@@ -80,6 +80,7 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
+import com.google.inject.Inject;
 import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
 import sun.misc.BASE64Decoder;
 import sun.misc.BASE64Encoder;
@@ -88,6 +89,13 @@ import sun.misc.BASE64Encoder;
  * @author Brian Pontarelli
  */
 public class DefaultAuthenticationService implements AuthenticationService {
+  private final RoleResolver roleResolver;
+
+  @Inject
+  public DefaultAuthenticationService(RoleResolver roleResolver) {
+    this.roleResolver = roleResolver;
+  }
+
   @Override
   public AuthenticationRequest buildRequest(String issuer, NameIDFormat format, boolean sign, KeyPair keyPair) {
     String id = UUID.randomUUID().toString();
@@ -160,7 +168,13 @@ public class DefaultAuthenticationService implements AuthenticationService {
             throw new RuntimeException("This library currently doesn't handle encrypted assertions");
           }
         }
+
+        // Roles are in the AttributeStatement elements (usually just one but who knows)
+        response.user.roles.addAll(roleResolver.parseRoles(jaxbResponse));
       }
+
+      // Handle conditions to pull out audience restriction
+
     }
 
     return response;
@@ -220,6 +234,7 @@ public class DefaultAuthenticationService implements AuthenticationService {
   }
 
   private Document parseFromBytes(byte[] bytes) {
+    System.out.println("XML response is\n" + new String(bytes));
     DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
     documentBuilderFactory.setNamespaceAware(true);
     try {
@@ -292,7 +307,8 @@ public class DefaultAuthenticationService implements AuthenticationService {
     try {
       JAXBContext context = JAXBContext.newInstance(type);
       Unmarshaller unmarshaller = context.createUnmarshaller();
-      return (T) unmarshaller.unmarshal(document.getDocumentElement());
+      JAXBElement element = (JAXBElement) unmarshaller.unmarshal(document);
+      return (T) element.getValue();
     } catch (JAXBException e) {
       throw new RuntimeException("Unable to unmarshall SAML response", e);
     }

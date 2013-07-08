@@ -16,6 +16,8 @@
 package org.inversoft.samlv2.domain;
 
 /**
+ * Enumeration for the SAML v2.0 status codes in the Response.
+ *
  * @author Brian Pontarelli
  */
 public enum ResponseStatus {
@@ -143,6 +145,7 @@ public enum ResponseStatus {
    * The SAML responder could not process the request because the version of the request message was incorrect.
    */
   VersionMismatch("urn:oasis:names:tc:SAML:2.0:status:VersionMismatch");
+
   /**
    * The SAML string.
    */

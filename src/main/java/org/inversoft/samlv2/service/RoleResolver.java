@@ -13,32 +13,25 @@
  * either express or implied. See the License for the specific
  * language governing permissions and limitations under the License.
  */
-package org.inversoft.samlv2.domain;
+package org.inversoft.samlv2.service;
 
-import java.util.Map;
+import java.util.Set;
 
-import org.joda.time.DateTime;
+import org.inversoft.samlv2.domain.jaxb.oasis.protocol.ResponseType;
 
 /**
+ * This interface defines a mechanism where SAML v2.0 Response attributes are converted into Roles. Not all users of
+ * the library will need this behavior, but it is defined in case you do. A no-op version is provided for anyone that
+ * doesn't need Role resolution.
+ *
  * @author Brian Pontarelli
  */
-public class AuthenticationResponse {
-  public Map<String, String> attributes;
-
-  public UserConfirmation confirmation;
-
-  public String destination;
-
-  public String id;
-
-  public DateTime instant;
-
-  public String issuer;
-
-  public ResponseStatus status;
-
-  public User user;
-
-  public AuthenticationResponse() {
-  }
+public interface RoleResolver {
+  /**
+   * Parses the roles from the given attribute statement.
+   *
+   * @param response The SAML response.
+   * @return The roles.
+   */
+  Set<String> parseRoles(ResponseType response);
 }

@@ -12,7 +12,6 @@ import javax.xml.bind.annotation.XmlAccessType;
 import javax.xml.bind.annotation.XmlAccessorType;
 import javax.xml.bind.annotation.XmlElement;
 import javax.xml.bind.annotation.XmlElements;
-import javax.xml.bind.annotation.XmlRootElement;
 import javax.xml.bind.annotation.XmlType;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,7 +42,6 @@ import org.inversoft.samlv2.domain.jaxb.oasis.assertion.EncryptedElementType;
 @XmlType(name = "ResponseType", propOrder = {
     "assertionOrEncryptedAssertion"
 })
-@XmlRootElement
 public class ResponseType
     extends StatusResponseType {
 

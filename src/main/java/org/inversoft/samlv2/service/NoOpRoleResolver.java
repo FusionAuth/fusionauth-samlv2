@@ -13,32 +13,21 @@
  * either express or implied. See the License for the specific
  * language governing permissions and limitations under the License.
  */
-package org.inversoft.samlv2.domain;
+package org.inversoft.samlv2.service;
 
-import java.util.Map;
+import java.util.Collections;
+import java.util.Set;
 
-import org.joda.time.DateTime;
+import org.inversoft.samlv2.domain.jaxb.oasis.protocol.ResponseType;
 
 /**
+ * A name resolver that does nothing and returns an empty Set.
+ *
  * @author Brian Pontarelli
  */
-public class AuthenticationResponse {
-  public Map<String, String> attributes;
-
-  public UserConfirmation confirmation;
-
-  public String destination;
-
-  public String id;
-
-  public DateTime instant;
-
-  public String issuer;
-
-  public ResponseStatus status;
-
-  public User user;
-
-  public AuthenticationResponse() {
+public class NoOpRoleResolver implements RoleResolver {
+  @Override
+  public Set<String> parseRoles(ResponseType response) {
+    return Collections.emptySet();
   }
 }
