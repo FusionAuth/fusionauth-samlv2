@@ -13,8 +13,6 @@ apply plugin: "init"
 apply plugin: "testng"
 apply plugin: "release"
 
-releasePlugin.publicRepo = false
-
 // Build script config
 buildscript {
   repositories {
