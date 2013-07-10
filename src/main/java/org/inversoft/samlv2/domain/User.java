@@ -15,8 +15,9 @@
  */
 package org.inversoft.samlv2.domain;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Models a single User within the system. This information is returned from the SAML IDP as NameID values.
@@ -28,13 +29,17 @@ public class User {
 
   public String id;
 
+  public Map<String, Number> numberAttributes = new HashMap<String, Number>();
+
   public String qualifier;
 
   public String spProviderID;
 
   public String spQualifier;
 
-  public Set<String> roles = new HashSet<String>();
+  public Map<String, String> stringAttributes = new HashMap<String, String>();
+
+  public Map<String, List<String>> stringListAttributes = new HashMap<String, List<String>>();
 
   public User(NameIDFormat format, String id, String qualifier, String spProviderID, String spQualifier) {
     this.format = format;

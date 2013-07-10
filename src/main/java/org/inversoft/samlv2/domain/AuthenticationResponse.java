@@ -15,15 +15,18 @@
  */
 package org.inversoft.samlv2.domain;
 
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.joda.time.DateTime;
 
 /**
+ * The SAML v2.0 authentication response object that is sent back from the IDP.
+ *
  * @author Brian Pontarelli
  */
 public class AuthenticationResponse {
-  public Map<String, String> attributes;
+  public List<String> audiences = new ArrayList<String>();
 
   public UserConfirmation confirmation;
 
@@ -34,6 +37,12 @@ public class AuthenticationResponse {
   public DateTime instant;
 
   public String issuer;
+
+  public boolean oneTimeUse;
+
+  public List<String> proxyAudiences = new ArrayList<String>();
+
+  public Integer proxyCount;
 
   public ResponseStatus status;
 

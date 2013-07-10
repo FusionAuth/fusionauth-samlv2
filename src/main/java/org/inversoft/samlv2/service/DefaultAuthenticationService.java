@@ -66,8 +66,16 @@ import org.inversoft.samlv2.domain.ResponseStatus;
 import org.inversoft.samlv2.domain.User;
 import org.inversoft.samlv2.domain.UserConfirmation;
 import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AssertionType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AttributeStatementType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AttributeType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AudienceRestrictionType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.ConditionAbstractType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.ConditionsType;
 import org.inversoft.samlv2.domain.jaxb.oasis.assertion.EncryptedElementType;
 import org.inversoft.samlv2.domain.jaxb.oasis.assertion.NameIDType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.OneTimeUseType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.ProxyRestrictionType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.StatementAbstractType;
 import org.inversoft.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationDataType;
 import org.inversoft.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationType;
 import org.inversoft.samlv2.domain.jaxb.oasis.assertion.SubjectType;
@@ -80,7 +88,6 @@ import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
-import com.google.inject.Inject;
 import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
 import sun.misc.BASE64Decoder;
 import sun.misc.BASE64Encoder;
@@ -89,13 +96,6 @@ import sun.misc.BASE64Encoder;
  * @author Brian Pontarelli
  */
 public class DefaultAuthenticationService implements AuthenticationService {
-  private final RoleResolver roleResolver;
-
-  @Inject
-  public DefaultAuthenticationService(RoleResolver roleResolver) {
-    this.roleResolver = roleResolver;
-  }
-
   @Override
   public AuthenticationRequest buildRequest(String issuer, NameIDFormat format, boolean sign, KeyPair keyPair) {
     String id = UUID.randomUUID().toString();
@@ -121,6 +121,7 @@ public class DefaultAuthenticationService implements AuthenticationService {
   }
 
   @Override
+  @SuppressWarnings("unchecked")
   public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, Key key) {
     byte[] decodedResponse;
     try {
@@ -149,6 +150,8 @@ public class DefaultAuthenticationService implements AuthenticationService {
       }
 
       AssertionType assertionType = (AssertionType) assertion;
+
+      // Handle the subject
       SubjectType subject = assertionType.getSubject();
       if (subject != null) {
         List<JAXBElement<?>> elements = subject.getContent();
@@ -168,13 +171,61 @@ public class DefaultAuthenticationService implements AuthenticationService {
             throw new RuntimeException("This library currently doesn't handle encrypted assertions");
           }
         }
-
-        // Roles are in the AttributeStatement elements (usually just one but who knows)
-        response.user.roles.addAll(roleResolver.parseRoles(jaxbResponse));
       }
 
       // Handle conditions to pull out audience restriction
+      ConditionsType conditionsType = assertionType.getConditions();
+      List<ConditionAbstractType> conditionAbstractTypes = conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse();
+      for (ConditionAbstractType conditionAbstractType : conditionAbstractTypes) {
+        if (conditionAbstractType instanceof AudienceRestrictionType) {
+          AudienceRestrictionType restrictionType = (AudienceRestrictionType) conditionAbstractType;
+          response.audiences.addAll(restrictionType.getAudience());
+        } else if (conditionAbstractType instanceof OneTimeUseType) {
+          response.oneTimeUse = true;
+        } else if (conditionAbstractType instanceof ProxyRestrictionType) {
+          ProxyRestrictionType proxyRestrictionType = (ProxyRestrictionType) conditionAbstractType;
+          response.proxyAudiences.addAll(proxyRestrictionType.getAudience());
+          response.proxyCount = proxyRestrictionType.getCount() == null ? null : proxyRestrictionType.getCount().intValue();
+        }
+      }
 
+      // Handle the attributes
+      List<StatementAbstractType> statements = assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement();
+      for (StatementAbstractType statement : statements) {
+        if (statement instanceof AttributeStatementType) {
+          AttributeStatementType attributeStatementType = (AttributeStatementType) statement;
+          List<Object> attributeObjects = attributeStatementType.getAttributeOrEncryptedAttribute();
+          for (Object attributeObject : attributeObjects) {
+            if (attributeObject instanceof AttributeType) {
+              AttributeType attributeType = (AttributeType) attributeObject;
+              String name = attributeType.getName();
+              List<Object> attributeValues = attributeType.getAttributeValue();
+
+              // Single value attribute
+              if (attributeValues.size() == 1) {
+                Object value = attributeValues.get(0);
+                if (value instanceof Number) {
+                  response.user.numberAttributes.put(name, (Number) value);
+                } else if (value instanceof String) {
+                  response.user.stringAttributes.put(name, (String) value);
+                } else {
+                  throw new RuntimeException("This library currently doesn't handle attributes of type [" + value.getClass() + "]");
+                }
+              } else {
+                // Multi-value attribute
+                Object value = attributeValues.get(0);
+                if (value instanceof String) {
+                  response.user.stringListAttributes.put(name, (List<String>) ((List) attributeValues));
+                } else {
+                  throw new RuntimeException("This library currently doesn't handle multi-value attributes of type [" + value.getClass() + "]");
+                }
+              }
+            } else {
+              throw new RuntimeException("This library currently doesn't support encrypted attributes");
+            }
+          }
+        }
+      }
     }
 
     return response;
