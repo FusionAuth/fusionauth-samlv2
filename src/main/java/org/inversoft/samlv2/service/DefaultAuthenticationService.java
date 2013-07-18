@@ -285,7 +285,6 @@ public class DefaultAuthenticationService implements AuthenticationService {
   }
 
   private Document parseFromBytes(byte[] bytes) {
-    System.out.println("XML response is\n" + new String(bytes));
     DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
     documentBuilderFactory.setNamespaceAware(true);
     try {

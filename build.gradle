@@ -3,7 +3,7 @@
  */
 // Project Info
 group = "org.inversoft"
-version = "0.2"
+version = "0.3"
 description = "The SAML v2.0 Project"
 
 // Plugins
