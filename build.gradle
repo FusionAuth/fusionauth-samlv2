@@ -29,7 +29,7 @@ buildscript {
     classpath(
         "org.primeframework.gradle:gradle-init-plugin:0.4",
         "org.primeframework.gradle:gradle-release-plugin:0.11",
-        "org.primeframework.gradle:gradle-testng-plugin:0.7"
+        "org.primeframework.gradle:gradle-testng-plugin:0.9"
     )
   }
 }

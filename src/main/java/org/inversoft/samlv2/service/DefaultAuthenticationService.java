@@ -83,7 +83,10 @@ import org.inversoft.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import org.inversoft.samlv2.domain.jaxb.oasis.protocol.NameIDPolicyType;
 import org.inversoft.samlv2.domain.jaxb.oasis.protocol.ResponseType;
 import org.joda.time.DateTime;
+import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
@@ -365,6 +368,9 @@ public class DefaultAuthenticationService implements AuthenticationService {
   }
 
   private void verifySignature(Document document, Key key) {
+    // Fix the IDs in the entire document per the suggestions at http://stackoverflow.com/questions/17331187/xml-dig-sig-error-after-upgrade-to-java7u25
+    fixIDs(document.getDocumentElement());
+
     NodeList nl = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
     if (nl.getLength() == 0) {
       return;
@@ -382,6 +388,24 @@ public class DefaultAuthenticationService implements AuthenticationService {
       throw new RuntimeException("Unable to verify XML signature in the SAML v2.0 authentication response because we couldn't unmarshall the XML Signature element", e);
     } catch (XMLSignatureException e) {
       throw new RuntimeException("Unable to verify XML signature in the SAML v2.0 authentication response. The signature was unmarshalled we couldn't validate it for an unknown reason", e);
+    }
+  }
+
+  private void fixIDs(Element element) {
+    NamedNodeMap attributes = element.getAttributes();
+    for (int i = 0; i < attributes.getLength(); i++) {
+      Attr attribute = (Attr) attributes.item(i);
+      if (attribute.getLocalName().toLowerCase().equals("id")) {
+        element.setIdAttributeNode(attribute, true);
+      }
+    }
+
+    NodeList children = element.getChildNodes();
+    for (int i = 0; i < children.getLength(); i++) {
+      Node child = children.item(i);
+      if (child.getNodeType() == Node.ELEMENT_NODE) {
+        fixIDs((Element) child);
+      }
     }
   }
 }
