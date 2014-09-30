@@ -21,7 +21,7 @@ project(group: "org.inversoft", name: "samlv2", version: "0.6", licenses: ["Apac
   }
 
   publishWorkflow {
-    subversion(repository: "http://svn.inversoft.com/inversoft-savant")
+    subversion(repository: "http://svn.inversoft.org/savant")
   }
 
   dependencies {
