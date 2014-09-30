@@ -38,9 +38,6 @@
   <component name="EntryPointsManager">
     <entry_points version="2.0" />
   </component>
-  <component name="GradleSettings">
-    <option name="gradleHome" value="asdf" />
-  </component>
   <component name="GradleUISettings">
     <setting name="root" />
   </component>
