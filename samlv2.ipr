@@ -203,7 +203,7 @@
         </XML>
       </value>
     </option>
-    <option name="PREFERRED_PROJECT_CODE_STYLE" value="Default (1)" />
+    <option name="PREFERRED_PROJECT_CODE_STYLE" value="Inversoft" />
   </component>
   <component name="ProjectModuleManager">
     <modules>

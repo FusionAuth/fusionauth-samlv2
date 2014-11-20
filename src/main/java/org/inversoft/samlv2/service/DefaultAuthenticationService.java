@@ -15,6 +15,42 @@
  */
 package org.inversoft.samlv2.service;
 
+import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
+import org.inversoft.samlv2.domain.AuthenticationRequest;
+import org.inversoft.samlv2.domain.AuthenticationResponse;
+import org.inversoft.samlv2.domain.ConfirmationMethod;
+import org.inversoft.samlv2.domain.NameIDFormat;
+import org.inversoft.samlv2.domain.ResponseStatus;
+import org.inversoft.samlv2.domain.User;
+import org.inversoft.samlv2.domain.UserConfirmation;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AssertionType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AttributeStatementType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AttributeType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AudienceRestrictionType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.ConditionAbstractType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.ConditionsType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.EncryptedElementType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.NameIDType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.OneTimeUseType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.ProxyRestrictionType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.StatementAbstractType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationDataType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationType;
+import org.inversoft.samlv2.domain.jaxb.oasis.assertion.SubjectType;
+import org.inversoft.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
+import org.inversoft.samlv2.domain.jaxb.oasis.protocol.NameIDPolicyType;
+import org.inversoft.samlv2.domain.jaxb.oasis.protocol.ResponseType;
+import org.joda.time.DateTime;
+import org.w3c.dom.Attr;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NamedNodeMap;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
+import sun.misc.BASE64Decoder;
+import sun.misc.BASE64Encoder;
+
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
@@ -57,43 +93,6 @@ import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.UUID;
 import java.util.zip.Deflater;
-
-import org.inversoft.samlv2.domain.AuthenticationRequest;
-import org.inversoft.samlv2.domain.AuthenticationResponse;
-import org.inversoft.samlv2.domain.ConfirmationMethod;
-import org.inversoft.samlv2.domain.NameIDFormat;
-import org.inversoft.samlv2.domain.ResponseStatus;
-import org.inversoft.samlv2.domain.User;
-import org.inversoft.samlv2.domain.UserConfirmation;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AssertionType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AttributeStatementType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AttributeType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.AudienceRestrictionType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.ConditionAbstractType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.ConditionsType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.EncryptedElementType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.NameIDType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.OneTimeUseType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.ProxyRestrictionType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.StatementAbstractType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationDataType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationType;
-import org.inversoft.samlv2.domain.jaxb.oasis.assertion.SubjectType;
-import org.inversoft.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
-import org.inversoft.samlv2.domain.jaxb.oasis.protocol.NameIDPolicyType;
-import org.inversoft.samlv2.domain.jaxb.oasis.protocol.ResponseType;
-import org.joda.time.DateTime;
-import org.w3c.dom.Attr;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NamedNodeMap;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
-
-import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
-import sun.misc.BASE64Decoder;
-import sun.misc.BASE64Encoder;
 
 /**
  * @author Brian Pontarelli
@@ -188,7 +187,8 @@ public class DefaultAuthenticationService implements AuthenticationService {
         } else if (conditionAbstractType instanceof ProxyRestrictionType) {
           ProxyRestrictionType proxyRestrictionType = (ProxyRestrictionType) conditionAbstractType;
           response.proxyAudiences.addAll(proxyRestrictionType.getAudience());
-          response.proxyCount = proxyRestrictionType.getCount() == null ? null : proxyRestrictionType.getCount().intValue();
+          response.proxyCount = proxyRestrictionType.getCount() == null ? null : proxyRestrictionType.getCount()
+                                                                                                     .intValue();
         }
       }
 
@@ -220,7 +220,8 @@ public class DefaultAuthenticationService implements AuthenticationService {
                 if (value instanceof String) {
                   response.user.stringListAttributes.put(name, (List<String>) ((List) attributeValues));
                 } else {
-                  throw new RuntimeException("This library currently doesn't handle multi-value attributes of type [" + value.getClass() + "]");
+                  throw new RuntimeException("This library currently doesn't handle multi-value attributes of type [" + value
+                      .getClass() + "]");
                 }
               }
             } else {
@@ -232,6 +233,14 @@ public class DefaultAuthenticationService implements AuthenticationService {
     }
 
     return response;
+  }
+
+  private DateTime toJodaDateTime(XMLGregorianCalendar instant) {
+    if (instant == null) {
+      return null;
+    }
+
+    return new DateTime(instant.toGregorianCalendar());
   }
 
   private String deflateAndEncode(byte[] result) {
@@ -324,9 +333,9 @@ public class DefaultAuthenticationService implements AuthenticationService {
       XMLSignatureFactory fac = XMLSignatureFactory.getInstance("DOM");
 
       Reference ref = fac.newReference("",
-          fac.newDigestMethod(DigestMethod.SHA1, null),
-          Collections.singletonList(fac.newTransform(Transform.ENVELOPED, (XMLStructure) null)),
-          null, null);
+                                       fac.newDigestMethod(DigestMethod.SHA1, null),
+                                       Collections.singletonList(fac.newTransform(Transform.ENVELOPED, (XMLStructure) null)),
+                                       null, null);
 
       SignedInfo si = fac.newSignedInfo(
           fac.newCanonicalizationMethod(CanonicalizationMethod.INCLUSIVE_WITH_COMMENTS, (XMLStructure) null),
@@ -345,14 +354,6 @@ public class DefaultAuthenticationService implements AuthenticationService {
     } catch (Exception e) {
       throw new RuntimeException("Unable to sign XML document.", e);
     }
-  }
-
-  private DateTime toJodaDateTime(XMLGregorianCalendar instant) {
-    if (instant == null) {
-      return null;
-    }
-
-    return new DateTime(instant.toGregorianCalendar());
   }
 
   @SuppressWarnings("unchecked")

@@ -47,7 +47,8 @@ public class DefaultAuthenticationServiceTest {
 
     DefaultAuthenticationService service = new DefaultAuthenticationService();
     AuthenticationRequest request = service.buildRequest("testing 123", NameIDFormat.EmailAddress, true, kp);
-    assertEquals(request.toRedirectURL(new URL("http://www.example.com/samlv2/idp")).toString(), "http://www.example.com/samlv2/idp?SAMLRequest=" + URLEncoder.encode(request.encodedRequest, "UTF-8"));
+    assertEquals(request.toRedirectURL(new URL("http://www.example.com/samlv2/idp"))
+                        .toString(), "http://www.example.com/samlv2/idp?SAMLRequest=" + URLEncoder.encode(request.encodedRequest, "UTF-8"));
 
     JAXBContext context = JAXBContext.newInstance(AuthnRequestType.class);
     Unmarshaller unmarshaller = context.createUnmarshaller();
