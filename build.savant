@@ -25,11 +25,7 @@ project(group: "org.inversoft", name: "samlv2", version: "0.6", licenses: ["Apac
   }
 
   dependencies {
-    group(name: "compile") {
-      dependency(id: "org.joda:joda-time:2.1.0")
-    }
     group(name: "test-compile", export: false) {
-      dependency(id: "org.easymock:easymock:3.2")
       dependency(id: "org.testng:testng:6.8.7")
     }
   }
