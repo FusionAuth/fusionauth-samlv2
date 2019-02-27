@@ -36,6 +36,7 @@ import javax.xml.crypto.dsig.dom.DOMValidateContext;
 import javax.xml.crypto.dsig.keyinfo.KeyInfo;
 import javax.xml.crypto.dsig.keyinfo.KeyInfoFactory;
 import javax.xml.crypto.dsig.keyinfo.KeyValue;
+import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -43,24 +44,28 @@ import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMResult;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.nio.ByteBuffer;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
 import java.security.KeyPair;
+import java.security.PrivateKey;
+import java.security.Signature;
+import java.security.interfaces.DSAKey;
+import java.security.interfaces.RSAKey;
 import java.time.ZonedDateTime;
+import java.util.Arrays;
+import java.util.Base64;
 import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.UUID;
 import java.util.zip.Deflater;
 
-import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
-import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
 import io.fusionauth.samlv2.domain.NameIDFormat;
@@ -83,6 +88,7 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.NameIDPolicyType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ObjectFactory;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ResponseType;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
@@ -91,54 +97,73 @@ import org.w3c.dom.NamedNodeMap;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
-import sun.misc.BASE64Decoder;
-import sun.misc.BASE64Encoder;
 
 /**
  * @author Brian Pontarelli
  */
-public class DefaultAuthenticationService implements AuthenticationService {
+public class DefaultSAMLService implements SAMLService {
   @Override
-  public AuthenticationRequest buildRequest(String issuer, NameIDFormat format, boolean sign, KeyPair keyPair) {
-    String id = UUID.randomUUID().toString();
+  public String buildHTTPRedirectAuthnRequest(String issuer, String relayState, boolean sign, PrivateKey key) {
+    UUID id = UUID.randomUUID();
 
-    AuthnRequestType jaxbRequest = new AuthnRequestType();
-    jaxbRequest.setIssuer(new NameIDType());
-    jaxbRequest.getIssuer().setValue(issuer);
-    jaxbRequest.setNameIDPolicy(new NameIDPolicyType());
-    jaxbRequest.getNameIDPolicy().setAllowCreate(true);
-    jaxbRequest.getNameIDPolicy().setFormat(format.toSAMLFormat());
-    jaxbRequest.setID(id);
-    jaxbRequest.setIssueInstant(new XMLGregorianCalendarImpl(new GregorianCalendar()));
-    jaxbRequest.setVersion("2.0");
+    // SAML Web SSO profile requirements (section 4.1.4.1)
+    AuthnRequestType authnRequest = new AuthnRequestType();
+    authnRequest.setIssuer(new NameIDType());
+    authnRequest.getIssuer().setValue(issuer);
+    authnRequest.setNameIDPolicy(new NameIDPolicyType());
+    authnRequest.getNameIDPolicy().setAllowCreate(false);
+    authnRequest.setID("id" + id.toString()); // Required because Active Directory requires a non-number as the first character
 
-    Document document = marshallToDocument(jaxbRequest);
-    if (sign) {
-      sign(document.getDocumentElement(), keyPair);
+    try {
+      GregorianCalendar gregorianCalendar = GregorianCalendar.from(ZonedDateTime.now());
+      XMLGregorianCalendar now = DatatypeFactory.newInstance().newXMLGregorianCalendar(gregorianCalendar);
+      authnRequest.setIssueInstant(now);
+      authnRequest.setVersion("2.0");
+
+      byte[] rawResult = marshall(new ObjectFactory().createAuthnRequest(authnRequest));
+      String encodedResult = deflateAndEncode(rawResult);
+      String parameters = "SAMLRequest=" + URLEncoder.encode(encodedResult, "UTF-8");
+      if (relayState != null) {
+        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
+      }
+
+      if (sign && key != null) {
+        Signature signature;
+        if (key instanceof RSAKey) {
+          parameters += "&SigAlg=" + URLEncoder.encode("http://www.w3.org/2000/09/xmldsig#rsa-sha1", "UTF-8");
+          signature = Signature.getInstance("SHA1withRSA");
+        } else if (key instanceof DSAKey) {
+          parameters += "&SigAlg=" + URLEncoder.encode("http://www.w3.org/2000/09/xmldsig#dsa-sha1", "UTF-8");
+          signature = Signature.getInstance("SHA1withDSA");
+        } else {
+          throw new IllegalStateException("Invalid key object. Must be an RSA or DSA key. Instead it is of type [" + key.getClass() + "]");
+        }
+
+        signature.initSign(key);
+        signature.update(parameters.getBytes(StandardCharsets.UTF_8));
+
+        String signatureParameter = Base64.getEncoder().encodeToString(signature.sign());
+        parameters += "&Signature=" + URLEncoder.encode(signatureParameter, "UTF-8");
+      }
+
+      return parameters;
+    } catch (Exception e) {
+      // Not possible but freak out
+      throw new IllegalStateException(e);
     }
-
-    byte[] rawResult = documentToBytes(document);
-    String encodedResult = deflateAndEncode(rawResult);
-    return new AuthenticationRequest(id, encodedResult, rawResult);
   }
 
-  @Override
+  //  @Override
   @SuppressWarnings("unchecked")
   public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, Key key) {
-    byte[] decodedResponse;
-    try {
-      decodedResponse = new BASE64Decoder().decodeBuffer(encodedResponse);
-    } catch (IOException e) {
-      throw new RuntimeException("Unable to decode the SAML authentication response", e);
-    }
-
+    byte[] decodedResponse = Base64.getDecoder().decode(encodedResponse);
     Document document = parseFromBytes(decodedResponse);
     if (verifySignature) {
       verifySignature(document, key);
     }
 
     AuthenticationResponse response = new AuthenticationResponse();
-    ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
+    ResponseType jaxbResponse = unmarshallFromDocument(document);
     response.status = ResponseStatus.fromSAMLFormat(jaxbResponse.getStatus().getStatusCode().getValue());
     response.id = jaxbResponse.getID();
     response.issuer = parseIssuer(jaxbResponse.getIssuer());
@@ -236,13 +261,14 @@ public class DefaultAuthenticationService implements AuthenticationService {
   }
 
   private String deflateAndEncode(byte[] result) {
-    byte[] deflatedResult = new byte[result.length];
-    Deflater deflater = new Deflater();
+    Deflater deflater = new Deflater(Deflater.DEFLATED, true);
     deflater.setInput(result);
     deflater.finish();
+    byte[] deflatedResult = new byte[result.length];
     int length = deflater.deflate(deflatedResult);
-    String base64 = new BASE64Encoder().encode(ByteBuffer.wrap(deflatedResult, 0, length));
-    return base64.replaceAll("\n", "").replaceAll("\r", "");
+    deflater.end();
+    byte[] src = Arrays.copyOf(deflatedResult, length);
+    return Base64.getEncoder().encodeToString(src);
   }
 
   private byte[] documentToBytes(Document document) {
@@ -277,13 +303,13 @@ public class DefaultAuthenticationService implements AuthenticationService {
     }
   }
 
-  private <T> Document marshallToDocument(T object) {
+  private <T> byte[] marshall(T object) {
     try {
       JAXBContext context = JAXBContext.newInstance(AuthnRequestType.class);
       Marshaller marshaller = context.createMarshaller();
-      DOMResult domResult = new DOMResult();
-      marshaller.marshal(object, domResult);
-      return (Document) domResult.getNode();
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      marshaller.marshal(object, baos);
+      return baos.toByteArray();
     } catch (JAXBException e) {
       // Rethrow as runtime
       throw new RuntimeException("Unable to marshall JAXB SAML object to DOM for signing.", e);
@@ -312,11 +338,7 @@ public class DefaultAuthenticationService implements AuthenticationService {
     try {
       DocumentBuilder builder = documentBuilderFactory.newDocumentBuilder();
       return builder.parse(new ByteArrayInputStream(bytes));
-    } catch (ParserConfigurationException e) {
-      throw new RuntimeException("Unable to parse SAML v2.0 authentication response", e);
-    } catch (SAXException e) {
-      throw new RuntimeException("Unable to parse SAML v2.0 authentication response", e);
-    } catch (IOException e) {
+    } catch (ParserConfigurationException | SAXException | IOException e) {
       throw new RuntimeException("Unable to parse SAML v2.0 authentication response", e);
     }
   }
@@ -375,9 +397,9 @@ public class DefaultAuthenticationService implements AuthenticationService {
   }
 
   @SuppressWarnings("unchecked")
-  private <T> T unmarshallFromDocument(Document document, Class<T> type) {
+  private <T> T unmarshallFromDocument(Document document) {
     try {
-      JAXBContext context = JAXBContext.newInstance(type);
+      JAXBContext context = JAXBContext.newInstance(ResponseType.class);
       Unmarshaller unmarshaller = context.createUnmarshaller();
       JAXBElement element = (JAXBElement) unmarshaller.unmarshal(document);
       return (T) element.getValue();
