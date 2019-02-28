@@ -19,13 +19,22 @@ import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.Unmarshaller;
 import java.io.ByteArrayInputStream;
+import java.io.InputStream;
 import java.net.URLDecoder;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.PublicKey;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateFactory;
+import java.time.ZonedDateTime;
 import java.util.Base64;
-import java.util.UUID;
 import java.util.zip.Inflater;
 
+import io.fusionauth.samlv2.domain.AuthenticationResponse;
+import io.fusionauth.samlv2.domain.NameIDFormat;
+import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
@@ -37,7 +46,7 @@ import static org.testng.Assert.assertTrue;
  *
  * @author Brian Pontarelli
  */
-@SuppressWarnings({"unchecked", "ResultOfMethodCallIgnored"})
+@SuppressWarnings({"unchecked"})
 @Test(groups = "unit")
 public class DefaultSAMLServiceTest {
   @Test
@@ -47,7 +56,7 @@ public class DefaultSAMLServiceTest {
     KeyPair kp = kpg.generateKeyPair();
 
     DefaultSAMLService service = new DefaultSAMLService();
-    String parameters = service.buildHTTPRedirectAuthnRequest("https://local.fusionauth.io", "Relay-State-String", true, kp.getPrivate());
+    String parameters = service.buildHTTPRedirectAuthnRequest("foobarbaz", "https://local.fusionauth.io", "Relay-State-String", true, kp.getPrivate());
     System.out.println(parameters);
 //    assertEquals(parameters, "SAMLRequest=eJx9kNtOwzAMhl8lMtdt0rQ7RU2niQlpEiDEBvdZ63WVsmQkKWVvTzZON8Cl7c%2BW%2F6%2Bcvx00eUXnO2skZCkDgqa2TWdaCU%2Bbm2QKxAdlGqWtQQnGwrwqjc%2BF6sPePOJLjz5sTkck8ZLxIo4k9M4Iq3wXS3VAL0It1ou7W8FTJo7OBltbDR8L%2F8PKe3Qh%2Fgbf57mEfQhHQekwDOmQp9a1lDPGKJvRCDW%2Ba69%2B8OIPPKOsOOMxbaRXSwmIBZ%2Fkiifb0bhOijzLk%2BlEYTKabTnjE9bsxuNIet%2FjypydBAlAnr%2FcxXehKi9jV4UoJSokGc9L%2Btm7WLuPEVfLB6u7%2BkQWWtvh2qEK0exOaY9Aq5L%2BZrd6BwQejFI%3D&RelayState=Relay-State-String&SigAlg=http%3A%2F%2Fwww.w3.org%2F2000%2F09%2Fxmldsig%23rsa-sha1&Signature=MCwCFCZDBcWxZD65RY0AR8K4WhNzs0tZAhRQFyc80lMy7yTl9a8UQMSST4wioA%3D%3D");
 
@@ -66,8 +75,7 @@ public class DefaultSAMLServiceTest {
     Unmarshaller unmarshaller = context.createUnmarshaller();
 
     JAXBElement<AuthnRequestType> fromEncoded = (JAXBElement<AuthnRequestType>) unmarshaller.unmarshal(new ByteArrayInputStream(inflatedBytes, 0, length));
-    assertTrue(fromEncoded.getValue().getID().startsWith("id"));
-    UUID.fromString(fromEncoded.getValue().getID().substring(2)); // This will ensure it is a UUID after the "id" prefix
+    assertEquals(fromEncoded.getValue().getID(), "foobarbaz");
     assertEquals(fromEncoded.getValue().getIssuer().getValue(), "https://local.fusionauth.io");
     assertEquals(fromEncoded.getValue().getVersion(), "2.0");
     assertFalse(fromEncoded.getValue().getNameIDPolicy().isAllowCreate());
@@ -83,5 +91,32 @@ public class DefaultSAMLServiceTest {
     end = parameters.indexOf("&", start);
     String sigAlg = URLDecoder.decode(parameters.substring(start + "SigAlg=".length(), end), "UTF-8");
     assertEquals(sigAlg, "http://www.w3.org/2000/09/xmldsig#dsa-sha1");
+  }
+
+  @Test
+  public void parseResponse() throws Exception {
+    CertificateFactory cf = CertificateFactory.getInstance("X.509");
+    PublicKey key;
+    try (InputStream is = Files.newInputStream(Paths.get("src/test/certificates/certificate.cer"))) {
+      Certificate cert = cf.generateCertificate(is);
+      key = cert.getPublicKey();
+    }
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLService service = new DefaultSAMLService();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, true, key);
+
+    assertEquals(response.destination, "https://local.fusionauth.io/saml2/reply");
+    assertTrue(response.notBefore.isBefore(ZonedDateTime.now()));
+    assertTrue(ZonedDateTime.now().isAfter(response.notOnOrAfter));
+    assertTrue(response.instant.isBefore(ZonedDateTime.now()));
+    assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
+    assertEquals(response.status, ResponseStatus.Success);
+    assertEquals(response.user.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
+    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
+    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
+    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
+    assertEquals(response.user.format, NameIDFormat.EmailAddress);
   }
 }

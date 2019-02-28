@@ -21,55 +21,39 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.crypto.MarshalException;
-import javax.xml.crypto.XMLStructure;
-import javax.xml.crypto.dsig.CanonicalizationMethod;
-import javax.xml.crypto.dsig.DigestMethod;
-import javax.xml.crypto.dsig.Reference;
-import javax.xml.crypto.dsig.SignatureMethod;
-import javax.xml.crypto.dsig.SignedInfo;
-import javax.xml.crypto.dsig.Transform;
 import javax.xml.crypto.dsig.XMLSignature;
 import javax.xml.crypto.dsig.XMLSignatureException;
 import javax.xml.crypto.dsig.XMLSignatureFactory;
-import javax.xml.crypto.dsig.dom.DOMSignContext;
 import javax.xml.crypto.dsig.dom.DOMValidateContext;
-import javax.xml.crypto.dsig.keyinfo.KeyInfo;
-import javax.xml.crypto.dsig.keyinfo.KeyInfoFactory;
-import javax.xml.crypto.dsig.keyinfo.KeyValue;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
-import javax.xml.transform.Transformer;
-import javax.xml.transform.TransformerException;
-import javax.xml.transform.TransformerFactory;
-import javax.xml.transform.dom.DOMSource;
-import javax.xml.transform.stream.StreamResult;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
-import java.security.KeyPair;
 import java.security.PrivateKey;
+import java.security.PublicKey;
 import java.security.Signature;
 import java.security.interfaces.DSAKey;
 import java.security.interfaces.RSAKey;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
-import java.util.Collections;
 import java.util.GregorianCalendar;
 import java.util.List;
-import java.util.UUID;
+import java.util.stream.Collectors;
 import java.util.zip.Deflater;
 
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
+import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.User;
 import io.fusionauth.samlv2.domain.UserConfirmation;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AssertionType;
@@ -90,6 +74,8 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.NameIDPolicyType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ObjectFactory;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ResponseType;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.w3c.dom.Attr;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -102,17 +88,18 @@ import org.xml.sax.SAXException;
  * @author Brian Pontarelli
  */
 public class DefaultSAMLService implements SAMLService {
-  @Override
-  public String buildHTTPRedirectAuthnRequest(String issuer, String relayState, boolean sign, PrivateKey key) {
-    UUID id = UUID.randomUUID();
+  private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLService.class);
 
+  @Override
+  public String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign,
+                                              PrivateKey key) throws SAMLException {
     // SAML Web SSO profile requirements (section 4.1.4.1)
     AuthnRequestType authnRequest = new AuthnRequestType();
     authnRequest.setIssuer(new NameIDType());
     authnRequest.getIssuer().setValue(issuer);
     authnRequest.setNameIDPolicy(new NameIDPolicyType());
     authnRequest.getNameIDPolicy().setAllowCreate(false);
-    authnRequest.setID("id" + id.toString()); // Required because Active Directory requires a non-number as the first character
+    authnRequest.setID(id);
 
     try {
       GregorianCalendar gregorianCalendar = GregorianCalendar.from(ZonedDateTime.now());
@@ -136,7 +123,7 @@ public class DefaultSAMLService implements SAMLService {
           parameters += "&SigAlg=" + URLEncoder.encode("http://www.w3.org/2000/09/xmldsig#dsa-sha1", "UTF-8");
           signature = Signature.getInstance("SHA1withDSA");
         } else {
-          throw new IllegalStateException("Invalid key object. Must be an RSA or DSA key. Instead it is of type [" + key.getClass() + "]");
+          throw new SAMLException("Invalid key object. Must be an RSA or DSA key. Instead it is of type [" + key.getClass() + "]");
         }
 
         signature.initSign(key);
@@ -149,14 +136,15 @@ public class DefaultSAMLService implements SAMLService {
       return parameters;
     } catch (Exception e) {
       // Not possible but freak out
-      throw new IllegalStateException(e);
+      throw new SAMLException(e);
     }
   }
 
-  //  @Override
-  @SuppressWarnings("unchecked")
-  public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, Key key) {
+  @Override
+  public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, PublicKey key)
+      throws SAMLException {
     byte[] decodedResponse = Base64.getDecoder().decode(encodedResponse);
+    System.out.println(new String(decodedResponse));
     Document document = parseFromBytes(decodedResponse);
     if (verifySignature) {
       verifySignature(document, key);
@@ -166,14 +154,15 @@ public class DefaultSAMLService implements SAMLService {
     ResponseType jaxbResponse = unmarshallFromDocument(document);
     response.status = ResponseStatus.fromSAMLFormat(jaxbResponse.getStatus().getStatusCode().getValue());
     response.id = jaxbResponse.getID();
-    response.issuer = parseIssuer(jaxbResponse.getIssuer());
+    response.issuer = jaxbResponse.getIssuer() != null ? jaxbResponse.getIssuer().getValue() : null;
     response.instant = toZonedDateTime(jaxbResponse.getIssueInstant());
     response.destination = jaxbResponse.getDestination();
 
     List<Object> assertions = jaxbResponse.getAssertionOrEncryptedAssertion();
     for (Object assertion : assertions) {
       if (assertion instanceof EncryptedElementType) {
-        throw new RuntimeException("This library currently doesn't handle encrypted assertions");
+        logger.warn("SAML response contained encrypted attribute. It was ignored.");
+        continue;
       }
 
       AssertionType assertionType = (AssertionType) assertion;
@@ -186,7 +175,8 @@ public class DefaultSAMLService implements SAMLService {
           Class<?> type = element.getDeclaredType();
           if (type == NameIDType.class) {
             if (response.user != null) {
-              throw new RuntimeException("This library currently does not handle multiple NameID elements in the Response assertions.");
+              logger.warn("SAML response contained multiple NameID elements. Only the first one was used.");
+              continue;
             }
 
             // Extract the name
@@ -195,13 +185,16 @@ public class DefaultSAMLService implements SAMLService {
             // Extract the confirmation
             response.confirmation = parseConfirmation((SubjectConfirmationType) element.getValue());
           } else if (type == EncryptedElementType.class) {
-            throw new RuntimeException("This library currently doesn't handle encrypted assertions");
+            throw new SAMLException("This library currently doesn't handle encrypted assertions");
           }
         }
       }
 
       // Handle conditions to pull out audience restriction
       ConditionsType conditionsType = assertionType.getConditions();
+      response.notBefore = convertToZonedDateTime(conditionsType.getNotBefore());
+      response.notOnOrAfter = convertToZonedDateTime(conditionsType.getNotOnOrAfter());
+
       List<ConditionAbstractType> conditionAbstractTypes = conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse();
       for (ConditionAbstractType conditionAbstractType : conditionAbstractTypes) {
         if (conditionAbstractType instanceof AudienceRestrictionType) {
@@ -212,8 +205,7 @@ public class DefaultSAMLService implements SAMLService {
         } else if (conditionAbstractType instanceof ProxyRestrictionType) {
           ProxyRestrictionType proxyRestrictionType = (ProxyRestrictionType) conditionAbstractType;
           response.proxyAudiences.addAll(proxyRestrictionType.getAudience());
-          response.proxyCount = proxyRestrictionType.getCount() == null ? null : proxyRestrictionType.getCount()
-                                                                                                     .intValue();
+          response.proxyCount = proxyRestrictionType.getCount() == null ? null : proxyRestrictionType.getCount().intValue();
         }
       }
 
@@ -228,29 +220,10 @@ public class DefaultSAMLService implements SAMLService {
               AttributeType attributeType = (AttributeType) attributeObject;
               String name = attributeType.getName();
               List<Object> attributeValues = attributeType.getAttributeValue();
-
-              // Single value attribute
-              if (attributeValues.size() == 1) {
-                Object value = attributeValues.get(0);
-                if (value instanceof Number) {
-                  response.user.numberAttributes.put(name, (Number) value);
-                } else if (value instanceof String) {
-                  response.user.stringAttributes.put(name, (String) value);
-                } else {
-                  throw new RuntimeException("This library currently doesn't handle attributes of type [" + value.getClass() + "]");
-                }
-              } else {
-                // Multi-value attribute
-                Object value = attributeValues.get(0);
-                if (value instanceof String) {
-                  response.user.stringListAttributes.put(name, (List<String>) ((List) attributeValues));
-                } else {
-                  throw new RuntimeException("This library currently doesn't handle multi-value attributes of type [" + value
-                      .getClass() + "]");
-                }
-              }
+              List<String> values = attributeValues.stream().map(this::attributeToString).collect(Collectors.toList());
+              response.user.attributes.computeIfAbsent(name, k -> new ArrayList<>()).addAll(values);
             } else {
-              throw new RuntimeException("This library currently doesn't support encrypted attributes");
+              throw new SAMLException("This library currently doesn't support encrypted attributes");
             }
           }
         }
@@ -258,6 +231,24 @@ public class DefaultSAMLService implements SAMLService {
     }
 
     return response;
+  }
+
+  private ZonedDateTime convertToZonedDateTime(XMLGregorianCalendar cal) {
+    return cal != null ? cal.toGregorianCalendar().toZonedDateTime() : null;
+  }
+
+  private String attributeToString(Object attribute) {
+    if (attribute instanceof Number) {
+      return attribute.toString();
+    } else if (attribute instanceof String) {
+      return (String) attribute;
+    } else if (attribute instanceof Element) {
+      return ((Element) attribute).getTextContent();
+    } else {
+      logger.warn("This library currently doesn't handle attributes of type [" + attribute.getClass() + "]");
+    }
+
+    return null;
   }
 
   private String deflateAndEncode(byte[] result) {
@@ -269,20 +260,6 @@ public class DefaultSAMLService implements SAMLService {
     deflater.end();
     byte[] src = Arrays.copyOf(deflatedResult, length);
     return Base64.getEncoder().encodeToString(src);
-  }
-
-  private byte[] documentToBytes(Document document) {
-    try {
-      TransformerFactory tf = TransformerFactory.newInstance();
-      Transformer t = tf.newTransformer();
-      DOMSource source = new DOMSource(document);
-      ByteArrayOutputStream baos = new ByteArrayOutputStream();
-      StreamResult result = new StreamResult(baos);
-      t.transform(source, result);
-      return baos.toByteArray();
-    } catch (TransformerException e) {
-      throw new RuntimeException("Unable to write DOM object to a byte[]", e);
-    }
   }
 
   private void fixIDs(Element element) {
@@ -303,7 +280,7 @@ public class DefaultSAMLService implements SAMLService {
     }
   }
 
-  private <T> byte[] marshall(T object) {
+  private <T> byte[] marshall(T object) throws SAMLException {
     try {
       JAXBContext context = JAXBContext.newInstance(AuthnRequestType.class);
       Marshaller marshaller = context.createMarshaller();
@@ -312,7 +289,7 @@ public class DefaultSAMLService implements SAMLService {
       return baos.toByteArray();
     } catch (JAXBException e) {
       // Rethrow as runtime
-      throw new RuntimeException("Unable to marshall JAXB SAML object to DOM for signing.", e);
+      throw new SAMLException("Unable to marshall JAXB SAML object to DOM for signing.", e);
     }
   }
 
@@ -332,23 +309,15 @@ public class DefaultSAMLService implements SAMLService {
     return userConfirmation;
   }
 
-  private Document parseFromBytes(byte[] bytes) {
+  private Document parseFromBytes(byte[] bytes) throws SAMLException {
     DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
     documentBuilderFactory.setNamespaceAware(true);
     try {
       DocumentBuilder builder = documentBuilderFactory.newDocumentBuilder();
       return builder.parse(new ByteArrayInputStream(bytes));
     } catch (ParserConfigurationException | SAXException | IOException e) {
-      throw new RuntimeException("Unable to parse SAML v2.0 authentication response", e);
+      throw new SAMLException("Unable to parse SAML v2.0 authentication response", e);
     }
-  }
-
-  private String parseIssuer(NameIDType issuer) {
-    if (issuer == null) {
-      return null;
-    }
-
-    return issuer.getValue();
   }
 
   private User parseUser(NameIDType nameID) {
@@ -360,34 +329,6 @@ public class DefaultSAMLService implements SAMLService {
     return new User(format, id, qualifier, spProviderID, spQualifier);
   }
 
-  private void sign(Node node, KeyPair keyPair) {
-    try {
-      XMLSignatureFactory fac = XMLSignatureFactory.getInstance("DOM");
-
-      Reference ref = fac.newReference("",
-          fac.newDigestMethod(DigestMethod.SHA1, null),
-          Collections.singletonList(fac.newTransform(Transform.ENVELOPED, (XMLStructure) null)),
-          null, null);
-
-      SignedInfo si = fac.newSignedInfo(
-          fac.newCanonicalizationMethod(CanonicalizationMethod.INCLUSIVE_WITH_COMMENTS, (XMLStructure) null),
-          fac.newSignatureMethod(SignatureMethod.DSA_SHA1, null),
-          Collections.singletonList(ref));
-
-      KeyInfoFactory kif = fac.getKeyInfoFactory();
-      KeyValue kv = kif.newKeyValue(keyPair.getPublic());
-
-      KeyInfo ki = kif.newKeyInfo(Collections.singletonList(kv));
-
-      DOMSignContext dsc = new DOMSignContext(keyPair.getPrivate(), node);
-
-      XMLSignature signature = fac.newXMLSignature(si, ki);
-      signature.sign(dsc);
-    } catch (Exception e) {
-      throw new RuntimeException("Unable to sign XML document.", e);
-    }
-  }
-
   private ZonedDateTime toZonedDateTime(XMLGregorianCalendar instant) {
     if (instant == null) {
       return null;
@@ -397,18 +338,18 @@ public class DefaultSAMLService implements SAMLService {
   }
 
   @SuppressWarnings("unchecked")
-  private <T> T unmarshallFromDocument(Document document) {
+  private <T> T unmarshallFromDocument(Document document) throws SAMLException {
     try {
       JAXBContext context = JAXBContext.newInstance(ResponseType.class);
       Unmarshaller unmarshaller = context.createUnmarshaller();
       JAXBElement element = (JAXBElement) unmarshaller.unmarshal(document);
       return (T) element.getValue();
     } catch (JAXBException e) {
-      throw new RuntimeException("Unable to unmarshall SAML response", e);
+      throw new SAMLException("Unable to unmarshall SAML response", e);
     }
   }
 
-  private void verifySignature(Document document, Key key) {
+  private void verifySignature(Document document, PublicKey key) throws SAMLException {
     // Fix the IDs in the entire document per the suggestions at http://stackoverflow.com/questions/17331187/xml-dig-sig-error-after-upgrade-to-java7u25
     fixIDs(document.getDocumentElement());
 
@@ -417,18 +358,20 @@ public class DefaultSAMLService implements SAMLService {
       return;
     }
 
-    DOMValidateContext validateContext = new DOMValidateContext(key, nl.item(0));
-    XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
-    try {
-      XMLSignature signature = factory.unmarshalXMLSignature(validateContext);
-      boolean valid = signature.validate(validateContext);
-      if (!valid) {
-        throw new RuntimeException("Invalid SAML v2.0 authentication response. The signature is invalid.");
+    for (int i = 0; i < nl.getLength(); i++) {
+      DOMValidateContext validateContext = new DOMValidateContext(key, nl.item(i));
+      XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
+      try {
+        XMLSignature signature = factory.unmarshalXMLSignature(validateContext);
+        boolean valid = signature.validate(validateContext);
+        if (!valid) {
+          throw new SAMLException("Invalid SAML v2.0 authentication response. The signature is invalid.");
+        }
+      } catch (MarshalException e) {
+        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 authentication response because we couldn't unmarshall the XML Signature element", e);
+      } catch (XMLSignatureException e) {
+        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 authentication response. The signature was unmarshalled we couldn't validate it for an unknown reason", e);
       }
-    } catch (MarshalException e) {
-      throw new RuntimeException("Unable to verify XML signature in the SAML v2.0 authentication response because we couldn't unmarshall the XML Signature element", e);
-    } catch (XMLSignatureException e) {
-      throw new RuntimeException("Unable to verify XML signature in the SAML v2.0 authentication response. The signature was unmarshalled we couldn't validate it for an unknown reason", e);
     }
   }
 }

@@ -25,6 +25,9 @@ project(group: "io.fusionauth", name: "samlv2", version: "0.1", licenses: ["Apac
   }
 
   dependencies {
+    group(name: "compile", export: false) {
+      dependency(id: "org.slf4j:slf4j-api:1.7.21")
+    }
     group(name: "test-compile", export: false) {
       dependency(id: "org.testng:testng:6.8.7")
     }

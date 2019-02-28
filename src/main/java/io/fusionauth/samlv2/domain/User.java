@@ -25,21 +25,17 @@ import java.util.Map;
  * @author Brian Pontarelli
  */
 public class User {
+  public Map<String, List<String>> attributes = new HashMap<>();
+
   public NameIDFormat format;
 
   public String id;
-
-  public Map<String, Number> numberAttributes = new HashMap<String, Number>();
 
   public String qualifier;
 
   public String spProviderID;
 
   public String spQualifier;
-
-  public Map<String, String> stringAttributes = new HashMap<String, String>();
-
-  public Map<String, List<String>> stringListAttributes = new HashMap<String, List<String>>();
 
   public User(NameIDFormat format, String id, String qualifier, String spProviderID, String spQualifier) {
     this.format = format;

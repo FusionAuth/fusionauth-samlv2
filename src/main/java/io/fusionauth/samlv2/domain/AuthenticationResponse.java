@@ -37,6 +37,10 @@ public class AuthenticationResponse {
 
   public String issuer;
 
+  public ZonedDateTime notBefore;
+
+  public ZonedDateTime notOnOrAfter;
+
   public boolean oneTimeUse;
 
   public List<String> proxyAudiences = new ArrayList<String>();
