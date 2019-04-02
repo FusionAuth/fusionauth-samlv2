@@ -32,6 +32,7 @@ import java.time.ZonedDateTime;
 import java.util.Base64;
 import java.util.zip.Inflater;
 
+import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
@@ -56,7 +57,7 @@ public class DefaultSAMLServiceTest {
     KeyPair kp = kpg.generateKeyPair();
 
     DefaultSAMLService service = new DefaultSAMLService();
-    String parameters = service.buildHTTPRedirectAuthnRequest("foobarbaz", "https://local.fusionauth.io", "Relay-State-String", true, kp.getPrivate());
+    String parameters = service.buildHTTPRedirectAuthnRequest("foobarbaz", "https://local.fusionauth.io", "Relay-State-String", true, kp.getPrivate(), Algorithm.DS1);
     System.out.println(parameters);
 //    assertEquals(parameters, "SAMLRequest=eJx9kNtOwzAMhl8lMtdt0rQ7RU2niQlpEiDEBvdZ63WVsmQkKWVvTzZON8Cl7c%2BW%2F6%2Bcvx00eUXnO2skZCkDgqa2TWdaCU%2Bbm2QKxAdlGqWtQQnGwrwqjc%2BF6sPePOJLjz5sTkck8ZLxIo4k9M4Iq3wXS3VAL0It1ou7W8FTJo7OBltbDR8L%2F8PKe3Qh%2Fgbf57mEfQhHQekwDOmQp9a1lDPGKJvRCDW%2Ba69%2B8OIPPKOsOOMxbaRXSwmIBZ%2Fkiifb0bhOijzLk%2BlEYTKabTnjE9bsxuNIet%2FjypydBAlAnr%2FcxXehKi9jV4UoJSokGc9L%2Btm7WLuPEVfLB6u7%2BkQWWtvh2qEK0exOaY9Aq5L%2BZrd6BwQejFI%3D&RelayState=Relay-State-String&SigAlg=http%3A%2F%2Fwww.w3.org%2F2000%2F09%2Fxmldsig%23rsa-sha1&Signature=MCwCFCZDBcWxZD65RY0AR8K4WhNzs0tZAhRQFyc80lMy7yTl9a8UQMSST4wioA%3D%3D");
 
@@ -107,7 +108,7 @@ public class DefaultSAMLServiceTest {
     DefaultSAMLService service = new DefaultSAMLService();
     AuthenticationResponse response = service.parseResponse(encodedResponse, true, key);
 
-    assertEquals(response.destination, "https://local.fusionauth.io/saml2/reply");
+    assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
     assertTrue(response.notBefore.isBefore(ZonedDateTime.now()));
     assertTrue(ZonedDateTime.now().isAfter(response.notOnOrAfter));
     assertTrue(response.instant.isBefore(ZonedDateTime.now()));

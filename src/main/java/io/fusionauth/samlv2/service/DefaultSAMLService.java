@@ -35,11 +35,10 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
-import java.security.interfaces.DSAKey;
-import java.security.interfaces.RSAKey;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,6 +48,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 import java.util.zip.Deflater;
 
+import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
 import io.fusionauth.samlv2.domain.NameIDFormat;
@@ -91,8 +91,9 @@ public class DefaultSAMLService implements SAMLService {
   private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLService.class);
 
   @Override
-  public String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign,
-                                              PrivateKey key) throws SAMLException {
+  public String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign, PrivateKey key,
+                                              Algorithm algorithm)
+      throws SAMLException {
     // SAML Web SSO profile requirements (section 4.1.4.1)
     AuthnRequestType authnRequest = new AuthnRequestType();
     authnRequest.setIssuer(new NameIDType());
@@ -114,18 +115,10 @@ public class DefaultSAMLService implements SAMLService {
         parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
       }
 
-      if (sign && key != null) {
+      if (sign && key != null && algorithm != null) {
         Signature signature;
-        if (key instanceof RSAKey) {
-          parameters += "&SigAlg=" + URLEncoder.encode("http://www.w3.org/2000/09/xmldsig#rsa-sha1", "UTF-8");
-          signature = Signature.getInstance("SHA1withRSA");
-        } else if (key instanceof DSAKey) {
-          parameters += "&SigAlg=" + URLEncoder.encode("http://www.w3.org/2000/09/xmldsig#dsa-sha1", "UTF-8");
-          signature = Signature.getInstance("SHA1withDSA");
-        } else {
-          throw new SAMLException("Invalid key object. Must be an RSA or DSA key. Instead it is of type [" + key.getClass() + "]");
-        }
-
+        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.url, "UTF-8");
+        signature = Signature.getInstance(algorithm.name);
         signature.initSign(key);
         signature.update(parameters.getBytes(StandardCharsets.UTF_8));
 
@@ -144,7 +137,6 @@ public class DefaultSAMLService implements SAMLService {
   public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, PublicKey key)
       throws SAMLException {
     byte[] decodedResponse = Base64.getDecoder().decode(encodedResponse);
-    System.out.println(new String(decodedResponse));
     Document document = parseFromBytes(decodedResponse);
     if (verifySignature) {
       verifySignature(document, key);
@@ -233,10 +225,6 @@ public class DefaultSAMLService implements SAMLService {
     return response;
   }
 
-  private ZonedDateTime convertToZonedDateTime(XMLGregorianCalendar cal) {
-    return cal != null ? cal.toGregorianCalendar().toZonedDateTime() : null;
-  }
-
   private String attributeToString(Object attribute) {
     if (attribute instanceof Number) {
       return attribute.toString();
@@ -249,6 +237,10 @@ public class DefaultSAMLService implements SAMLService {
     }
 
     return null;
+  }
+
+  private ZonedDateTime convertToZonedDateTime(XMLGregorianCalendar cal) {
+    return cal != null ? cal.toGregorianCalendar().toZonedDateTime() : null;
   }
 
   private String deflateAndEncode(byte[] result) {
@@ -349,7 +341,7 @@ public class DefaultSAMLService implements SAMLService {
     }
   }
 
-  private void verifySignature(Document document, PublicKey key) throws SAMLException {
+  private void verifySignature(Document document, Key key) throws SAMLException {
     // Fix the IDs in the entire document per the suggestions at http://stackoverflow.com/questions/17331187/xml-dig-sig-error-after-upgrade-to-java7u25
     fixIDs(document.getDocumentElement());
 

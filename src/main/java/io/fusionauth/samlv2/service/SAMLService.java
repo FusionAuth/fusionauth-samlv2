@@ -18,6 +18,7 @@ package io.fusionauth.samlv2.service;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
+import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.SAMLException;
 
@@ -34,11 +35,13 @@ public interface SAMLService {
    * @param issuer     The issuer that is put into the SAML request.
    * @param relayState The relay state parameter (required if signing).
    * @param sign       Determines if the request should be signed or not.
-   * @param key        The private key that is used to sign the request.
+   * @param key        The key that is used to sign the request (private key, shared, secret, etc).
+   * @param algorithm  The signing algorithm to use (if any).
    * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign, PrivateKey key)
+  String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign, PrivateKey key,
+                                       Algorithm algorithm)
       throws SAMLException;
 
   /**
@@ -46,7 +49,7 @@ public interface SAMLService {
    *
    * @param response        The response in base 64 deflated format.
    * @param verifySignature Determines if the responses signature should be verified or not.
-   * @param key             The public key (signing certificate) used to verify the signature in the response.
+   * @param key             The key (signing certificate) used to verify the signature in the response.
    * @return The response.
    * @throws SAMLException If any unrecoverable errors occur.
    */
