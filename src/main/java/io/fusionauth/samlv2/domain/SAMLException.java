@@ -16,7 +16,7 @@
 package io.fusionauth.samlv2.domain;
 
 /**
- * Thrown from the SAMLService when an unrecoverable error occurs.
+ * Thrown from the SAMLv2Service when an unrecoverable error occurs.
  *
  * @author Brian Pontarelli
  */

@@ -27,7 +27,7 @@ import io.fusionauth.samlv2.domain.SAMLException;
  *
  * @author Brian Pontarelli
  */
-public interface SAMLService {
+public interface SAMLv2Service {
   /**
    * Builds a HTTP-Redirect binding to a AuthnRequest protocol.
    *

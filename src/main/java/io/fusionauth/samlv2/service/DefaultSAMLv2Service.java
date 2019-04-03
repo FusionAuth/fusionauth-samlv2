@@ -87,8 +87,8 @@ import org.xml.sax.SAXException;
 /**
  * @author Brian Pontarelli
  */
-public class DefaultSAMLService implements SAMLService {
-  private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLService.class);
+public class DefaultSAMLv2Service implements SAMLv2Service {
+  private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLv2Service.class);
 
   @Override
   public String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign, PrivateKey key,

@@ -23,16 +23,6 @@ package io.fusionauth.samlv2.domain;
  */
 public enum Algorithm {
   /**
-   * DSA with SHA-1.
-   */
-  DS1("SHA1withDSA", "http://www.w3.org/2000/09/xmldsig#dsa-sha1"),
-
-  /**
-   * DSA with SHA-256.
-   */
-  DS256("SHA256withDSA", "http://www.w3.org/2009/xmldsig11#dsa-sha256"),
-
-  /**
    * ECDSA using P-256 and SHA-256
    * <p>
    * OID: 1.2.840.10045.3.1.7
