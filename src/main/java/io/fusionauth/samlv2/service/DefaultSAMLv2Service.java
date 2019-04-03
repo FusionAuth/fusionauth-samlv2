@@ -15,6 +15,8 @@
  */
 package io.fusionauth.samlv2.service;
 
+import javax.security.cert.CertificateException;
+import javax.security.cert.X509Certificate;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
@@ -45,12 +47,15 @@ import java.util.Arrays;
 import java.util.Base64;
 import java.util.GregorianCalendar;
 import java.util.List;
+import java.util.Objects;
+import java.util.Optional;
 import java.util.stream.Collectors;
 import java.util.zip.Deflater;
 
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
+import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
@@ -70,10 +75,16 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.StatementAbstractType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationDataType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.EntityDescriptorType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.IDPSSODescriptorType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.KeyDescriptorType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.KeyTypes;
+import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.RoleDescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.NameIDPolicyType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ObjectFactory;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ResponseType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.X509DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Attr;
@@ -134,6 +145,42 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
+  public MetaData parseMetaData(String metaDataXML) throws SAMLException {
+    Document document = parseFromBytes(metaDataXML.getBytes(StandardCharsets.UTF_8));
+    EntityDescriptorType root = unmarshallFromDocument(document, EntityDescriptorType.class);
+    MetaData metaData = new MetaData();
+
+    List<RoleDescriptorType> roles = root.getRoleDescriptorOrIDPSSODescriptorOrSPSSODescriptor();
+    Optional<RoleDescriptorType> optional = roles.stream()
+                                                 .filter(r -> r instanceof IDPSSODescriptorType)
+                                                 .findFirst();
+    if (!optional.isPresent()) {
+      return metaData;
+    }
+
+    IDPSSODescriptorType idp = (IDPSSODescriptorType) optional.get();
+
+    // Extract the URLs
+    metaData.signInEndpoint = idp.getSingleSignOnService().size() > 0 ? idp.getSingleSignOnService().get(0).getLocation() : null;
+    metaData.logoutEndpoint = idp.getSingleLogoutService().size() > 0 ? idp.getSingleLogoutService().get(0).getLocation() : null;
+
+    // Extract the signing keys
+    try {
+      metaData.keys = idp.getKeyDescriptor()
+                         .stream()
+                         .filter(kd -> kd.getUse() == KeyTypes.SIGNING)
+                         .map(this::toPublicKey)
+                         .filter(Objects::nonNull)
+                         .collect(Collectors.toList());
+    } catch (IllegalArgumentException e) {
+      // toPublicKey might throw this and we want to translate it back to a known exception
+      throw new SAMLException(e.getCause());
+    }
+
+    return metaData;
+  }
+
+  @Override
   public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, PublicKey key)
       throws SAMLException {
     byte[] decodedResponse = Base64.getDecoder().decode(encodedResponse);
@@ -143,7 +190,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     AuthenticationResponse response = new AuthenticationResponse();
-    ResponseType jaxbResponse = unmarshallFromDocument(document);
+    ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
     response.status = ResponseStatus.fromSAMLFormat(jaxbResponse.getStatus().getStatusCode().getValue());
     response.id = jaxbResponse.getID();
     response.issuer = jaxbResponse.getIssuer() != null ? jaxbResponse.getIssuer().getValue() : null;
@@ -321,6 +368,33 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return new User(format, id, qualifier, spProviderID, spQualifier);
   }
 
+  private PublicKey toPublicKey(KeyDescriptorType keyDescriptorType) {
+    try {
+      List<Object> keyData = keyDescriptorType.getKeyInfo().getContent();
+      for (Object keyDatum : keyData) {
+        if (keyDatum instanceof JAXBElement<?>) {
+          JAXBElement<?> element = (JAXBElement<?>) keyDatum;
+          if (element.getDeclaredType() == X509DataType.class) {
+            X509DataType cert = (X509DataType) element.getValue();
+            List<Object> certData = cert.getX509IssuerSerialOrX509SKIOrX509SubjectName();
+            for (Object certDatum : certData) {
+              element = (JAXBElement<?>) certDatum;
+              if (element.getName().getLocalPart().equals("X509Certificate")) {
+                byte[] certBytes = (byte[]) element.getValue();
+                X509Certificate x509Certificate = X509Certificate.getInstance(certBytes);
+                return x509Certificate.getPublicKey();
+              }
+            }
+          }
+        }
+      }
+
+      return null;
+    } catch (CertificateException e) {
+      throw new IllegalArgumentException(e);
+    }
+  }
+
   private ZonedDateTime toZonedDateTime(XMLGregorianCalendar instant) {
     if (instant == null) {
       return null;
@@ -329,13 +403,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return instant.toGregorianCalendar().toZonedDateTime();
   }
 
-  @SuppressWarnings("unchecked")
-  private <T> T unmarshallFromDocument(Document document) throws SAMLException {
+  private <T> T unmarshallFromDocument(Document document, Class<T> type) throws SAMLException {
     try {
-      JAXBContext context = JAXBContext.newInstance(ResponseType.class);
+      JAXBContext context = JAXBContext.newInstance(type);
       Unmarshaller unmarshaller = context.createUnmarshaller();
-      JAXBElement element = (JAXBElement) unmarshaller.unmarshal(document);
-      return (T) element.getValue();
+      JAXBElement<T> element = unmarshaller.unmarshal(document, type);
+      return element.getValue();
     } catch (JAXBException e) {
       throw new SAMLException("Unable to unmarshall SAML response", e);
     }

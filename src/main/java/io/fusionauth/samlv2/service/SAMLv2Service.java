@@ -20,6 +20,7 @@ import java.security.PublicKey;
 
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
+import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.SAMLException;
 
 /**
@@ -43,6 +44,15 @@ public interface SAMLv2Service {
   String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign, PrivateKey key,
                                        Algorithm algorithm)
       throws SAMLException;
+
+  /**
+   * Parses a SAML 2.0 MetaData response and converts it to a simple to use object.
+   *
+   * @param metaDataXML The MetaData XML.
+   * @return The MetaData object.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  MetaData parseMetaData(String metaDataXML) throws SAMLException;
 
   /**
    * Parses the authentication response from the given String and verifies that it is valid.

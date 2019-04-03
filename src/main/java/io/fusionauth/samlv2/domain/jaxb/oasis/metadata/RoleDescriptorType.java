@@ -72,7 +72,7 @@ import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.SignatureType;
     PDPDescriptorType.class,
     SSODescriptorType.class
 })
-public abstract class RoleDescriptorType {
+public class RoleDescriptorType {
 
     @XmlElement(name = "Signature", namespace = "http://www.w3.org/2000/09/xmldsig#")
     protected SignatureType signature;

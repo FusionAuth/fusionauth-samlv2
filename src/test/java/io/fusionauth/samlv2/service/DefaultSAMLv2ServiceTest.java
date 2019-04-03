@@ -21,6 +21,7 @@ import javax.xml.bind.Unmarshaller;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.security.KeyPair;
@@ -34,6 +35,7 @@ import java.util.zip.Inflater;
 
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
+import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
@@ -92,6 +94,18 @@ public class DefaultSAMLv2ServiceTest {
     end = parameters.indexOf("&", start);
     String sigAlg = URLDecoder.decode(parameters.substring(start + "SigAlg=".length(), end), "UTF-8");
     assertEquals(sigAlg, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256");
+  }
+
+  @Test
+  public void metaData() throws Exception {
+    byte[] buf = Files.readAllBytes(Paths.get("src/test/xml/metadata.xml"));
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    MetaData metaData = service.parseMetaData(new String(buf, StandardCharsets.UTF_8));
+    assertEquals(metaData.keys.size(), 3);
+
+    buf = Files.readAllBytes(Paths.get("src/test/xml/metadata-2.xml"));
+    metaData = service.parseMetaData(new String(buf, StandardCharsets.UTF_8));
+    assertEquals(metaData.keys.size(), 1);
   }
 
   @Test
