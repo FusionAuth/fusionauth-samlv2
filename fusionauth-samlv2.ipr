@@ -68,6 +68,7 @@
     <option name="LOCALE" />
     <option name="OPEN_IN_BROWSER" value="true" />
   </component>
+  <component name="MarkdownNavigator.ProfileManager" default="" pdf-export="" plain-text-search-scope="Project Files" />
   <component name="Palette2">
     <group name="Swing">
       <item class="com.intellij.uiDesigner.HSpacer" tooltip-text="Horizontal Spacer" icon="/com/intellij/uiDesigner/icons/hspacer.png" removable="false" auto-create-binding="false" can-attach-label="false">
@@ -233,6 +234,9 @@
           </value>
         </option>
       </JavaCodeStyleSettings>
+      <MarkdownNavigatorCodeStyleSettings>
+        <option name="RIGHT_MARGIN" value="72" />
+      </MarkdownNavigatorCodeStyleSettings>
       <SqlCodeStyleSettings version="0">
         <option name="myVersion" value="0" />
         <option name="ALIAS_CASE" value="4" />

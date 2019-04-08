@@ -34,6 +34,7 @@ import java.util.Base64;
 import java.util.zip.Inflater;
 
 import io.fusionauth.samlv2.domain.Algorithm;
+import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
@@ -133,5 +134,44 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
     assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
     assertEquals(response.user.format, NameIDFormat.EmailAddress);
+  }
+
+  @Test
+  public void roundTrip() throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String parameters = service.buildHTTPRedirectAuthnRequest("foobarbaz", "https://local.fusionauth.io", "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+    System.out.println(parameters);
+
+    // Unwind the request
+    int start = parameters.indexOf("=");
+    int end = parameters.indexOf("&");
+    String encodedRequest = URLDecoder.decode(parameters.substring(start + 1, end), "UTF-8");
+
+    // Unwind the RelayState
+    start = parameters.indexOf("RelayState=");
+    end = parameters.indexOf("&", start);
+    String relayState = parameters.substring(start + "RelayState=".length(), end);
+    assertEquals(relayState, "Relay-State-String");
+
+    // Unwind the SigAlg
+    start = parameters.indexOf("SigAlg=");
+    end = parameters.indexOf("&", start);
+    String sigAlg = URLDecoder.decode(parameters.substring(start + "SigAlg=".length(), end), "UTF-8");
+
+    // Unwind the Signature
+    start = parameters.indexOf("Signature=");
+    end = parameters.length();
+    String signature = URLDecoder.decode(parameters.substring(start + "Signature=".length(), end), "UTF-8");
+
+    // Parse the request
+    AuthenticationRequest request = service.parseRequest(encodedRequest, relayState, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
+    assertEquals(request.id, "foobarbaz");
+    assertEquals(request.issuer, "https://local.fusionauth.io");
+    assertEquals(request.nameIdFormat, "urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress");
+    assertEquals(request.version, "2.0");
   }
 }

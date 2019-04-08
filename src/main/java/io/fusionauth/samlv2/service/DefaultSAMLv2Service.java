@@ -50,9 +50,12 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
+import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
+import java.util.zip.Inflater;
 
 import io.fusionauth.samlv2.domain.Algorithm;
+import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
 import io.fusionauth.samlv2.domain.MetaData;
@@ -110,14 +113,15 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     authnRequest.setIssuer(new NameIDType());
     authnRequest.getIssuer().setValue(issuer);
     authnRequest.setNameIDPolicy(new NameIDPolicyType());
+    authnRequest.getNameIDPolicy().setFormat("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress");
     authnRequest.getNameIDPolicy().setAllowCreate(false);
     authnRequest.setID(id);
+    authnRequest.setVersion("2.0");
 
     try {
       GregorianCalendar gregorianCalendar = GregorianCalendar.from(ZonedDateTime.now());
       XMLGregorianCalendar now = DatatypeFactory.newInstance().newXMLGregorianCalendar(gregorianCalendar);
       authnRequest.setIssueInstant(now);
-      authnRequest.setVersion("2.0");
 
       byte[] rawResult = marshall(new ObjectFactory().createAuthnRequest(authnRequest));
       String encodedResult = deflateAndEncode(rawResult);
@@ -128,7 +132,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
       if (sign && key != null && algorithm != null) {
         Signature signature;
-        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.url, "UTF-8");
+        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, "UTF-8");
         signature = Signature.getInstance(algorithm.name);
         signature.initSign(key);
         signature.update(parameters.getBytes(StandardCharsets.UTF_8));
@@ -178,6 +182,41 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     return metaData;
+  }
+
+  @Override
+  public AuthenticationRequest parseRequest(String encodedRequest, String relayState, String signature, PublicKey key,
+                                            Algorithm algorithm) throws SAMLException {
+    byte[] requestBytes = decodeAndInflate(encodedRequest);
+    Document document = parseFromBytes(requestBytes);
+    AuthnRequestType authnRequest = unmarshallFromDocument(document, AuthnRequestType.class);
+    AuthenticationRequest result = new AuthenticationRequest();
+    result.id = authnRequest.getID();
+    result.issuer = authnRequest.getIssuer().getValue();
+    result.issueInstant = authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
+    result.nameIdFormat = authnRequest.getNameIDPolicy().getFormat();
+    result.version = authnRequest.getVersion();
+
+    if (signature != null && key != null && algorithm != null) {
+      try {
+        String parameters = "SAMLRequest=" + URLEncoder.encode(encodedRequest, "UTF-8");
+        if (relayState != null) {
+          parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
+        }
+        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, "UTF-8");
+
+        Signature sig = Signature.getInstance(algorithm.name);
+        sig.initVerify(key);
+        sig.update(parameters.getBytes(StandardCharsets.UTF_8));
+        if (!sig.verify(Base64.getDecoder().decode(signature))) {
+          throw new SAMLException("Invalid signature");
+        }
+      } catch (Exception e) {
+        throw new SAMLException("Unable to verify signature", e);
+      }
+    }
+
+    return result;
   }
 
   @Override
@@ -288,6 +327,28 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
   private ZonedDateTime convertToZonedDateTime(XMLGregorianCalendar cal) {
     return cal != null ? cal.toGregorianCalendar().toZonedDateTime() : null;
+  }
+
+  private byte[] decodeAndInflate(String encodedRequest) throws SAMLException {
+    byte[] bytes = Base64.getDecoder().decode(encodedRequest);
+    Inflater inflater = new Inflater(true);
+    inflater.setInput(bytes);
+    inflater.finished();
+
+    try {
+      ByteArrayOutputStream baos = new ByteArrayOutputStream();
+      byte[] result = new byte[bytes.length];
+      while (!inflater.finished()) {
+        int length = inflater.inflate(result);
+        if (length > 0) {
+          baos.write(result, 0, length);
+        }
+      }
+
+      return baos.toByteArray();
+    } catch (DataFormatException e) {
+      throw new SAMLException("Invalid AuthnRequest. Inflating the bytes failed.", e);
+    }
   }
 
   private String deflateAndEncode(byte[] result) {

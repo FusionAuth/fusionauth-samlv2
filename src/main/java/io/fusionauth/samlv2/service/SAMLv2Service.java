@@ -19,6 +19,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 
 import io.fusionauth.samlv2.domain.Algorithm;
+import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.SAMLException;
@@ -53,6 +54,20 @@ public interface SAMLv2Service {
    * @throws SAMLException If any unrecoverable errors occur.
    */
   MetaData parseMetaData(String metaDataXML) throws SAMLException;
+
+  /**
+   * Parses the authentication request from the given String and verifies that it is valid.
+   *
+   * @param encodedRequest The encoded (and deflated) request from the URL parameter.
+   * @param relayState     The RelayState URL parameter (only needed if verifying signatures).
+   * @param signature      (Optional) The signature to validate. If this is null, no validation is performed.
+   * @param key            (Optional) The key (signing certificate) used to verify the signature.
+   * @param algorithm      (Optional) The key algorithm used to verify the signature.
+   * @return The request.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  AuthenticationRequest parseRequest(String encodedRequest, String relayState, String signature, PublicKey key,
+                                     Algorithm algorithm) throws SAMLException;
 
   /**
    * Parses the authentication response from the given String and verifies that it is valid.
