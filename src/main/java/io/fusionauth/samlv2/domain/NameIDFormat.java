@@ -125,6 +125,7 @@ public enum NameIDFormat {
    * specifies encoding rules for X.509 subject names that differ from the rules given in IETF RFC 2253 [RFC 2253].
    */
   X509("urn:oasis:names:tc:SAML:1.1:nameid-format:X509SubjectName");
+
   /**
    * The SAML String.
    */

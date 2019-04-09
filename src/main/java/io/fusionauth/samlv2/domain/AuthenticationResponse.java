@@ -33,6 +33,8 @@ public class AuthenticationResponse {
 
   public String id;
 
+  public String inResponseTo;
+
   public ZonedDateTime instant;
 
   public String issuer;
@@ -47,7 +49,7 @@ public class AuthenticationResponse {
 
   public Integer proxyCount;
 
-  public ResponseStatus status;
+  public Status status = new Status();
 
   public User user;
 }

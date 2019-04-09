@@ -31,6 +31,20 @@ import io.fusionauth.samlv2.domain.SAMLException;
  */
 public interface SAMLv2Service {
   /**
+   * Builds a SAML AuthnResponse that can be sent back to the service provider.
+   *
+   * @param response   The authentication response that is converted to a AuthnResponse.
+   * @param sign       Determines if the XML should be signed or not.
+   * @param publicKey  The public key to include in the XML signature.
+   * @param privateKey The key that is used to sign the request (private key, shared, secret, etc).
+   * @param algorithm  The signing algorithm to use (if any).
+   * @return The response base-64 encoded.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  String buildAuthnResponse(AuthenticationResponse response, boolean sign, PublicKey publicKey, PrivateKey privateKey,
+                            Algorithm algorithm) throws SAMLException;
+
+  /**
    * Builds a HTTP-Redirect binding to a AuthnRequest protocol.
    *
    * @param id         The request id that is echoed in the response.
@@ -43,8 +57,7 @@ public interface SAMLv2Service {
    * @throws SAMLException If any unrecoverable errors occur.
    */
   String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign, PrivateKey key,
-                                       Algorithm algorithm)
-      throws SAMLException;
+                                       Algorithm algorithm) throws SAMLException;
 
   /**
    * Parses a SAML 2.0 MetaData response and converts it to a simple to use object.
@@ -58,16 +71,17 @@ public interface SAMLv2Service {
   /**
    * Parses the authentication request from the given String and verifies that it is valid.
    *
-   * @param encodedRequest The encoded (and deflated) request from the URL parameter.
-   * @param relayState     The RelayState URL parameter (only needed if verifying signatures).
-   * @param signature      (Optional) The signature to validate. If this is null, no validation is performed.
-   * @param key            (Optional) The key (signing certificate) used to verify the signature.
-   * @param algorithm      (Optional) The key algorithm used to verify the signature.
+   * @param encodedRequest  The encoded (and deflated) request from the URL parameter.
+   * @param relayState      The RelayState URL parameter (only needed if verifying signatures).
+   * @param signature       (Optional) The signature to validate.
+   * @param verifySignature True if the signature should be verified.
+   * @param key             (Optional) The key (signing certificate) used to verify the signature.
+   * @param algorithm       (Optional) The key algorithm used to verify the signature.
    * @return The request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationRequest parseRequest(String encodedRequest, String relayState, String signature, PublicKey key,
-                                     Algorithm algorithm) throws SAMLException;
+  AuthenticationRequest parseRequest(String encodedRequest, String relayState, String signature,
+                                     boolean verifySignature, PublicKey key, Algorithm algorithm) throws SAMLException;
 
   /**
    * Parses the authentication response from the given String and verifies that it is valid.

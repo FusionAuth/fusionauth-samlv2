@@ -15,21 +15,13 @@
  */
 package io.fusionauth.samlv2.domain;
 
-import java.time.ZonedDateTime;
-
 /**
- * The SAML v2.0 authentication response object that is sent back from the IDP.
+ * Status object.
  *
  * @author Brian Pontarelli
  */
-public class AuthenticationRequest {
-  public String id;
+public class Status {
+  public ResponseStatus code;
 
-  public ZonedDateTime issueInstant;
-
-  public String issuer;
-
-  public NameIDFormat nameIdFormat;
-
-  public String version;
+  public String message;
 }
