@@ -80,10 +80,20 @@ public enum Algorithm {
 
   public final String name;
 
-  public final String url;
+  public final String uri;
 
-  Algorithm(String name, String url) {
+  Algorithm(String name, String uri) {
     this.name = name;
-    this.url = url;
+    this.uri = uri;
+  }
+
+  public static Algorithm fromURI(String uri) {
+    for (Algorithm alg : values()) {
+      if (alg.uri.equals(uri)) {
+        return alg;
+      }
+    }
+
+    return null;
   }
 }

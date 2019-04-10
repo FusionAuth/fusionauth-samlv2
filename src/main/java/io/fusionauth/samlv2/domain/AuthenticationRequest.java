@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,40 +16,20 @@
 package io.fusionauth.samlv2.domain;
 
 import java.time.ZonedDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 /**
  * The SAML v2.0 authentication response object that is sent back from the IDP.
  *
  * @author Brian Pontarelli
  */
-public class AuthenticationResponse {
-  public List<String> audiences = new ArrayList<>();
-
-  public UserConfirmation confirmation;
-
-  public String destination;
-
+public class AuthenticationRequest {
   public String id;
 
-  public String inResponseTo;
-
-  public ZonedDateTime instant;
+  public ZonedDateTime issueInstant;
 
   public String issuer;
 
-  public ZonedDateTime notBefore;
+  public NameIDFormat nameIdFormat;
 
-  public ZonedDateTime notOnOrAfter;
-
-  public boolean oneTimeUse;
-
-  public List<String> proxyAudiences = new ArrayList<>();
-
-  public Integer proxyCount;
-
-  public Status status = new Status();
-
-  public User user;
+  public String version;
 }

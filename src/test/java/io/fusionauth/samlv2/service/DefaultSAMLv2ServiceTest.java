@@ -34,6 +34,7 @@ import java.util.Base64;
 import java.util.zip.Inflater;
 
 import io.fusionauth.samlv2.domain.Algorithm;
+import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
@@ -127,7 +128,73 @@ public class DefaultSAMLv2ServiceTest {
     assertTrue(ZonedDateTime.now().isAfter(response.notOnOrAfter));
     assertTrue(response.instant.isBefore(ZonedDateTime.now()));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
-    assertEquals(response.status, ResponseStatus.Success);
+    assertEquals(response.status.code, ResponseStatus.Success);
+    assertEquals(response.user.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
+    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
+    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
+    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
+    assertEquals(response.user.format, NameIDFormat.EmailAddress);
+  }
+
+  @Test
+  public void roundTripRequest() throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String parameters = service.buildHTTPRedirectAuthnRequest("foobarbaz", "https://local.fusionauth.io", "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+    System.out.println(parameters);
+
+    // Unwind the request
+    int start = parameters.indexOf("=");
+    int end = parameters.indexOf("&");
+    String encodedRequest = URLDecoder.decode(parameters.substring(start + 1, end), "UTF-8");
+
+    // Unwind the RelayState
+    start = parameters.indexOf("RelayState=");
+    end = parameters.indexOf("&", start);
+    String relayState = parameters.substring(start + "RelayState=".length(), end);
+    assertEquals(relayState, "Relay-State-String");
+
+    // Unwind the SigAlg
+    start = parameters.indexOf("SigAlg=");
+    end = parameters.indexOf("&", start);
+    String sigAlg = URLDecoder.decode(parameters.substring(start + "SigAlg=".length(), end), "UTF-8");
+
+    // Unwind the Signature
+    start = parameters.indexOf("Signature=");
+    end = parameters.length();
+    String signature = URLDecoder.decode(parameters.substring(start + "Signature=".length(), end), "UTF-8");
+
+    // Parse the request
+    AuthenticationRequest request = service.parseRequest(encodedRequest, relayState, signature, true, kp.getPublic(), Algorithm.fromURI(sigAlg));
+    assertEquals(request.id, "foobarbaz");
+    assertEquals(request.issuer, "https://local.fusionauth.io");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.version, "2.0");
+  }
+
+  @Test
+  public void roundTripResponse() throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPublic(), kp.getPrivate(), Algorithm.RS256);
+    response = service.parseResponse(encodedXML, true, kp.getPublic());
+
+    assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
+    assertTrue(response.notBefore.isBefore(ZonedDateTime.now()));
+    assertTrue(ZonedDateTime.now().isAfter(response.notOnOrAfter));
+    assertTrue(response.instant.isBefore(ZonedDateTime.now()));
+    assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
+    assertEquals(response.status.code, ResponseStatus.Success);
     assertEquals(response.user.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
     assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
     assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
