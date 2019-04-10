@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2019, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -25,7 +25,7 @@ import java.util.List;
  * @author Brian Pontarelli
  */
 public class AuthenticationResponse {
-  public List<String> audiences = new ArrayList<String>();
+  public List<String> audiences = new ArrayList<>();
 
   public UserConfirmation confirmation;
 
@@ -43,7 +43,7 @@ public class AuthenticationResponse {
 
   public boolean oneTimeUse;
 
-  public List<String> proxyAudiences = new ArrayList<String>();
+  public List<String> proxyAudiences = new ArrayList<>();
 
   public Integer proxyCount;
 

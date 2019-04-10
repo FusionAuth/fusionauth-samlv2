@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2019, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -36,6 +36,9 @@ public class User {
   public String spProviderID;
 
   public String spQualifier;
+
+  public User() {
+  }
 
   public User(NameIDFormat format, String id, String qualifier, String spProviderID, String spQualifier) {
     this.format = format;
