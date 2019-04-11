@@ -15,8 +15,6 @@
  */
 package io.fusionauth.samlv2.service;
 
-import javax.security.cert.CertificateException;
-import javax.security.cert.X509Certificate;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
@@ -57,6 +55,9 @@ import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.security.cert.Certificate;
+import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -97,6 +98,7 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.StatementAbstractType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationDataType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.EndpointType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.EntityDescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.IDPSSODescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.KeyDescriptorType;
@@ -108,6 +110,7 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ObjectFactory;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ResponseType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusCodeType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.KeyInfoType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.X509DataType;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -124,6 +127,10 @@ import org.xml.sax.SAXException;
  */
 public class DefaultSAMLv2Service implements SAMLv2Service {
   private static final io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ObjectFactory ASSERTION_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ObjectFactory();
+
+  private static final io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.ObjectFactory DSIG_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.ObjectFactory();
+
+  private static final io.fusionauth.samlv2.domain.jaxb.oasis.metadata.ObjectFactory METADATA_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.oasis.metadata.ObjectFactory();
 
   private static final ObjectFactory PROTOCOL_OBJECT_FACTORY = new ObjectFactory();
 
@@ -230,7 +237,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement().add(attributeStatementType);
     }
 
-    Document document = marshallResponse(PROTOCOL_OBJECT_FACTORY.createResponse(jaxbResponse));
+    Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createResponse(jaxbResponse), ResponseType.class);
     try {
       XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
       Reference ref = factory.newReference("",
@@ -274,10 +281,59 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
+  public String buildMetadataResponse(MetaData metaData) throws SAMLException {
+    EntityDescriptorType root = new EntityDescriptorType();
+    root.setID(metaData.id);
+    root.setEntityID(metaData.entityId);
+
+    IDPSSODescriptorType idp = new IDPSSODescriptorType();
+    if (metaData.idp.signInEndpoint != null) {
+      EndpointType signIn = new EndpointType();
+      signIn.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect");
+      signIn.setLocation(metaData.idp.signInEndpoint);
+      idp.getSingleSignOnService().add(signIn);
+    }
+
+    if (metaData.idp.logoutEndpoint != null) {
+      EndpointType logout = new EndpointType();
+      logout.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect");
+      logout.setLocation(metaData.idp.logoutEndpoint);
+      idp.getSingleLogoutService().add(logout);
+    }
+
+    metaData.idp.certificates.forEach(cert -> {
+      KeyDescriptorType key = new KeyDescriptorType();
+      key.setUse(KeyTypes.SIGNING);
+      KeyInfoType info = new KeyInfoType();
+      key.setKeyInfo(info);
+      X509DataType data = new X509DataType();
+      info.getContent().add(DSIG_OBJECT_FACTORY.createX509Data(data));
+
+      try {
+        byte[] base64Bytes = Base64.getEncoder().encode(cert.getEncoded());
+        JAXBElement<byte[]> certElement = DSIG_OBJECT_FACTORY.createX509DataTypeX509Certificate(cert.getEncoded());
+        data.getX509IssuerSerialOrX509SKIOrX509SubjectName().add(certElement);
+        idp.getKeyDescriptor().add(key);
+      } catch (Exception e) {
+        // Rethrow
+        throw new IllegalArgumentException(e);
+      }
+    });
+
+    root.getRoleDescriptorOrIDPSSODescriptorOrSPSSODescriptor().add(idp);
+
+    // Convert to String
+    byte[] bytes = marshallToBytes(METADATA_OBJECT_FACTORY.createEntityDescriptor(root), EntityDescriptorType.class);
+    return new String(bytes, StandardCharsets.UTF_8);
+  }
+
+  @Override
   public MetaData parseMetaData(String metaDataXML) throws SAMLException {
     Document document = parseFromBytes(metaDataXML.getBytes(StandardCharsets.UTF_8));
     EntityDescriptorType root = unmarshallFromDocument(document, EntityDescriptorType.class);
     MetaData metaData = new MetaData();
+    metaData.id = root.getID();
+    metaData.entityId = root.getEntityID();
 
     List<RoleDescriptorType> roles = root.getRoleDescriptorOrIDPSSODescriptorOrSPSSODescriptor();
     Optional<RoleDescriptorType> optional = roles.stream()
@@ -290,17 +346,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     IDPSSODescriptorType idp = (IDPSSODescriptorType) optional.get();
 
     // Extract the URLs
-    metaData.signInEndpoint = idp.getSingleSignOnService().size() > 0 ? idp.getSingleSignOnService().get(0).getLocation() : null;
-    metaData.logoutEndpoint = idp.getSingleLogoutService().size() > 0 ? idp.getSingleLogoutService().get(0).getLocation() : null;
+    metaData.idp.signInEndpoint = idp.getSingleSignOnService().size() > 0 ? idp.getSingleSignOnService().get(0).getLocation() : null;
+    metaData.idp.logoutEndpoint = idp.getSingleLogoutService().size() > 0 ? idp.getSingleLogoutService().get(0).getLocation() : null;
 
-    // Extract the signing keys
+    // Extract the signing certificates
     try {
-      metaData.keys = idp.getKeyDescriptor()
-                         .stream()
-                         .filter(kd -> kd.getUse() == KeyTypes.SIGNING)
-                         .map(this::toPublicKey)
-                         .filter(Objects::nonNull)
-                         .collect(Collectors.toList());
+      metaData.idp.certificates = idp.getKeyDescriptor()
+                                     .stream()
+                                     .filter(kd -> kd.getUse() == KeyTypes.SIGNING)
+                                     .map(this::toCertificate)
+                                     .filter(Objects::nonNull)
+                                     .collect(Collectors.toList());
     } catch (IllegalArgumentException e) {
       // toPublicKey might throw this and we want to translate it back to a known exception
       throw new SAMLException(e.getCause());
@@ -456,7 +512,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
 
     try {
-      byte[] rawResult = marshallRequest(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest));
+      byte[] rawResult = marshallToBytes(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
       String encodedResult = deflateAndEncode(rawResult);
       String parameters = "SAMLRequest=" + URLEncoder.encode(encodedResult, "UTF-8");
       if (relayState != null) {
@@ -550,9 +606,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
-  private byte[] marshallRequest(Object object) throws SAMLException {
+  private <T> byte[] marshallToBytes(JAXBElement<T> object, Class<T> type) throws SAMLException {
     try {
-      JAXBContext context = JAXBContext.newInstance(AuthnRequestType.class);
+      JAXBContext context = JAXBContext.newInstance(type);
       Marshaller marshaller = context.createMarshaller();
       ByteArrayOutputStream baos = new ByteArrayOutputStream();
       marshaller.marshal(object, baos);
@@ -562,9 +618,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
-  private Document marshallResponse(Object object) throws SAMLException {
+  @SuppressWarnings("SameParameterValue")
+  private <T> Document marshallToDocument(JAXBElement<T> object, Class<T> type) throws SAMLException {
     try {
-      JAXBContext context = JAXBContext.newInstance(ResponseType.class);
+      JAXBContext context = JAXBContext.newInstance(type);
       Marshaller marshaller = context.createMarshaller();
       DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
       dbf.setNamespaceAware(true);
@@ -613,7 +670,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return new User(format, id, qualifier, spProviderID, spQualifier);
   }
 
-  private PublicKey toPublicKey(KeyDescriptorType keyDescriptorType) {
+  private Certificate toCertificate(KeyDescriptorType keyDescriptorType) {
     try {
       List<Object> keyData = keyDescriptorType.getKeyInfo().getContent();
       for (Object keyDatum : keyData) {
@@ -626,8 +683,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
               element = (JAXBElement<?>) certDatum;
               if (element.getName().getLocalPart().equals("X509Certificate")) {
                 byte[] certBytes = (byte[]) element.getValue();
-                X509Certificate x509Certificate = X509Certificate.getInstance(certBytes);
-                return x509Certificate.getPublicKey();
+                CertificateFactory cf = CertificateFactory.getInstance("X.509");
+                return cf.generateCertificate(new ByteArrayInputStream(certBytes));
               }
             }
           }

@@ -31,6 +31,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.time.ZonedDateTime;
 import java.util.Base64;
+import java.util.UUID;
 import java.util.zip.Inflater;
 
 import io.fusionauth.samlv2.domain.Algorithm;
@@ -98,15 +99,46 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
-  public void metaData() throws Exception {
+  public void buildMetaData() throws Exception {
+    MetaData metaData = new MetaData();
+    metaData.id = UUID.randomUUID().toString();
+    metaData.entityId = "https://fusionauth.io/saml-metadata";
+    metaData.idp.signInEndpoint = "https://fusionauth.io/login";
+    metaData.idp.logoutEndpoint = "https://fusionauth.io/logout";
+
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+    Certificate cert = CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FusionAuth");
+    metaData.idp.certificates.add(cert);
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String xml = service.buildMetadataResponse(metaData);
+    System.out.println(xml);
+    assertTrue(xml.contains(metaData.id));
+    assertTrue(xml.contains(metaData.entityId));
+    assertTrue(xml.contains(metaData.idp.signInEndpoint));
+    assertTrue(xml.contains(metaData.idp.logoutEndpoint));
+
+    // Now parse it
+    MetaData parsed = service.parseMetaData(xml);
+    assertEquals(parsed.id, metaData.id);
+    assertEquals(parsed.entityId, metaData.entityId);
+    assertEquals(parsed.idp.signInEndpoint, metaData.idp.signInEndpoint);
+    assertEquals(parsed.idp.logoutEndpoint, metaData.idp.logoutEndpoint);
+    assertEquals(parsed.idp.certificates.get(0), metaData.idp.certificates.get(0));
+  }
+
+  @Test
+  public void parseMetaData() throws Exception {
     byte[] buf = Files.readAllBytes(Paths.get("src/test/xml/metadata.xml"));
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     MetaData metaData = service.parseMetaData(new String(buf, StandardCharsets.UTF_8));
-    assertEquals(metaData.keys.size(), 3);
+    assertEquals(metaData.idp.certificates.size(), 3);
 
     buf = Files.readAllBytes(Paths.get("src/test/xml/metadata-2.xml"));
     metaData = service.parseMetaData(new String(buf, StandardCharsets.UTF_8));
-    assertEquals(metaData.keys.size(), 1);
+    assertEquals(metaData.idp.certificates.size(), 1);
   }
 
   @Test

@@ -15,13 +15,22 @@
  */
 package io.fusionauth.samlv2.domain;
 
-import java.security.PublicKey;
+import java.security.cert.Certificate;
+import java.util.ArrayList;
 import java.util.List;
 
 public class MetaData {
-  public List<PublicKey> keys;
+  public String entityId;
 
-  public String logoutEndpoint;
+  public String id;
 
-  public String signInEndpoint;
+  public IDP idp = new IDP();
+
+  public static class IDP {
+    public List<Certificate> certificates = new ArrayList<>();
+
+    public String logoutEndpoint;
+
+    public String signInEndpoint;
+  }
 }

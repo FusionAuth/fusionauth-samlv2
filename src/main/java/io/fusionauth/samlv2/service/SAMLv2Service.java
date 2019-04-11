@@ -60,6 +60,15 @@ public interface SAMLv2Service {
                                        Algorithm algorithm) throws SAMLException;
 
   /**
+   * Builds the metadata response for a SAML IdP.
+   *
+   * @param metaData The metadata to build XMl from.
+   * @return The metadata response XML as a String.
+   * @throws SAMLException If the JAXB marshalling failed.
+   */
+  String buildMetadataResponse(MetaData metaData) throws SAMLException;
+
+  /**
    * Builds an invalid HTTP-Redirect binding to a AuthnRequest protocol for testing.
    *
    * @param id         The request id that is echoed in the response.

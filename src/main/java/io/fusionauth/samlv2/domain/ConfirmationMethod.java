@@ -38,7 +38,7 @@ public enum ConfirmationMethod {
    * party.
    * <p/>
    * Note that in accordance with [XMLSig], each &lt;ds:KeyInfo> element MUST identify a single cryptographic key.
-   * Multiple keys MAY be identified with separate &lt;ds:KeyInfo> elements, such as when different confirmation keys
+   * Multiple certificates MAY be identified with separate &lt;ds:KeyInfo> elements, such as when different confirmation certificates
    * are needed for different relying parties.
    */
   HolderOfKey("urn:oasis:names:tc:SAML:2.0:cm:holder-of-key"),
