@@ -60,6 +60,21 @@ public interface SAMLv2Service {
                                        Algorithm algorithm) throws SAMLException;
 
   /**
+   * Builds an invalid HTTP-Redirect binding to a AuthnRequest protocol for testing.
+   *
+   * @param id         The request id that is echoed in the response.
+   * @param issuer     The issuer that is put into the SAML request.
+   * @param relayState The relay state parameter (required if signing).
+   * @param sign       Determines if the request should be signed or not.
+   * @param key        The key that is used to sign the request (private key, shared, secret, etc).
+   * @param algorithm  The signing algorithm to use (if any).
+   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  String buildInvalidTestingHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign,
+                                                     PrivateKey key, Algorithm algorithm) throws SAMLException;
+
+  /**
    * Parses a SAML 2.0 MetaData response and converts it to a simple to use object.
    *
    * @param metaDataXML The MetaData XML.

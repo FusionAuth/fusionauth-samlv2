@@ -156,77 +156,79 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     jaxbResponse.setDestination(response.destination);
 
     // The main assertion element
-    AssertionType assertionType = new AssertionType();
-    String id = UUID.randomUUID().toString();
-    jaxbResponse.getAssertionOrEncryptedAssertion().add(assertionType);
-    assertionType.setID(id);
+    if (response.user != null && response.status.code == ResponseStatus.Success) {
+      AssertionType assertionType = new AssertionType();
+      String id = UUID.randomUUID().toString();
+      jaxbResponse.getAssertionOrEncryptedAssertion().add(assertionType);
+      assertionType.setID(id);
 
-    // NameId
-    SubjectType subjectType = new SubjectType();
-    NameIDType nameIdType = new NameIDType();
-    nameIdType.setValue(response.user.id);
-    nameIdType.setFormat(response.user.format.toSAMLFormat());
-    nameIdType.setNameQualifier(response.user.qualifier);
-    nameIdType.setSPNameQualifier(response.user.spQualifier);
-    nameIdType.setSPProvidedID(response.user.spProviderID);
-    subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createNameID(nameIdType));
+      // NameId
+      SubjectType subjectType = new SubjectType();
+      NameIDType nameIdType = new NameIDType();
+      nameIdType.setValue(response.user.id);
+      nameIdType.setFormat(response.user.format.toSAMLFormat());
+      nameIdType.setNameQualifier(response.user.qualifier);
+      nameIdType.setSPNameQualifier(response.user.spQualifier);
+      nameIdType.setSPProvidedID(response.user.spProviderID);
+      subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createNameID(nameIdType));
 
-    // Subject confirmation
-    SubjectConfirmationDataType dataType = new SubjectConfirmationDataType();
-    dataType.setAddress(response.confirmation.address);
-    dataType.setInResponseTo(response.confirmation.inResponseTo);
-    dataType.setNotBefore(toXMLGregorianCalendar(response.confirmation.notBefore));
-    dataType.setNotOnOrAfter(toXMLGregorianCalendar(response.confirmation.notOnOrAfter));
-    dataType.setRecipient(response.confirmation.recipient);
-    dataType.setRecipient(response.confirmation.recipient);
-    SubjectConfirmationType subjectConfirmationType = new SubjectConfirmationType();
-    subjectConfirmationType.setSubjectConfirmationData(dataType);
-    subjectConfirmationType.setMethod(response.confirmation.method.toSAMLFormat());
-    subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createSubjectConfirmation(subjectConfirmationType));
+      // Subject confirmation
+      SubjectConfirmationDataType dataType = new SubjectConfirmationDataType();
+      dataType.setAddress(response.confirmation.address);
+      dataType.setInResponseTo(response.confirmation.inResponseTo);
+      dataType.setNotBefore(toXMLGregorianCalendar(response.confirmation.notBefore));
+      dataType.setNotOnOrAfter(toXMLGregorianCalendar(response.confirmation.notOnOrAfter));
+      dataType.setRecipient(response.confirmation.recipient);
+      dataType.setRecipient(response.confirmation.recipient);
+      SubjectConfirmationType subjectConfirmationType = new SubjectConfirmationType();
+      subjectConfirmationType.setSubjectConfirmationData(dataType);
+      subjectConfirmationType.setMethod(response.confirmation.method.toSAMLFormat());
+      subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createSubjectConfirmation(subjectConfirmationType));
 
-    // Add the subject
-    assertionType.setSubject(subjectType);
+      // Add the subject
+      assertionType.setSubject(subjectType);
 
-    // Conditions
-    ConditionsType conditionsType = new ConditionsType();
-    conditionsType.setNotBefore(toXMLGregorianCalendar(response.notBefore));
-    conditionsType.setNotOnOrAfter(toXMLGregorianCalendar(response.notOnOrAfter));
-    assertionType.setConditions(conditionsType);
+      // Conditions
+      ConditionsType conditionsType = new ConditionsType();
+      conditionsType.setNotBefore(toXMLGregorianCalendar(response.notBefore));
+      conditionsType.setNotOnOrAfter(toXMLGregorianCalendar(response.notOnOrAfter));
+      assertionType.setConditions(conditionsType);
 
-    // Audiences
-    if (response.audiences.size() > 0) {
-      AudienceRestrictionType audienceRestrictionType = new AudienceRestrictionType();
-      audienceRestrictionType.getAudience().addAll(response.audiences);
-      conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(audienceRestrictionType);
-    }
-
-    // OneTimeUse
-    if (response.oneTimeUse) {
-      OneTimeUseType oneTimeUseType = new OneTimeUseType();
-      conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(oneTimeUseType);
-    }
-
-    // Proxy
-    if (response.proxyAudiences.size() > 0 || response.proxyCount != null) {
-      ProxyRestrictionType proxyRestrictionType = new ProxyRestrictionType();
-      proxyRestrictionType.setCount(response.proxyCount != null ? BigInteger.valueOf(response.proxyCount) : null);
-      proxyRestrictionType.getAudience().addAll(response.proxyAudiences);
-      conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(proxyRestrictionType);
-    }
-
-    // Attributes
-    AttributeStatementType attributeStatementType = new AttributeStatementType();
-    response.user.attributes.forEach((k, v) -> {
-      AttributeType attributeType = new AttributeType();
-      attributeType.setName(k);
-
-      for (String value : v) {
-        attributeType.getAttributeValue().add(value);
+      // Audiences
+      if (response.audiences.size() > 0) {
+        AudienceRestrictionType audienceRestrictionType = new AudienceRestrictionType();
+        audienceRestrictionType.getAudience().addAll(response.audiences);
+        conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(audienceRestrictionType);
       }
 
-      attributeStatementType.getAttributeOrEncryptedAttribute().add(attributeType);
-    });
-    assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement().add(attributeStatementType);
+      // OneTimeUse
+      if (response.oneTimeUse) {
+        OneTimeUseType oneTimeUseType = new OneTimeUseType();
+        conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(oneTimeUseType);
+      }
+
+      // Proxy
+      if (response.proxyAudiences.size() > 0 || response.proxyCount != null) {
+        ProxyRestrictionType proxyRestrictionType = new ProxyRestrictionType();
+        proxyRestrictionType.setCount(response.proxyCount != null ? BigInteger.valueOf(response.proxyCount) : null);
+        proxyRestrictionType.getAudience().addAll(response.proxyAudiences);
+        conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(proxyRestrictionType);
+      }
+
+      // Attributes
+      AttributeStatementType attributeStatementType = new AttributeStatementType();
+      response.user.attributes.forEach((k, v) -> {
+        AttributeType attributeType = new AttributeType();
+        attributeType.setName(k);
+
+        for (String value : v) {
+          attributeType.getAttributeValue().add(value);
+        }
+
+        attributeStatementType.getAttributeOrEncryptedAttribute().add(attributeType);
+      });
+      assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement().add(attributeStatementType);
+    }
 
     Document document = marshallResponse(PROTOCOL_OBJECT_FACTORY.createResponse(jaxbResponse));
     try {
@@ -243,7 +245,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       KeyValue kv = kif.newKeyValue(publicKey);
       KeyInfo ki = kif.newKeyInfo(Collections.singletonList(kv));
       XMLSignature signature = factory.newXMLSignature(si, ki);
-      Node assertion = document.getElementsByTagName("Assertion").item(0);
+      Node assertion = document.getDocumentElement();
       DOMSignContext dsc = new DOMSignContext(privateKey, assertion);
       signature.sign(dsc);
 
@@ -262,41 +264,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   public String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign, PrivateKey key,
                                               Algorithm algorithm)
       throws SAMLException {
-    // SAML Web SSO profile requirements (section 4.1.4.1)
-    AuthnRequestType authnRequest = new AuthnRequestType();
-    authnRequest.setIssuer(new NameIDType());
-    authnRequest.getIssuer().setValue(issuer);
-    authnRequest.setNameIDPolicy(new NameIDPolicyType());
-    authnRequest.getNameIDPolicy().setFormat("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress");
-    authnRequest.getNameIDPolicy().setAllowCreate(false);
-    authnRequest.setID(id);
-    authnRequest.setVersion("2.0");
-    authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+    return _buildAuthnRequest(id, issuer, "2.0", relayState, sign, key, algorithm);
+  }
 
-    try {
-      byte[] rawResult = marshallRequest(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest));
-      String encodedResult = deflateAndEncode(rawResult);
-      String parameters = "SAMLRequest=" + URLEncoder.encode(encodedResult, "UTF-8");
-      if (relayState != null) {
-        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
-      }
-
-      if (sign && key != null && algorithm != null) {
-        Signature signature;
-        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, "UTF-8");
-        signature = Signature.getInstance(algorithm.name);
-        signature.initSign(key);
-        signature.update(parameters.getBytes(StandardCharsets.UTF_8));
-
-        String signatureParameter = Base64.getEncoder().encodeToString(signature.sign());
-        parameters += "&Signature=" + URLEncoder.encode(signatureParameter, "UTF-8");
-      }
-
-      return parameters;
-    } catch (Exception e) {
-      // Not possible but freak out
-      throw new SAMLException(e);
-    }
+  @Override
+  public String buildInvalidTestingHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign,
+                                                            PrivateKey key, Algorithm algorithm) throws SAMLException {
+    return _buildAuthnRequest(id, issuer, "bad", relayState, sign, key, algorithm);
   }
 
   @Override
@@ -465,6 +439,46 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     return response;
+  }
+
+  private String _buildAuthnRequest(String id, String issuer, String version, String relayState, boolean sign,
+                                    PrivateKey key,
+                                    Algorithm algorithm) throws SAMLException {
+    // SAML Web SSO profile requirements (section 4.1.4.1)
+    AuthnRequestType authnRequest = new AuthnRequestType();
+    authnRequest.setIssuer(new NameIDType());
+    authnRequest.getIssuer().setValue(issuer);
+    authnRequest.setNameIDPolicy(new NameIDPolicyType());
+    authnRequest.getNameIDPolicy().setFormat("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress");
+    authnRequest.getNameIDPolicy().setAllowCreate(false);
+    authnRequest.setID(id);
+    authnRequest.setVersion(version);
+    authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+
+    try {
+      byte[] rawResult = marshallRequest(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest));
+      String encodedResult = deflateAndEncode(rawResult);
+      String parameters = "SAMLRequest=" + URLEncoder.encode(encodedResult, "UTF-8");
+      if (relayState != null) {
+        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
+      }
+
+      if (sign && key != null && algorithm != null) {
+        Signature signature;
+        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, "UTF-8");
+        signature = Signature.getInstance(algorithm.name);
+        signature.initSign(key);
+        signature.update(parameters.getBytes(StandardCharsets.UTF_8));
+
+        String signatureParameter = Base64.getEncoder().encodeToString(signature.sign());
+        parameters += "&Signature=" + URLEncoder.encode(signatureParameter, "UTF-8");
+      }
+
+      return parameters;
+    } catch (Exception e) {
+      // Not possible but freak out
+      throw new SAMLException(e);
+    }
   }
 
   private String attributeToString(Object attribute) {
