@@ -40,6 +40,7 @@ import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
+import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
@@ -127,6 +128,13 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(parsed.idp.signInEndpoint, metaData.idp.signInEndpoint);
     assertEquals(parsed.idp.logoutEndpoint, metaData.idp.logoutEndpoint);
     assertEquals(parsed.idp.certificates.get(0), metaData.idp.certificates.get(0));
+  }
+
+  @Test
+  public void randomJunk() throws SAMLException {
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String parameters = service.buildHTTPRedirectAuthnRequest("foobarbaz", "c98742e0-887a-44c7-ad62-07af15622f58", "Relay-State-String", false, null, null);
+    System.out.println("https://local.fusionauth.io/samlv2/login?" + parameters);
   }
 
   @Test

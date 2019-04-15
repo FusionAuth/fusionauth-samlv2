@@ -58,6 +58,7 @@ import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -123,6 +124,8 @@ import org.w3c.dom.NodeList;
 import org.xml.sax.SAXException;
 
 /**
+ * Default implementation of the SAML service.
+ *
  * @author Brian Pontarelli
  */
 public class DefaultSAMLv2Service implements SAMLv2Service {
@@ -141,33 +144,37 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                    PrivateKey privateKey, Algorithm algorithm) throws SAMLException {
     ResponseType jaxbResponse = new ResponseType();
 
-    // Status
+    // Status (element - order safe)
     StatusType status = new StatusType();
     status.setStatusCode(new StatusCodeType());
     status.getStatusCode().setValue(response.status.code.toSAMLFormat());
     status.setStatusMessage(response.status.message);
     jaxbResponse.setStatus(status);
 
-    // Id and issuer
+    // Id (attribute), issuer (element - order safe) and version (attribute)
     jaxbResponse.setID(response.id);
     jaxbResponse.setIssuer(new NameIDType());
     jaxbResponse.getIssuer().setValue(response.issuer);
+    jaxbResponse.setVersion(response.version);
 
-    // Response to
+    // Response to (attribute)
     jaxbResponse.setInResponseTo(response.inResponseTo);
 
-    // Instant
+    // Instant (attribute)
     jaxbResponse.setIssueInstant(toXMLGregorianCalendar(response.instant));
 
-    // Destination
+    // Destination (Attribute)
     jaxbResponse.setDestination(response.destination);
 
-    // The main assertion element
+    // The main assertion element (element  - order safe)
+    AssertionType assertionType = new AssertionType();
     if (response.user != null && response.status.code == ResponseStatus.Success) {
-      AssertionType assertionType = new AssertionType();
-      String id = UUID.randomUUID().toString();
-      jaxbResponse.getAssertionOrEncryptedAssertion().add(assertionType);
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
+      String id = "_" + UUID.randomUUID().toString();
       assertionType.setID(id);
+      assertionType.setIssuer(jaxbResponse.getIssuer());
+      assertionType.setIssueInstant(toXMLGregorianCalendar(now));
+      assertionType.setVersion(response.version);
 
       // NameId
       SubjectType subjectType = new SubjectType();
@@ -180,17 +187,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createNameID(nameIdType));
 
       // Subject confirmation
-      SubjectConfirmationDataType dataType = new SubjectConfirmationDataType();
-      dataType.setAddress(response.confirmation.address);
-      dataType.setInResponseTo(response.confirmation.inResponseTo);
-      dataType.setNotBefore(toXMLGregorianCalendar(response.confirmation.notBefore));
-      dataType.setNotOnOrAfter(toXMLGregorianCalendar(response.confirmation.notOnOrAfter));
-      dataType.setRecipient(response.confirmation.recipient);
-      dataType.setRecipient(response.confirmation.recipient);
-      SubjectConfirmationType subjectConfirmationType = new SubjectConfirmationType();
-      subjectConfirmationType.setSubjectConfirmationData(dataType);
-      subjectConfirmationType.setMethod(response.confirmation.method.toSAMLFormat());
-      subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createSubjectConfirmation(subjectConfirmationType));
+      if (response.confirmation != null) {
+        SubjectConfirmationDataType dataType = new SubjectConfirmationDataType();
+        dataType.setAddress(response.confirmation.address);
+        dataType.setInResponseTo(response.confirmation.inResponseTo);
+        dataType.setNotBefore(toXMLGregorianCalendar(response.confirmation.notBefore));
+        dataType.setNotOnOrAfter(toXMLGregorianCalendar(response.confirmation.notOnOrAfter));
+        dataType.setRecipient(response.confirmation.recipient);
+        SubjectConfirmationType subjectConfirmationType = new SubjectConfirmationType();
+        subjectConfirmationType.setSubjectConfirmationData(dataType);
+        if (response.confirmation.method != null) {
+          subjectConfirmationType.setMethod(response.confirmation.method.toSAMLFormat());
+        }
+        subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createSubjectConfirmation(subjectConfirmationType));
+      }
 
       // Add the subject
       assertionType.setSubject(subjectType);
@@ -235,25 +245,48 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         attributeStatementType.getAttributeOrEncryptedAttribute().add(attributeType);
       });
       assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement().add(attributeStatementType);
+
+      // Add the assertion (element - order doesn't matter)
+      jaxbResponse.getAssertionOrEncryptedAssertion().add(assertionType);
     }
 
     Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createResponse(jaxbResponse), ResponseType.class);
     try {
+      // If successful, sign the assertion. Otherwise, sign the root
+      Element toSign;
+      Node insertBefore;
+      if (response.status.code == ResponseStatus.Success) {
+        toSign = (Element) document.getElementsByTagName("Assertion").item(0);
+        insertBefore = toSign.getElementsByTagName("Subject").item(0);
+      } else {
+        toSign = document.getDocumentElement();
+        insertBefore = null;
+      }
+
+      // Set the id attribute node. Yucky! Yuck!
+      toSign.setIdAttributeNode(toSign.getAttributeNode("ID"), true);
+
+      // If there is an insert before, set it so that the signature is in the place that some IdPs require
+      DOMSignContext dsc = new DOMSignContext(privateKey, toSign);
+      if (insertBefore != null) {
+        dsc.setNextSibling(insertBefore);
+      }
+
+      // Sign away
       XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
-      Reference ref = factory.newReference("",
+      Reference ref = factory.newReference("#" + toSign.getAttribute("ID"),
           factory.newDigestMethod(DigestMethod.SHA256, null),
           Collections.singletonList(factory.newTransform(Transform.ENVELOPED, (TransformParameterSpec) null)),
           null,
           null);
-      SignedInfo si = factory.newSignedInfo(factory.newCanonicalizationMethod(CanonicalizationMethod.INCLUSIVE_WITH_COMMENTS, (C14NMethodParameterSpec) null),
+      SignedInfo si = factory.newSignedInfo(factory.newCanonicalizationMethod(CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, (C14NMethodParameterSpec) null),
           factory.newSignatureMethod(algorithm.uri, null),
           Collections.singletonList(ref));
       KeyInfoFactory kif = factory.getKeyInfoFactory();
       KeyValue kv = kif.newKeyValue(publicKey);
       KeyInfo ki = kif.newKeyInfo(Collections.singletonList(kv));
       XMLSignature signature = factory.newXMLSignature(si, ki);
-      Node assertion = document.getDocumentElement();
-      DOMSignContext dsc = new DOMSignContext(privateKey, assertion);
+
       signature.sign(dsc);
 
       StringWriter sw = new StringWriter();
@@ -310,7 +343,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       info.getContent().add(DSIG_OBJECT_FACTORY.createX509Data(data));
 
       try {
-        byte[] base64Bytes = Base64.getEncoder().encode(cert.getEncoded());
         JAXBElement<byte[]> certElement = DSIG_OBJECT_FACTORY.createX509DataTypeX509Certificate(cert.getEncoded());
         data.getX509IssuerSerialOrX509SKIOrX509SubjectName().add(certElement);
         idp.getKeyDescriptor().add(key);

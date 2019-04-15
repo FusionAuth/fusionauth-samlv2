@@ -52,4 +52,6 @@ public class AuthenticationResponse {
   public Status status = new Status();
 
   public User user;
+
+  public String version;
 }
