@@ -89,6 +89,8 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AssertionType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AttributeStatementType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AttributeType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AudienceRestrictionType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AuthnContextType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AuthnStatementType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ConditionAbstractType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ConditionsType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.EncryptedElementType;
@@ -237,14 +239,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       response.user.attributes.forEach((k, v) -> {
         AttributeType attributeType = new AttributeType();
         attributeType.setName(k);
-
-        for (String value : v) {
-          attributeType.getAttributeValue().add(value);
-        }
-
+        attributeType.getAttributeValue().addAll(v);
         attributeStatementType.getAttributeOrEncryptedAttribute().add(attributeType);
       });
       assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement().add(attributeStatementType);
+
+      // AuthnStatement
+      AuthnStatementType authnStatement = new AuthnStatementType();
+      authnStatement.setAuthnInstant(toXMLGregorianCalendar(now));
+      authnStatement.setAuthnContext(new AuthnContextType());
+      authnStatement.getAuthnContext().getContent().add(ASSERTION_OBJECT_FACTORY.createAuthnContextClassRef("urn:oasis:names:tc:SAML:2.0:ac:classes:Password"));
+      assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement().add(authnStatement);
 
       // Add the assertion (element - order doesn't matter)
       jaxbResponse.getAssertionOrEncryptedAssertion().add(assertionType);

@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!--
+  ~ Copyright (c) 2019, Inversoft Inc., All Rights Reserved
+  ~
+  ~ Licensed under the Apache License, Version 2.0 (the "License");
+  ~ you may not use this file except in compliance with the License.
+  ~ You may obtain a copy of the License at
+  ~
+  ~   http://www.apache.org/licenses/LICENSE-2.0
+  ~
+  ~ Unless required by applicable law or agreed to in writing,
+  ~ software distributed under the License is distributed on an
+  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
+  ~ either express or implied. See the License for the specific
+  ~ language governing permissions and limitations under the License.
+  -->
+<ns3:Response xmlns:ns3="urn:oasis:names:tc:SAML:2.0:protocol" xmlns="urn:oasis:names:tc:SAML:2.0:assertion"
+              Destination="https://www.google.com/a/fusionauth.io/acs" ID="_40cf1ea4-4776-48de-9f27-ccce20e11919"
+              InResponseTo="aokkbfniiiicfbcohgpbmhnlhmheoecmihpcalaf" IssueInstant="2019-04-15T21:05:00.039Z"
+              Version="2.0">
+  <Issuer>google.com</Issuer>
+  <ns3:Status>
+    <ns3:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+  </ns3:Status>
+  <Assertion ID="_b6bf94b8-2c6a-4917-b7d1-77c61e5ef7d1" IssueInstant="2019-04-15T21:05:00.040Z" Version="2.0">
+    <Issuer>google.com</Issuer>
+    <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+      <SignedInfo>
+        <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>
+        <SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+        <Reference URI="#_b6bf94b8-2c6a-4917-b7d1-77c61e5ef7d1">
+          <Transforms>
+            <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+          </Transforms>
+          <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+          <DigestValue>agT+n8YXYqKqUwjzId1dCaNfvmQHg7mjaQLgwE3lsCk=</DigestValue>
+        </Reference>
+      </SignedInfo>
+      <SignatureValue>UsKLLxux7aQmTzekWtvMB67Fp4M75o07SH7QyJxTpiUtmC+rRI8mRMFek9s6HpSldpTWP5FGwcdT
+        gwTEsgTkUYwEM0bVq54aH4JBxHHHLXEcZOqG7k0kEu2JqkjvPeukrmjcUo6/CysgTnIYRKEGStAh
+        094lObQRzXPvj0Bebno+ceQMWEHb2qgr3gwbb8Xzdwr7rVGIyGuhqmJiZOB4vCndN7+UTaGF/Jub
+        DMnL43Ur5D9NVU3yr0TMuTwzX6F//iQSw/XBE3ipx8mV/yFpn40OuqBSTJp1cTQHBZPyV1GpUG0K
+        xUoLzD7Mk8UMR00RLUTKPW21e1BiX5DL1/YcYg==
+      </SignatureValue>
+      <KeyInfo>
+        <KeyValue>
+          <RSAKeyValue>
+            <Modulus>iZEea8bycpfgdLMtoeBy/srPRayqLeSZmlEWMYQivPHrSyLDxxV+HzTpqX94dzBmpllYc28DFQc0
+              lbsTYMz70HYeuWjsSqCsHsHzKKRZML0bV31AyPZnLCW9bn9rEWNpr0MlvJtfimGJtebBDGuKwcgi
+              k1S0beE9dv+0m19qD/x4zPnNM8efaaPEO+qXhT2un5jITbfpNSTq6oOv8Vo9DBME/HpmFbEe7uWp
+              5IN1A4VqI0xVW7+Mo4bwoLQUlrOfu0EkRvLRNV/DborRO2uPCDuPv3AlIffmW2FqvB+O/qi/crGV
+              c7Msn/Y/myng5xb+ElU6Aep1QWhumH9Dkj1stQ==
+            </Modulus>
+            <Exponent>AQAB</Exponent>
+          </RSAKeyValue>
+        </KeyValue>
+      </KeyInfo>
+    </Signature>
+    <Subject>
+      <NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress"
+              SPNameQualifier="google.com/a/fusionauth.io">brett@fusionauth.io
+      </NameID>
+      <SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+        <SubjectConfirmationData InResponseTo="aokkbfniiiicfbcohgpbmhnlhmheoecmihpcalaf"
+                                 NotBefore="2019-04-15T20:05:00.039Z" NotOnOrAfter="2019-04-15T22:05:00.039Z"
+                                 Recipient="https://www.google.com/a/fusionauth.io/acs"/>
+      </SubjectConfirmation>
+    </Subject>
+    <Conditions NotBefore="2019-04-15T20:05:00.039Z" NotOnOrAfter="2019-04-15T22:05:00.039Z">
+      <AudienceRestriction>
+        <Audience>https://www.google.com/a/fusionauth.io/acs</Audience>
+      </AudienceRestriction>
+    </Conditions>
+    <AttributeStatement>
+      <Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">brett@fusionauth.io
+        </AttributeValue>
+      </Attribute>
+    </AttributeStatement>
+  </Assertion>
+</ns3:Response>

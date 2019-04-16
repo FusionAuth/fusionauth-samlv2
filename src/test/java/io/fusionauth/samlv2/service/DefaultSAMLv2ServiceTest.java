@@ -227,6 +227,7 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
     String encodedXML = service.buildAuthnResponse(response, true, kp.getPublic(), kp.getPrivate(), Algorithm.RS256);
+    System.out.println(new String(Base64.getDecoder().decode(encodedXML)));
     response = service.parseResponse(encodedXML, true, kp.getPublic());
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
