@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<ns3:Response xmlns:ns3="urn:oasis:names:tc:SAML:2.0:protocol" xmlns="urn:oasis:names:tc:SAML:2.0:assertion"
+              Destination="https://local.fusionauth.io/oauth2/callback" ID="_c81837ac-6465-41cc-a102-6257d7112473"
+              IssueInstant="2019-02-28T18:29:55.473Z" Version="2.0">
+  <Issuer>https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/</Issuer>
+  <ns3:Status>
+    <ns3:StatusCode Value="urn:oasis:names:tc:SAML:2.0:status:Success"/>
+  </ns3:Status>
+  <Assertion ID="_f9437ec9-e9a1-4181-b5e8-55f1ae1526f8" IssueInstant="2019-04-16T13:54:00.446Z" Version="2.0">
+    <Issuer>https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/</Issuer>
+    <Signature xmlns="http://www.w3.org/2000/09/xmldsig#">
+      <SignedInfo>
+        <CanonicalizationMethod Algorithm="http://www.w3.org/2001/10/xml-exc-c14n#WithComments"/>
+        <SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/>
+        <Reference URI="#_f9437ec9-e9a1-4181-b5e8-55f1ae1526f8">
+          <Transforms>
+            <Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/>
+          </Transforms>
+          <DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/>
+          <DigestValue>pmy6vmDN/OvfIyQEgZoimhajR8g+na/1rRr+RfPtXZk=</DigestValue>
+        </Reference>
+      </SignedInfo>
+      <SignatureValue>Zxw+NcrHIpx5wzBSls7eMHJWUlJiD4dnUz9dyTgjtZQNSRyZO67lbnAzKQDtHSlqXBHFflp4l2s9
+        yIqWr6xHv/8PVve2kppsQmFu8mOZjDweMIJbGPf4uHRZqFFoAgSKXnjJlwmJO9N0tmIREMCT/BfB
+        TBGs3xKyqnG3jzLNdiJdN/wZzC2NMc2+DUzBq7uPNVV5izDeuKJ6CJsJFpRjMBSOqcdy3Cm8Nxxx
+        /21+bkKcApdrdmgsoEOPE5Lb0jVD4WkitpPP+DyHL0HimERav3Y7FJ/Dz4U6rOf41KosEb7ElTlF
+        3FonCJBo61msDGqTQuSoC0bNOjqONslnT82FKg==
+      </SignatureValue>
+      <KeyInfo>
+        <X509Data>
+          <X509Certificate>MIIDEDCCAfigAwIBAgIGAWombQbmMA0GCSqGSIb3DQEBCwUAMEgxRjBEBgNVBAMTPWh0dHBzOi8v
+            c3RzLndpbmRvd3MubmV0L2MyMTUwMTExLTNjNDQtNDUwOC05ZjA4LTc5MGNiNDAzMmEyMy8wIBcN
+            NzAwMTAxMDAwMDAwWhgPMjExODA0MTYxMzU0MDBaMEgxRjBEBgNVBAMTPWh0dHBzOi8vc3RzLndp
+            bmRvd3MubmV0L2MyMTUwMTExLTNjNDQtNDUwOC05ZjA4LTc5MGNiNDAzMmEyMy8wggEiMA0GCSqG
+            SIb3DQEBAQUAA4IBDwAwggEKAoIBAQCqL+abevJ4S2vJ522XOpwXBBo+GW71OJ1LeDgH+u6upJ2y
+            WnRWNr9Tlu4POswrzg1ijUHsjzVy/pTh5lPYARQY4DTfgeVcE/s/YhsgjvRBRjWQSWRgY++i8gG3
+            iM1u5DMwg5CwfFkWifkYD0wC6fS8lDp9WLcF+anb5Ehhig90tFpr8FtVZp7wA2r/V3djKrWD1p14
+            XSLBvKc097yMXw32W8I8HNblNeShACsFDTzcqAIesI94er72iBhkkQiotnOa0p4Gd6ig2s+ZmEa5
+            pel4Re3JgD2Vhc71bQprhJhfFmeY1sNVzr30RyoCb+ANzNSlYj8uCilKqWgSHFprr3JZAgMBAAEw
+            DQYJKoZIhvcNAQELBQADggEBAHTTvrZ5mczTv+cw1Zj2ky55EOq1GlSL2NC2tF7ufysaRqUU70oK
+            SkHphlv8hlVKbEtzEu2tjJh5NuBOuX7eTmMxIAaDit5M7isP7MzwGqms14O3p7bgNujNtGeWvNfs
+            R/nyo7k/yVYkV7PDoChmhkM/ouizlUaPEi40gAaSzZL62UlMcE9dVUxMq3/O7jjL7k9gY/Mmrqr/
+            UsIM2+oMzwyLxDVFJVOgS+dQRcsIhRo/y52EuSBhEsZU1ZJr2n76YgT6hAGEBlXHQ1xnXBszcAMq
+            8c3daDNUCZ5tKCOEcKHroVdvIlz+LZVFoo465ZoF5t6L0VOU5NYIzavjVn26+QI=
+          </X509Certificate>
+        </X509Data>
+      </KeyInfo>
+    </Signature>
+    <Subject>
+      <NameID Format="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">
+        brian_inversoft.com#EXT#@brianinversoft.onmicrosoft.com
+      </NameID>
+      <SubjectConfirmation Method="urn:oasis:names:tc:SAML:2.0:cm:bearer">
+        <SubjectConfirmationData InResponseTo="id31f83b35-5954-4b67-acf8-763c15fc3aac"
+                                 NotOnOrAfter="2019-02-28T18:34:55.473Z"
+                                 Recipient="https://local.fusionauth.io/oauth2/callback"/>
+      </SubjectConfirmation>
+    </Subject>
+    <Conditions NotBefore="2019-02-28T18:24:55.473Z" NotOnOrAfter="2019-02-28T19:24:55.473Z">
+      <AudienceRestriction>
+        <Audience>https://local.fusionauth.io</Audience>
+      </AudienceRestriction>
+    </Conditions>
+    <AttributeStatement>
+      <Attribute Name="http://schemas.microsoft.com/identity/claims/displayname">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">Brian Pontarelli
+        </AttributeValue>
+      </Attribute>
+      <Attribute Name="http://schemas.microsoft.com/identity/claims/identityprovider">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">live.com
+        </AttributeValue>
+      </Attribute>
+      <Attribute Name="http://schemas.microsoft.com/identity/claims/tenantid">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">
+          c2150111-3c44-4508-9f08-790cb4032a23
+        </AttributeValue>
+      </Attribute>
+      <Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">
+          brian_inversoft.com#EXT#@brianinversoft.onmicrosoft.com
+        </AttributeValue>
+      </Attribute>
+      <Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">Brian
+        </AttributeValue>
+      </Attribute>
+      <Attribute Name="http://schemas.microsoft.com/identity/claims/objectidentifier">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">
+          2b206baa-20d2-4273-b223-4cc5328272e8
+        </AttributeValue>
+      </Attribute>
+      <Attribute Name="http://schemas.microsoft.com/claims/authnmethodsreferences">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">
+          http://schemas.microsoft.com/ws/2008/06/identity/authenticationmethod/password
+        </AttributeValue>
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">
+          http://schemas.microsoft.com/ws/2008/06/identity/authenticationmethod/unspecified
+        </AttributeValue>
+      </Attribute>
+      <Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">Pontarelli
+        </AttributeValue>
+      </Attribute>
+      <Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress">
+        <AttributeValue xmlns:xs="http://www.w3.org/2001/XMLSchema"
+                        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:type="xs:string">brian@inversoft.com
+        </AttributeValue>
+      </Attribute>
+    </AttributeStatement>
+    <AuthnStatement AuthnInstant="2019-04-16T13:54:00.446Z">
+      <AuthnContext>
+        <AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</AuthnContextClassRef>
+      </AuthnContext>
+    </AuthnStatement>
+  </Assertion>
+</ns3:Response>

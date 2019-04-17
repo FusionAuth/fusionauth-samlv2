@@ -33,7 +33,7 @@ import javax.xml.crypto.dsig.dom.DOMSignContext;
 import javax.xml.crypto.dsig.dom.DOMValidateContext;
 import javax.xml.crypto.dsig.keyinfo.KeyInfo;
 import javax.xml.crypto.dsig.keyinfo.KeyInfoFactory;
-import javax.xml.crypto.dsig.keyinfo.KeyValue;
+import javax.xml.crypto.dsig.keyinfo.X509Data;
 import javax.xml.crypto.dsig.spec.C14NMethodParameterSpec;
 import javax.xml.crypto.dsig.spec.TransformParameterSpec;
 import javax.xml.datatype.XMLGregorianCalendar;
@@ -58,6 +58,7 @@ import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -142,8 +143,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLv2Service.class);
 
   @Override
-  public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PublicKey publicKey,
-                                   PrivateKey privateKey, Algorithm algorithm) throws SAMLException {
+  public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
+                                   X509Certificate certificate, Algorithm algorithm) throws SAMLException {
     ResponseType jaxbResponse = new ResponseType();
 
     // Status (element - order safe)
@@ -288,8 +289,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           factory.newSignatureMethod(algorithm.uri, null),
           Collections.singletonList(ref));
       KeyInfoFactory kif = factory.getKeyInfoFactory();
-      KeyValue kv = kif.newKeyValue(publicKey);
-      KeyInfo ki = kif.newKeyInfo(Collections.singletonList(kv));
+      X509Data data = kif.newX509Data(Collections.singletonList(certificate));
+      KeyInfo ki = kif.newKeyInfo(Collections.singletonList(data));
       XMLSignature signature = factory.newXMLSignature(si, ki);
 
       signature.sign(dsc);
@@ -298,7 +299,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       TransformerFactory tf = TransformerFactory.newInstance();
       Transformer transformer = tf.newTransformer();
       transformer.transform(new DOMSource(document), new StreamResult(sw));
-      String xml = sw.toString();
+      String xml = sw.toString().replace("\n", "").replace("\r", "");
       return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));
     } catch (Exception e) {
       throw new SAMLException("Unable to sign XML SAML response", e);
@@ -458,6 +459,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     response.issuer = jaxbResponse.getIssuer() != null ? jaxbResponse.getIssuer().getValue() : null;
     response.instant = toZonedDateTime(jaxbResponse.getIssueInstant());
     response.destination = jaxbResponse.getDestination();
+    response.version = jaxbResponse.getVersion();
 
     List<Object> assertions = jaxbResponse.getAssertionOrEncryptedAssertion();
     for (Object assertion : assertions) {
@@ -535,8 +537,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   private String _buildAuthnRequest(String id, String issuer, String version, String relayState, boolean sign,
-                                    PrivateKey key,
-                                    Algorithm algorithm) throws SAMLException {
+                                    PrivateKey key, Algorithm algorithm) throws SAMLException {
     // SAML Web SSO profile requirements (section 4.1.4.1)
     AuthnRequestType authnRequest = new AuthnRequestType();
     authnRequest.setIssuer(new NameIDType());

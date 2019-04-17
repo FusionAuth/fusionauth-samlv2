@@ -17,7 +17,7 @@ package io.fusionauth.samlv2.service;
 
 import java.math.BigInteger;
 import java.security.KeyPair;
-import java.security.cert.Certificate;
+import java.security.cert.X509Certificate;
 import java.time.ZonedDateTime;
 import java.util.Date;
 
@@ -43,13 +43,13 @@ public class CertificateTools {
    * @return The Certificate.
    * @throws IllegalArgumentException If the input is not valid and the certificate could not be created.
    */
-  public static Certificate fromKeyPair(KeyPair keyPair, Algorithm algorithm, String issuer)
+  public static X509Certificate fromKeyPair(KeyPair keyPair, Algorithm algorithm, String issuer)
       throws IllegalArgumentException {
     try {
       X509CertInfo certInfo = new X509CertInfo();
       CertificateX509Key certKey = new CertificateX509Key(keyPair.getPublic());
       certInfo.set(X509CertInfo.KEY, certKey);
-      certInfo.set(X509CertInfo.VERSION, new CertificateVersion(2));
+      certInfo.set(X509CertInfo.VERSION, new CertificateVersion(1));
       certInfo.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(AlgorithmId.sha256WithRSAEncryption_oid)));
       certInfo.set(X509CertInfo.ISSUER, new X500Name("cn=" + issuer));
       certInfo.set(X509CertInfo.SUBJECT, new X500Name("cn=" + issuer));

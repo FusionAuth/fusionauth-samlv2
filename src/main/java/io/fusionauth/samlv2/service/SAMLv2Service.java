@@ -17,6 +17,7 @@ package io.fusionauth.samlv2.service;
 
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.X509Certificate;
 
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
@@ -33,16 +34,16 @@ public interface SAMLv2Service {
   /**
    * Builds a SAML AuthnResponse that can be sent back to the service provider.
    *
-   * @param response   The authentication response that is converted to a AuthnResponse.
-   * @param sign       Determines if the XML should be signed or not.
-   * @param publicKey  The public key to include in the XML signature.
-   * @param privateKey The key that is used to sign the request (private key, shared, secret, etc).
-   * @param algorithm  The signing algorithm to use (if any).
+   * @param response    The authentication response that is converted to a AuthnResponse.
+   * @param sign        Determines if the XML should be signed or not.
+   * @param privateKey  The key that is used to sign the request (private key, shared, secret, etc).
+   * @param certificate The certificate that is included in the response.
+   * @param algorithm   The signing algorithm to use (if any).
    * @return The response base-64 encoded.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  String buildAuthnResponse(AuthenticationResponse response, boolean sign, PublicKey publicKey, PrivateKey privateKey,
-                            Algorithm algorithm) throws SAMLException;
+  String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
+                            X509Certificate certificate, Algorithm algorithm) throws SAMLException;
 
   /**
    * Builds a HTTP-Redirect binding to a AuthnRequest protocol.
@@ -60,15 +61,6 @@ public interface SAMLv2Service {
                                        Algorithm algorithm) throws SAMLException;
 
   /**
-   * Builds the metadata response for a SAML IdP.
-   *
-   * @param metaData The metadata to build XMl from.
-   * @return The metadata response XML as a String.
-   * @throws SAMLException If the JAXB marshalling failed.
-   */
-  String buildMetadataResponse(MetaData metaData) throws SAMLException;
-
-  /**
    * Builds an invalid HTTP-Redirect binding to a AuthnRequest protocol for testing.
    *
    * @param id         The request id that is echoed in the response.
@@ -82,6 +74,15 @@ public interface SAMLv2Service {
    */
   String buildInvalidTestingHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign,
                                                      PrivateKey key, Algorithm algorithm) throws SAMLException;
+
+  /**
+   * Builds the metadata response for a SAML IdP.
+   *
+   * @param metaData The metadata to build XMl from.
+   * @return The metadata response XML as a String.
+   * @throws SAMLException If the JAXB marshalling failed.
+   */
+  String buildMetadataResponse(MetaData metaData) throws SAMLException;
 
   /**
    * Parses a SAML 2.0 MetaData response and converts it to a simple to use object.

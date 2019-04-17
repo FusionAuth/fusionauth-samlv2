@@ -226,7 +226,7 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
-    String encodedXML = service.buildAuthnResponse(response, true, kp.getPublic(), kp.getPrivate(), Algorithm.RS256);
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256);
     System.out.println(new String(Base64.getDecoder().decode(encodedXML)));
     response = service.parseResponse(encodedXML, true, kp.getPublic());
 
