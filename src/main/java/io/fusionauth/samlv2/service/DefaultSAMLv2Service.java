@@ -408,6 +408,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                             boolean verifySignature, PublicKey key, Algorithm algorithm)
       throws SAMLException {
     byte[] requestBytes = decodeAndInflate(encodedRequest);
+    if (logger.isDebugEnabled()) {
+      logger.debug("SAMLRequest XML is\n{}", new String(requestBytes, StandardCharsets.UTF_8));
+    }
+
     Document document = parseFromBytes(requestBytes);
     AuthnRequestType authnRequest = unmarshallFromDocument(document, AuthnRequestType.class);
     AuthenticationRequest result = new AuthenticationRequest();
