@@ -48,8 +48,7 @@ public interface SAMLv2Service {
   /**
    * Builds a HTTP-Redirect binding to a AuthnRequest protocol.
    *
-   * @param id         The request id that is echoed in the response.
-   * @param issuer     The issuer that is put into the SAML request.
+   * @param request    The AuthnRequest information.
    * @param relayState The relay state parameter (required if signing).
    * @param sign       Determines if the request should be signed or not.
    * @param key        The key that is used to sign the request (private key, shared, secret, etc).
@@ -57,14 +56,13 @@ public interface SAMLv2Service {
    * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign, PrivateKey key,
+  String buildHTTPRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign, PrivateKey key,
                                        Algorithm algorithm) throws SAMLException;
 
   /**
    * Builds an invalid HTTP-Redirect binding to a AuthnRequest protocol for testing.
    *
-   * @param id         The request id that is echoed in the response.
-   * @param issuer     The issuer that is put into the SAML request.
+   * @param request    The AuthnRequest information.
    * @param relayState The relay state parameter (required if signing).
    * @param sign       Determines if the request should be signed or not.
    * @param key        The key that is used to sign the request (private key, shared, secret, etc).
@@ -72,7 +70,7 @@ public interface SAMLv2Service {
    * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  String buildInvalidTestingHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign,
+  String buildInvalidTestingHTTPRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
                                                      PrivateKey key, Algorithm algorithm) throws SAMLException;
 
   /**

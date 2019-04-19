@@ -23,6 +23,8 @@ import java.time.ZonedDateTime;
  * @author Brian Pontarelli
  */
 public class AuthenticationRequest {
+  public String acsURL;
+  
   public String id;
 
   public ZonedDateTime issueInstant;

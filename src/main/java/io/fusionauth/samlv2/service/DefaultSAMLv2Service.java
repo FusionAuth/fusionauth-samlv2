@@ -307,16 +307,18 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public String buildHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign, PrivateKey key,
+  public String buildHTTPRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
+                                              PrivateKey key,
                                               Algorithm algorithm)
       throws SAMLException {
-    return _buildAuthnRequest(id, issuer, "2.0", relayState, sign, key, algorithm);
+    return _buildAuthnRequest(request, "2.0", relayState, sign, key, algorithm);
   }
 
   @Override
-  public String buildInvalidTestingHTTPRedirectAuthnRequest(String id, String issuer, String relayState, boolean sign,
+  public String buildInvalidTestingHTTPRedirectAuthnRequest(AuthenticationRequest request, String relayState,
+                                                            boolean sign,
                                                             PrivateKey key, Algorithm algorithm) throws SAMLException {
-    return _buildAuthnRequest(id, issuer, "bad", relayState, sign, key, algorithm);
+    return _buildAuthnRequest(request, "bad", relayState, sign, key, algorithm);
   }
 
   @Override
@@ -540,16 +542,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return response;
   }
 
-  private String _buildAuthnRequest(String id, String issuer, String version, String relayState, boolean sign,
+  private String _buildAuthnRequest(AuthenticationRequest request, String version, String relayState, boolean sign,
                                     PrivateKey key, Algorithm algorithm) throws SAMLException {
     // SAML Web SSO profile requirements (section 4.1.4.1)
     AuthnRequestType authnRequest = new AuthnRequestType();
+    authnRequest.setAssertionConsumerServiceURL(request.acsURL);
     authnRequest.setIssuer(new NameIDType());
-    authnRequest.getIssuer().setValue(issuer);
+    authnRequest.getIssuer().setValue(request.issuer);
     authnRequest.setNameIDPolicy(new NameIDPolicyType());
     authnRequest.getNameIDPolicy().setFormat("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress");
     authnRequest.getNameIDPolicy().setAllowCreate(false);
-    authnRequest.setID(id);
+    authnRequest.setID(request.id);
     authnRequest.setVersion(version);
     authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
 

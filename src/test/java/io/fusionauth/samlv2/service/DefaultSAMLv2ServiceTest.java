@@ -40,7 +40,6 @@ import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
-import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
@@ -61,8 +60,12 @@ public class DefaultSAMLv2ServiceTest {
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
 
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "https://local.fusionauth.io";
+
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String parameters = service.buildHTTPRedirectAuthnRequest("foobarbaz", "https://local.fusionauth.io", "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+    String parameters = service.buildHTTPRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
     System.out.println(parameters);
 //    assertEquals(parameters, "SAMLRequest=eJx9kNtOwzAMhl8lMtdt0rQ7RU2niQlpEiDEBvdZ63WVsmQkKWVvTzZON8Cl7c%2BW%2F6%2Bcvx00eUXnO2skZCkDgqa2TWdaCU%2Bbm2QKxAdlGqWtQQnGwrwqjc%2BF6sPePOJLjz5sTkck8ZLxIo4k9M4Iq3wXS3VAL0It1ou7W8FTJo7OBltbDR8L%2F8PKe3Qh%2Fgbf57mEfQhHQekwDOmQp9a1lDPGKJvRCDW%2Ba69%2B8OIPPKOsOOMxbaRXSwmIBZ%2Fkiifb0bhOijzLk%2BlEYTKabTnjE9bsxuNIet%2FjypydBAlAnr%2FcxXehKi9jV4UoJSokGc9L%2Btm7WLuPEVfLB6u7%2BkQWWtvh2qEK0exOaY9Aq5L%2BZrd6BwQejFI%3D&RelayState=Relay-State-String&SigAlg=http%3A%2F%2Fwww.w3.org%2F2000%2F09%2Fxmldsig%23rsa-sha1&Signature=MCwCFCZDBcWxZD65RY0AR8K4WhNzs0tZAhRQFyc80lMy7yTl9a8UQMSST4wioA%3D%3D");
 
@@ -131,13 +134,6 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
-  public void randomJunk() throws SAMLException {
-    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String parameters = service.buildHTTPRedirectAuthnRequest("foobarbaz", "c98742e0-887a-44c7-ad62-07af15622f58", "Relay-State-String", false, null, null);
-    System.out.println("https://local.fusionauth.io/samlv2/login?" + parameters);
-  }
-
-  @Test
   public void parseMetaData() throws Exception {
     byte[] buf = Files.readAllBytes(Paths.get("src/test/xml/metadata.xml"));
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
@@ -182,8 +178,12 @@ public class DefaultSAMLv2ServiceTest {
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
 
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "https://local.fusionauth.io";
+
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String parameters = service.buildHTTPRedirectAuthnRequest("foobarbaz", "https://local.fusionauth.io", "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+    String parameters = service.buildHTTPRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
     System.out.println(parameters);
 
     // Unwind the request
@@ -208,7 +208,7 @@ public class DefaultSAMLv2ServiceTest {
     String signature = URLDecoder.decode(parameters.substring(start + "Signature=".length(), end), "UTF-8");
 
     // Parse the request
-    AuthenticationRequest request = service.parseRequest(encodedRequest, relayState, signature, true, kp.getPublic(), Algorithm.fromURI(sigAlg));
+    request = service.parseRequest(encodedRequest, relayState, signature, true, kp.getPublic(), Algorithm.fromURI(sigAlg));
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
