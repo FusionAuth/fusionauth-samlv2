@@ -18,6 +18,7 @@ package io.fusionauth.samlv2.service;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.crypto.dsig.CanonicalizationMethod;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.net.URLDecoder;
@@ -226,7 +227,7 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
-    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256);
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
     System.out.println(new String(Base64.getDecoder().decode(encodedXML)));
     response = service.parseResponse(encodedXML, true, kp.getPublic());
 

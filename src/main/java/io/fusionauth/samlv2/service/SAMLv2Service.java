@@ -34,16 +34,18 @@ public interface SAMLv2Service {
   /**
    * Builds a SAML AuthnResponse that can be sent back to the service provider.
    *
-   * @param response    The authentication response that is converted to a AuthnResponse.
-   * @param sign        Determines if the XML should be signed or not.
-   * @param privateKey  The key that is used to sign the request (private key, shared, secret, etc).
-   * @param certificate The certificate that is included in the response.
-   * @param algorithm   The signing algorithm to use (if any).
+   * @param response               The authentication response that is converted to a AuthnResponse.
+   * @param sign                   Determines if the XML should be signed or not.
+   * @param privateKey             The key that is used to sign the request (private key, shared, secret, etc).
+   * @param certificate            The certificate that is included in the response.
+   * @param algorithm              The signing algorithm to use (if any).
+   * @param xmlSignatureX14nMethod The XML signature canonicalization method used.
    * @return The response base-64 encoded.
    * @throws SAMLException If any unrecoverable errors occur.
    */
   String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
-                            X509Certificate certificate, Algorithm algorithm) throws SAMLException;
+                            X509Certificate certificate, Algorithm algorithm, String xmlSignatureX14nMethod)
+      throws SAMLException;
 
   /**
    * Builds a HTTP-Redirect binding to a AuthnRequest protocol.

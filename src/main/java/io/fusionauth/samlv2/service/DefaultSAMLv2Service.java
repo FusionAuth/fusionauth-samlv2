@@ -21,7 +21,6 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.crypto.MarshalException;
-import javax.xml.crypto.dsig.CanonicalizationMethod;
 import javax.xml.crypto.dsig.DigestMethod;
 import javax.xml.crypto.dsig.Reference;
 import javax.xml.crypto.dsig.SignedInfo;
@@ -144,7 +143,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
   @Override
   public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
-                                   X509Certificate certificate, Algorithm algorithm) throws SAMLException {
+                                   X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+      throws SAMLException {
     ResponseType jaxbResponse = new ResponseType();
 
     // Status (element - order safe)
@@ -285,7 +285,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           Collections.singletonList(factory.newTransform(Transform.ENVELOPED, (TransformParameterSpec) null)),
           null,
           null);
-      SignedInfo si = factory.newSignedInfo(factory.newCanonicalizationMethod(CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, (C14NMethodParameterSpec) null),
+      SignedInfo si = factory.newSignedInfo(factory.newCanonicalizationMethod(xmlSignatureC14nMethod, (C14NMethodParameterSpec) null),
           factory.newSignatureMethod(algorithm.uri, null),
           Collections.singletonList(ref));
       KeyInfoFactory kif = factory.getKeyInfoFactory();
