@@ -649,6 +649,23 @@
               <rule>
                 <match>
                   <AND>
+                    <INITIALIZER_BLOCK>true</INITIALIZER_BLOCK>
+                    <STATIC>true</STATIC>
+                  </AND>
+                </match>
+              </rule>
+            </section>
+            <section>
+              <rule>
+                <match>
+                  <INITIALIZER_BLOCK>true</INITIALIZER_BLOCK>
+                </match>
+              </rule>
+            </section>
+            <section>
+              <rule>
+                <match>
+                  <AND>
                     <CONSTRUCTOR>true</CONSTRUCTOR>
                     <PUBLIC>true</PUBLIC>
                     <STATIC>true</STATIC>

@@ -21,6 +21,7 @@ import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.crypto.MarshalException;
+import javax.xml.crypto.dsig.CanonicalizationMethod;
 import javax.xml.crypto.dsig.DigestMethod;
 import javax.xml.crypto.dsig.Reference;
 import javax.xml.crypto.dsig.SignedInfo;
@@ -47,6 +48,7 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.lang.reflect.Field;
 import java.math.BigInteger;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -140,6 +142,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   private static final ObjectFactory PROTOCOL_OBJECT_FACTORY = new ObjectFactory();
 
   private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLv2Service.class);
+
+  static {
+    try {
+      Class<?> utilClass = Class.forName("com.sun.org.apache.xml.internal.security.utils.XMLUtils");
+      Field f = utilClass.getDeclaredField("ignoreLineBreaks");
+      f.setAccessible(true);
+      f.set(null, Boolean.TRUE);
+    } catch (Exception e) {
+      e.printStackTrace();
+    }
+  }
 
   @Override
   public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
@@ -280,12 +293,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
       // Sign away
       XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
+      CanonicalizationMethod c14n = factory.newCanonicalizationMethod(xmlSignatureC14nMethod, (C14NMethodParameterSpec) null);
       Reference ref = factory.newReference("#" + toSign.getAttribute("ID"),
           factory.newDigestMethod(DigestMethod.SHA256, null),
-          Collections.singletonList(factory.newTransform(Transform.ENVELOPED, (TransformParameterSpec) null)),
+          Arrays.asList(factory.newTransform(Transform.ENVELOPED, (TransformParameterSpec) null), c14n),
           null,
           null);
-      SignedInfo si = factory.newSignedInfo(factory.newCanonicalizationMethod(xmlSignatureC14nMethod, (C14NMethodParameterSpec) null),
+      SignedInfo si = factory.newSignedInfo(c14n,
           factory.newSignatureMethod(algorithm.uri, null),
           Collections.singletonList(ref));
       KeyInfoFactory kif = factory.getKeyInfoFactory();
@@ -299,7 +313,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       TransformerFactory tf = TransformerFactory.newInstance();
       Transformer transformer = tf.newTransformer();
       transformer.transform(new DOMSource(document), new StreamResult(sw));
-      String xml = sw.toString().replace("\n", "").replace("\r", "");
+      String xml = sw.toString();
       return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));
     } catch (Exception e) {
       throw new SAMLException("Unable to sign XML SAML response", e);
