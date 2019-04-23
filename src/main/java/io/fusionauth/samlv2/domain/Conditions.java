@@ -25,10 +25,4 @@ public class Conditions {
   public ZonedDateTime notBefore;
 
   public ZonedDateTime notOnOrAfter;
-
-  public boolean oneTimeUse;
-
-  public List<String> proxyAudiences = new ArrayList<>();
-
-  public Integer proxyCount;
 }

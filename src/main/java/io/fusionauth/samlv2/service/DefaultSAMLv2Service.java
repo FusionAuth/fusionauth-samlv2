@@ -49,7 +49,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.lang.reflect.Field;
-import java.math.BigInteger;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
@@ -99,8 +98,6 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ConditionAbstractType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ConditionsType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.EncryptedElementType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.NameIDType;
-import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.OneTimeUseType;
-import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ProxyRestrictionType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.StatementAbstractType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationDataType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectConfirmationType;
@@ -203,16 +200,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           NameIDType nameIdType = new NameIDType();
           nameIdType.setValue(response.assertion.subject.nameID.id);
           nameIdType.setFormat(response.assertion.subject.nameID.format.toSAMLFormat());
-          nameIdType.setNameQualifier(response.assertion.subject.nameID.qualifier);
-          nameIdType.setSPNameQualifier(response.assertion.subject.nameID.spQualifier);
-          nameIdType.setSPProvidedID(response.assertion.subject.nameID.spProviderID);
           subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createNameID(nameIdType));
         }
 
         // Subject confirmation (element)
         if (response.assertion.subject.subjectConfirmation != null) {
           SubjectConfirmationDataType dataType = new SubjectConfirmationDataType();
-          dataType.setAddress(response.assertion.subject.subjectConfirmation.address);
           dataType.setInResponseTo(response.assertion.subject.subjectConfirmation.inResponseTo);
           dataType.setNotBefore(toXMLGregorianCalendar(response.assertion.subject.subjectConfirmation.notBefore));
           dataType.setNotOnOrAfter(toXMLGregorianCalendar(response.assertion.subject.subjectConfirmation.notOnOrAfter));
@@ -241,20 +234,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           AudienceRestrictionType audienceRestrictionType = new AudienceRestrictionType();
           audienceRestrictionType.getAudience().addAll(response.assertion.conditions.audiences);
           conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(audienceRestrictionType);
-        }
-
-        // OneTimeUse (element)
-        if (response.assertion.conditions.oneTimeUse) {
-          OneTimeUseType oneTimeUseType = new OneTimeUseType();
-          conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(oneTimeUseType);
-        }
-
-        // Proxy (element)
-        if (response.assertion.conditions.proxyAudiences.size() > 0 || response.assertion.conditions.proxyCount != null) {
-          ProxyRestrictionType proxyRestrictionType = new ProxyRestrictionType();
-          proxyRestrictionType.setCount(response.assertion.conditions.proxyCount != null ? BigInteger.valueOf(response.assertion.conditions.proxyCount) : null);
-          proxyRestrictionType.getAudience().addAll(response.assertion.conditions.proxyAudiences);
-          conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(proxyRestrictionType);
         }
       }
 
@@ -539,12 +518,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           if (conditionAbstractType instanceof AudienceRestrictionType) {
             AudienceRestrictionType restrictionType = (AudienceRestrictionType) conditionAbstractType;
             response.assertion.conditions.audiences.addAll(restrictionType.getAudience());
-          } else if (conditionAbstractType instanceof OneTimeUseType) {
-            response.assertion.conditions.oneTimeUse = true;
-          } else if (conditionAbstractType instanceof ProxyRestrictionType) {
-            ProxyRestrictionType proxyRestrictionType = (ProxyRestrictionType) conditionAbstractType;
-            response.assertion.conditions.proxyAudiences.addAll(proxyRestrictionType.getAudience());
-            response.assertion.conditions.proxyCount = proxyRestrictionType.getCount() == null ? null : proxyRestrictionType.getCount().intValue();
           }
         }
       }
@@ -714,7 +687,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     SubjectConfirmation subjectConfirmation = new SubjectConfirmation();
     SubjectConfirmationDataType data = subjectConfirmationType.getSubjectConfirmationData();
     if (data != null) {
-      subjectConfirmation.address = data.getAddress();
       subjectConfirmation.inResponseTo = data.getInResponseTo();
       subjectConfirmation.notBefore = toZonedDateTime(data.getNotBefore());
       subjectConfirmation.notOnOrAfter = toZonedDateTime(data.getNotOnOrAfter());
@@ -740,9 +712,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   private NameID parseNameId(NameIDType element) {
     NameID nameId = new NameID();
     nameId.format = NameIDFormat.fromSAMLFormat(element.getFormat());
-    nameId.qualifier = element.getNameQualifier();
-    nameId.spQualifier = element.getSPNameQualifier();
-    nameId.spProviderID = element.getSPProvidedID();
     nameId.id = element.getValue();
     return nameId;
   }

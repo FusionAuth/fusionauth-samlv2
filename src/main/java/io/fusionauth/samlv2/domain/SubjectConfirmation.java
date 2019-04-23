@@ -21,8 +21,6 @@ import java.time.ZonedDateTime;
  * @author Brian Pontarelli
  */
 public class SubjectConfirmation {
-  public String address;
-
   public String inResponseTo;
 
   public ConfirmationMethod method;

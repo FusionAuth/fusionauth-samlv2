@@ -19,10 +19,4 @@ public class NameID {
   public NameIDFormat format;
 
   public String id;
-
-  public String qualifier;
-
-  public String spProviderID;
-
-  public String spQualifier;
 }
