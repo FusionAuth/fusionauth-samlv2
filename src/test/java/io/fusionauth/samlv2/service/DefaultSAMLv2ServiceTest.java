@@ -161,16 +161,16 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, true, key);
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
-    assertTrue(response.notBefore.isBefore(ZonedDateTime.now()));
-    assertTrue(ZonedDateTime.now().isAfter(response.notOnOrAfter));
-    assertTrue(response.instant.isBefore(ZonedDateTime.now()));
+    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
+    assertTrue(ZonedDateTime.now().isAfter(response.assertion.conditions.notOnOrAfter));
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now()));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
     assertEquals(response.status.code, ResponseStatus.Success);
-    assertEquals(response.user.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
-    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
-    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
-    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
-    assertEquals(response.user.format, NameIDFormat.EmailAddress);
+    assertEquals(response.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
+    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
+    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
+    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
+    assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
   }
 
   @Test
@@ -232,15 +232,15 @@ public class DefaultSAMLv2ServiceTest {
     response = service.parseResponse(encodedXML, true, kp.getPublic());
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
-    assertTrue(response.notBefore.isBefore(ZonedDateTime.now()));
-    assertTrue(ZonedDateTime.now().isAfter(response.notOnOrAfter));
-    assertTrue(response.instant.isBefore(ZonedDateTime.now()));
+    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
+    assertTrue(ZonedDateTime.now().isAfter(response.assertion.conditions.notOnOrAfter));
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now()));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
     assertEquals(response.status.code, ResponseStatus.Success);
-    assertEquals(response.user.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
-    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
-    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
-    assertEquals(response.user.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
-    assertEquals(response.user.format, NameIDFormat.EmailAddress);
+    assertEquals(response.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
+    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
+    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
+    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
+    assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
   }
 }

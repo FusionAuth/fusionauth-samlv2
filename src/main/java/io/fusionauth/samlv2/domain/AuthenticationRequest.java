@@ -24,7 +24,9 @@ import java.time.ZonedDateTime;
  */
 public class AuthenticationRequest {
   public String acsURL;
-  
+
+  public String xml;
+
   public String id;
 
   public ZonedDateTime issueInstant;

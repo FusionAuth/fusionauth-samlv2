@@ -80,13 +80,15 @@ import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
+import io.fusionauth.samlv2.domain.Conditions;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
 import io.fusionauth.samlv2.domain.MetaData;
+import io.fusionauth.samlv2.domain.NameID;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
-import io.fusionauth.samlv2.domain.User;
-import io.fusionauth.samlv2.domain.UserConfirmation;
+import io.fusionauth.samlv2.domain.Subject;
+import io.fusionauth.samlv2.domain.SubjectConfirmation;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AssertionType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AttributeStatementType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AttributeType;
@@ -160,14 +162,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       throws SAMLException {
     ResponseType jaxbResponse = new ResponseType();
 
-    // Status (element - order safe)
+    // Status (element)
     StatusType status = new StatusType();
     status.setStatusCode(new StatusCodeType());
     status.getStatusCode().setValue(response.status.code.toSAMLFormat());
     status.setStatusMessage(response.status.message);
     jaxbResponse.setStatus(status);
 
-    // Id (attribute), issuer (element - order safe) and version (attribute)
+    // Id (attribute), issuer (element) and version (attribute)
     jaxbResponse.setID(response.id);
     jaxbResponse.setIssuer(new NameIDType());
     jaxbResponse.getIssuer().setValue(response.issuer);
@@ -177,14 +179,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     jaxbResponse.setInResponseTo(response.inResponseTo);
 
     // Instant (attribute)
-    jaxbResponse.setIssueInstant(toXMLGregorianCalendar(response.instant));
+    jaxbResponse.setIssueInstant(toXMLGregorianCalendar(response.issueInstant));
 
     // Destination (Attribute)
     jaxbResponse.setDestination(response.destination);
 
-    // The main assertion element (element  - order safe)
+    // The main assertion (element)
     AssertionType assertionType = new AssertionType();
-    if (response.user != null && response.status.code == ResponseStatus.Success) {
+    if (response.assertion != null && response.status.code == ResponseStatus.Success) {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       String id = "_" + UUID.randomUUID().toString();
       assertionType.setID(id);
@@ -192,65 +194,73 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       assertionType.setIssueInstant(toXMLGregorianCalendar(now));
       assertionType.setVersion(response.version);
 
-      // NameId
-      SubjectType subjectType = new SubjectType();
-      NameIDType nameIdType = new NameIDType();
-      nameIdType.setValue(response.user.id);
-      nameIdType.setFormat(response.user.format.toSAMLFormat());
-      nameIdType.setNameQualifier(response.user.qualifier);
-      nameIdType.setSPNameQualifier(response.user.spQualifier);
-      nameIdType.setSPProvidedID(response.user.spProviderID);
-      subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createNameID(nameIdType));
+      // Subject (element)
+      if (response.assertion.subject != null) {
+        SubjectType subjectType = new SubjectType();
 
-      // Subject confirmation
-      if (response.confirmation != null) {
-        SubjectConfirmationDataType dataType = new SubjectConfirmationDataType();
-        dataType.setAddress(response.confirmation.address);
-        dataType.setInResponseTo(response.confirmation.inResponseTo);
-        dataType.setNotBefore(toXMLGregorianCalendar(response.confirmation.notBefore));
-        dataType.setNotOnOrAfter(toXMLGregorianCalendar(response.confirmation.notOnOrAfter));
-        dataType.setRecipient(response.confirmation.recipient);
-        SubjectConfirmationType subjectConfirmationType = new SubjectConfirmationType();
-        subjectConfirmationType.setSubjectConfirmationData(dataType);
-        if (response.confirmation.method != null) {
-          subjectConfirmationType.setMethod(response.confirmation.method.toSAMLFormat());
+        // NameId (element)
+        if (response.assertion.subject.nameID != null) {
+          NameIDType nameIdType = new NameIDType();
+          nameIdType.setValue(response.assertion.subject.nameID.id);
+          nameIdType.setFormat(response.assertion.subject.nameID.format.toSAMLFormat());
+          nameIdType.setNameQualifier(response.assertion.subject.nameID.qualifier);
+          nameIdType.setSPNameQualifier(response.assertion.subject.nameID.spQualifier);
+          nameIdType.setSPProvidedID(response.assertion.subject.nameID.spProviderID);
+          subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createNameID(nameIdType));
         }
-        subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createSubjectConfirmation(subjectConfirmationType));
+
+        // Subject confirmation (element)
+        if (response.assertion.subject.subjectConfirmation != null) {
+          SubjectConfirmationDataType dataType = new SubjectConfirmationDataType();
+          dataType.setAddress(response.assertion.subject.subjectConfirmation.address);
+          dataType.setInResponseTo(response.assertion.subject.subjectConfirmation.inResponseTo);
+          dataType.setNotBefore(toXMLGregorianCalendar(response.assertion.subject.subjectConfirmation.notBefore));
+          dataType.setNotOnOrAfter(toXMLGregorianCalendar(response.assertion.subject.subjectConfirmation.notOnOrAfter));
+          dataType.setRecipient(response.assertion.subject.subjectConfirmation.recipient);
+          SubjectConfirmationType subjectConfirmationType = new SubjectConfirmationType();
+          subjectConfirmationType.setSubjectConfirmationData(dataType);
+          if (response.assertion.subject.subjectConfirmation.method != null) {
+            subjectConfirmationType.setMethod(response.assertion.subject.subjectConfirmation.method.toSAMLFormat());
+          }
+          subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createSubjectConfirmation(subjectConfirmationType));
+        }
+
+        // Add the subject
+        assertionType.setSubject(subjectType);
       }
 
-      // Add the subject
-      assertionType.setSubject(subjectType);
+      // Conditions (element)
+      if (response.assertion.conditions != null) {
+        ConditionsType conditionsType = new ConditionsType();
+        conditionsType.setNotBefore(toXMLGregorianCalendar(response.assertion.conditions.notBefore));
+        conditionsType.setNotOnOrAfter(toXMLGregorianCalendar(response.assertion.conditions.notOnOrAfter));
+        assertionType.setConditions(conditionsType);
 
-      // Conditions
-      ConditionsType conditionsType = new ConditionsType();
-      conditionsType.setNotBefore(toXMLGregorianCalendar(response.notBefore));
-      conditionsType.setNotOnOrAfter(toXMLGregorianCalendar(response.notOnOrAfter));
-      assertionType.setConditions(conditionsType);
+        // Audiences (element)
+        if (response.assertion.conditions.audiences.size() > 0) {
+          AudienceRestrictionType audienceRestrictionType = new AudienceRestrictionType();
+          audienceRestrictionType.getAudience().addAll(response.assertion.conditions.audiences);
+          conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(audienceRestrictionType);
+        }
 
-      // Audiences
-      if (response.audiences.size() > 0) {
-        AudienceRestrictionType audienceRestrictionType = new AudienceRestrictionType();
-        audienceRestrictionType.getAudience().addAll(response.audiences);
-        conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(audienceRestrictionType);
+        // OneTimeUse (element)
+        if (response.assertion.conditions.oneTimeUse) {
+          OneTimeUseType oneTimeUseType = new OneTimeUseType();
+          conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(oneTimeUseType);
+        }
+
+        // Proxy (element)
+        if (response.assertion.conditions.proxyAudiences.size() > 0 || response.assertion.conditions.proxyCount != null) {
+          ProxyRestrictionType proxyRestrictionType = new ProxyRestrictionType();
+          proxyRestrictionType.setCount(response.assertion.conditions.proxyCount != null ? BigInteger.valueOf(response.assertion.conditions.proxyCount) : null);
+          proxyRestrictionType.getAudience().addAll(response.assertion.conditions.proxyAudiences);
+          conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(proxyRestrictionType);
+        }
       }
 
-      // OneTimeUse
-      if (response.oneTimeUse) {
-        OneTimeUseType oneTimeUseType = new OneTimeUseType();
-        conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(oneTimeUseType);
-      }
-
-      // Proxy
-      if (response.proxyAudiences.size() > 0 || response.proxyCount != null) {
-        ProxyRestrictionType proxyRestrictionType = new ProxyRestrictionType();
-        proxyRestrictionType.setCount(response.proxyCount != null ? BigInteger.valueOf(response.proxyCount) : null);
-        proxyRestrictionType.getAudience().addAll(response.proxyAudiences);
-        conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(proxyRestrictionType);
-      }
-
-      // Attributes
+      // Attributes (elements)
       AttributeStatementType attributeStatementType = new AttributeStatementType();
-      response.user.attributes.forEach((k, v) -> {
+      response.assertion.attributes.forEach((k, v) -> {
         AttributeType attributeType = new AttributeType();
         attributeType.setName(k);
         attributeType.getAttributeValue().addAll(v);
@@ -258,7 +268,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       });
       assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement().add(attributeStatementType);
 
-      // AuthnStatement
+      // AuthnStatement (element)
       AuthnStatementType authnStatement = new AuthnStatementType();
       authnStatement.setAuthnInstant(toXMLGregorianCalendar(now));
       authnStatement.setAuthnContext(new AuthnContextType());
@@ -424,13 +434,15 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                             boolean verifySignature, PublicKey key, Algorithm algorithm)
       throws SAMLException {
     byte[] requestBytes = decodeAndInflate(encodedRequest);
+    String xml = new String(requestBytes, StandardCharsets.UTF_8);
     if (logger.isDebugEnabled()) {
-      logger.debug("SAMLRequest XML is\n{}", new String(requestBytes, StandardCharsets.UTF_8));
+      logger.debug("SAMLRequest XML is\n{}", xml);
     }
 
     Document document = parseFromBytes(requestBytes);
     AuthnRequestType authnRequest = unmarshallFromDocument(document, AuthnRequestType.class);
     AuthenticationRequest result = new AuthenticationRequest();
+    result.xml = xml;
     result.id = authnRequest.getID();
     result.issuer = authnRequest.getIssuer().getValue();
     result.issueInstant = authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
@@ -477,7 +489,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     response.status.code = ResponseStatus.fromSAMLFormat(jaxbResponse.getStatus().getStatusCode().getValue());
     response.id = jaxbResponse.getID();
     response.issuer = jaxbResponse.getIssuer() != null ? jaxbResponse.getIssuer().getValue() : null;
-    response.instant = toZonedDateTime(jaxbResponse.getIssueInstant());
+    response.issueInstant = toZonedDateTime(jaxbResponse.getIssueInstant());
     response.destination = jaxbResponse.getDestination();
     response.version = jaxbResponse.getVersion();
 
@@ -493,20 +505,22 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       // Handle the subject
       SubjectType subject = assertionType.getSubject();
       if (subject != null) {
+        response.assertion.subject = new Subject();
+
         List<JAXBElement<?>> elements = subject.getContent();
         for (JAXBElement<?> element : elements) {
           Class<?> type = element.getDeclaredType();
           if (type == NameIDType.class) {
-            if (response.user != null) {
+            if (response.assertion.subject.nameID != null) {
               logger.warn("SAML response contained multiple NameID elements. Only the first one was used.");
               continue;
             }
 
             // Extract the name
-            response.user = parseUser((NameIDType) element.getValue());
+            response.assertion.subject.nameID = parseNameId((NameIDType) element.getValue());
           } else if (type == SubjectConfirmationType.class) {
             // Extract the confirmation
-            response.confirmation = parseConfirmation((SubjectConfirmationType) element.getValue());
+            response.assertion.subject.subjectConfirmation = parseConfirmation((SubjectConfirmationType) element.getValue());
           } else if (type == EncryptedElementType.class) {
             throw new SAMLException("This library currently doesn't handle encrypted assertions");
           }
@@ -515,20 +529,23 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
       // Handle conditions to pull out audience restriction
       ConditionsType conditionsType = assertionType.getConditions();
-      response.notBefore = convertToZonedDateTime(conditionsType.getNotBefore());
-      response.notOnOrAfter = convertToZonedDateTime(conditionsType.getNotOnOrAfter());
+      if (conditionsType != null) {
+        response.assertion.conditions = new Conditions();
+        response.assertion.conditions.notBefore = convertToZonedDateTime(conditionsType.getNotBefore());
+        response.assertion.conditions.notOnOrAfter = convertToZonedDateTime(conditionsType.getNotOnOrAfter());
 
-      List<ConditionAbstractType> conditionAbstractTypes = conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse();
-      for (ConditionAbstractType conditionAbstractType : conditionAbstractTypes) {
-        if (conditionAbstractType instanceof AudienceRestrictionType) {
-          AudienceRestrictionType restrictionType = (AudienceRestrictionType) conditionAbstractType;
-          response.audiences.addAll(restrictionType.getAudience());
-        } else if (conditionAbstractType instanceof OneTimeUseType) {
-          response.oneTimeUse = true;
-        } else if (conditionAbstractType instanceof ProxyRestrictionType) {
-          ProxyRestrictionType proxyRestrictionType = (ProxyRestrictionType) conditionAbstractType;
-          response.proxyAudiences.addAll(proxyRestrictionType.getAudience());
-          response.proxyCount = proxyRestrictionType.getCount() == null ? null : proxyRestrictionType.getCount().intValue();
+        List<ConditionAbstractType> conditionAbstractTypes = conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse();
+        for (ConditionAbstractType conditionAbstractType : conditionAbstractTypes) {
+          if (conditionAbstractType instanceof AudienceRestrictionType) {
+            AudienceRestrictionType restrictionType = (AudienceRestrictionType) conditionAbstractType;
+            response.assertion.conditions.audiences.addAll(restrictionType.getAudience());
+          } else if (conditionAbstractType instanceof OneTimeUseType) {
+            response.assertion.conditions.oneTimeUse = true;
+          } else if (conditionAbstractType instanceof ProxyRestrictionType) {
+            ProxyRestrictionType proxyRestrictionType = (ProxyRestrictionType) conditionAbstractType;
+            response.assertion.conditions.proxyAudiences.addAll(proxyRestrictionType.getAudience());
+            response.assertion.conditions.proxyCount = proxyRestrictionType.getCount() == null ? null : proxyRestrictionType.getCount().intValue();
+          }
         }
       }
 
@@ -544,7 +561,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
               String name = attributeType.getName();
               List<Object> attributeValues = attributeType.getAttributeValue();
               List<String> values = attributeValues.stream().map(this::attributeToString).collect(Collectors.toList());
-              response.user.attributes.computeIfAbsent(name, k -> new ArrayList<>()).addAll(values);
+              response.assertion.attributes.computeIfAbsent(name, k -> new ArrayList<>()).addAll(values);
             } else {
               throw new SAMLException("This library currently doesn't support encrypted attributes");
             }
@@ -693,20 +710,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
-  private UserConfirmation parseConfirmation(SubjectConfirmationType subjectConfirmationType) {
-    UserConfirmation userConfirmation = new UserConfirmation();
+  private SubjectConfirmation parseConfirmation(SubjectConfirmationType subjectConfirmationType) {
+    SubjectConfirmation subjectConfirmation = new SubjectConfirmation();
     SubjectConfirmationDataType data = subjectConfirmationType.getSubjectConfirmationData();
     if (data != null) {
-      userConfirmation.address = data.getAddress();
-      userConfirmation.inResponseTo = data.getInResponseTo();
-      userConfirmation.notBefore = toZonedDateTime(data.getNotBefore());
-      userConfirmation.notOnOrAfter = toZonedDateTime(data.getNotOnOrAfter());
-      userConfirmation.recipient = data.getRecipient();
+      subjectConfirmation.address = data.getAddress();
+      subjectConfirmation.inResponseTo = data.getInResponseTo();
+      subjectConfirmation.notBefore = toZonedDateTime(data.getNotBefore());
+      subjectConfirmation.notOnOrAfter = toZonedDateTime(data.getNotOnOrAfter());
+      subjectConfirmation.recipient = data.getRecipient();
     }
 
-    userConfirmation.method = ConfirmationMethod.fromSAMLFormat(subjectConfirmationType.getMethod());
+    subjectConfirmation.method = ConfirmationMethod.fromSAMLFormat(subjectConfirmationType.getMethod());
 
-    return userConfirmation;
+    return subjectConfirmation;
   }
 
   private Document parseFromBytes(byte[] bytes) throws SAMLException {
@@ -720,13 +737,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
-  private User parseUser(NameIDType nameID) {
-    NameIDFormat format = NameIDFormat.fromSAMLFormat(nameID.getFormat());
-    String qualifier = nameID.getNameQualifier();
-    String spQualifier = nameID.getSPNameQualifier();
-    String spProviderID = nameID.getSPProvidedID();
-    String id = nameID.getValue();
-    return new User(format, id, qualifier, spProviderID, spQualifier);
+  private NameID parseNameId(NameIDType element) {
+    NameID nameId = new NameID();
+    nameId.format = NameIDFormat.fromSAMLFormat(element.getFormat());
+    nameId.qualifier = element.getNameQualifier();
+    nameId.spQualifier = element.getSPNameQualifier();
+    nameId.spProviderID = element.getSPProvidedID();
+    nameId.id = element.getValue();
+    return nameId;
   }
 
   private Certificate toCertificate(KeyDescriptorType keyDescriptorType) {

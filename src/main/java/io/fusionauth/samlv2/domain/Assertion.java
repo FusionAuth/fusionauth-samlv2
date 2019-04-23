@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,27 +15,16 @@
  */
 package io.fusionauth.samlv2.domain;
 
-import java.time.ZonedDateTime;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 
-/**
- * The SAML v2.0 authentication response object that is sent back from the IDP.
- *
- * @author Brian Pontarelli
- */
-public class AuthenticationResponse {
-  public Assertion assertion = new Assertion();
+public class Assertion {
+  public Map<String, List<String>> attributes = new HashMap<>();
 
-  public String destination;
-
-  public String id;
-
-  public String inResponseTo;
-
-  public ZonedDateTime issueInstant;
+  public Conditions conditions;
 
   public String issuer;
 
-  public Status status = new Status();
-
-  public String version;
+  public Subject subject;
 }

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,20 +16,19 @@
 package io.fusionauth.samlv2.domain;
 
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
-/**
- * @author Brian Pontarelli
- */
-public class UserConfirmation {
-  public String address;
-
-  public String inResponseTo;
-
-  public ConfirmationMethod method;
+public class Conditions {
+  public List<String> audiences = new ArrayList<>();
 
   public ZonedDateTime notBefore;
 
   public ZonedDateTime notOnOrAfter;
 
-  public String recipient;
+  public boolean oneTimeUse;
+
+  public List<String> proxyAudiences = new ArrayList<>();
+
+  public Integer proxyCount;
 }
