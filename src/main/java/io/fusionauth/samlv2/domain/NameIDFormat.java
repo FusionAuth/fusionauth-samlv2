@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2019, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -61,7 +61,7 @@ public enum NameIDFormat {
    * and temporary pair-wise identifier. In such a case, they MAY be omitted in accordance with the rules specified in
    * Section 8.3.7.
    */
-  Transient("urn:oasis:names:tc:SAML:1.1:nameid-format:transient"),
+  Transient("urn:oasis:names:tc:SAML:2.0:nameid-format:transient"),
 
   /**
    * Indicates that the content of the element is a persistent opaque identifier for a principal that is specific to an
@@ -106,7 +106,7 @@ public enum NameIDFormat {
    * does not change (and would of course not be omitted). It might alternatively choose to create its own persistent
    * identifier to represent the principal and link the two values. This is a deployment decision.
    */
-  Persistent("urn:oasis:names:tc:SAML:1.1:nameid-format:persistent"),
+  Persistent("urn:oasis:names:tc:SAML:2.0:nameid-format:persistent"),
 
   /**
    * The interpretation of the content of the element is left to individual implementations.
@@ -131,12 +131,12 @@ public enum NameIDFormat {
    */
   private final String samlFormat;
 
-  private NameIDFormat(String samlFormat) {
+  NameIDFormat(String samlFormat) {
     this.samlFormat = samlFormat;
   }
 
   /**
-   * Locates the NameIDFOrmat using the given SAML String. This is the value from the StatusCode element's value.
+   * Locates the NameIDFormat using the given SAML String. This is the value from the StatusCode element's value.
    *
    * @param samlFormat The SAML string.
    * @return The NameIDFormat enum instance.
