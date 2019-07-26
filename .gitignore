@@ -1,3 +1,4 @@
 build
 *.iws
 .gradle
+.DS_Store
