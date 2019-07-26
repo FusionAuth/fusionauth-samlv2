@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2019, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -120,14 +120,15 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     String xml = service.buildMetadataResponse(metaData);
     System.out.println(xml);
-    assertTrue(xml.contains(metaData.id));
+    assertTrue(xml.contains("_" + metaData.id));
     assertTrue(xml.contains(metaData.entityId));
     assertTrue(xml.contains(metaData.idp.signInEndpoint));
     assertTrue(xml.contains(metaData.idp.logoutEndpoint));
+    assertTrue(xml.contains("<ns2:IDPSSODescriptor protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
 
     // Now parse it
     MetaData parsed = service.parseMetaData(xml);
-    assertEquals(parsed.id, metaData.id);
+    assertEquals(parsed.id, "_" + metaData.id);
     assertEquals(parsed.entityId, metaData.entityId);
     assertEquals(parsed.idp.signInEndpoint, metaData.idp.signInEndpoint);
     assertEquals(parsed.idp.logoutEndpoint, metaData.idp.logoutEndpoint);

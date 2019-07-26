@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2019, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -327,10 +327,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   @Override
   public String buildMetadataResponse(MetaData metaData) throws SAMLException {
     EntityDescriptorType root = new EntityDescriptorType();
-    root.setID(metaData.id);
+    root.setID("_" + metaData.id);
     root.setEntityID(metaData.entityId);
 
     IDPSSODescriptorType idp = new IDPSSODescriptorType();
+    idp.getProtocolSupportEnumeration().add("urn:oasis:names:tc:SAML:2.0:protocol");
+
     if (metaData.idp.signInEndpoint != null) {
       EndpointType signIn = new EndpointType();
       signIn.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect");
