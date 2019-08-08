@@ -376,12 +376,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     if (metaData.sp != null) {
       SPSSODescriptorType sp = new SPSSODescriptorType();
       sp.getProtocolSupportEnumeration().add("urn:oasis:names:tc:SAML:2.0:protocol");
+      sp.setAuthnRequestsSigned(metaData.sp.authnRequestsSigned);
+      sp.setWantAssertionsSigned(metaData.sp.wantAssertionsSigned);
 
       if (metaData.sp.acsEndpoint != null) {
         IndexedEndpointType acs = new IndexedEndpointType();
         acs.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST");
         acs.setLocation(metaData.sp.acsEndpoint);
-        // TODO Do I need to set the index?
         sp.getAssertionConsumerService().add(acs);
       }
 
@@ -596,7 +597,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     authnRequest.setIssuer(new NameIDType());
     authnRequest.getIssuer().setValue(request.issuer);
     authnRequest.setNameIDPolicy(new NameIDPolicyType());
-    authnRequest.getNameIDPolicy().setFormat("urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress");
+    authnRequest.getNameIDPolicy().setFormat(NameIDFormat.EmailAddress.toSAMLFormat());
     authnRequest.getNameIDPolicy().setAllowCreate(false);
     authnRequest.setID(request.id);
     authnRequest.setVersion(version);

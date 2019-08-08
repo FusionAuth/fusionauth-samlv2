@@ -39,6 +39,10 @@ public class MetaData {
   public static class SPMetaData {
     public String acsEndpoint;
 
+    public boolean authnRequestsSigned;
+
     public NameIDFormat nameIDFormat;
+
+    public boolean wantAssertionsSigned;
   }
 }

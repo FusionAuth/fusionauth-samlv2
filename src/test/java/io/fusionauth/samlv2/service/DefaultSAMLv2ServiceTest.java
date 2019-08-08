@@ -154,7 +154,7 @@ public class DefaultSAMLv2ServiceTest {
     assertTrue(xml.contains(metaData.entityId));
     assertTrue(xml.contains(metaData.sp.acsEndpoint));
     assertTrue(xml.contains(metaData.sp.nameIDFormat.toSAMLFormat()));
-    assertTrue(xml.contains("<ns2:SPSSODescriptor protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
+    assertTrue(xml.contains("<ns2:SPSSODescriptor AuthnRequestsSigned=\"false\" WantAssertionsSigned=\"false\" protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
 
     // Now parse it
     MetaData parsed = service.parseMetaData(xml);
