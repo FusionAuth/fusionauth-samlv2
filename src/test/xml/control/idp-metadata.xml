@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+
+<!-- This is simply the output of the IDP MetaData from the 'DefaultSAMLv2ServiceTest' test to make it easy to view to see the structure -->
+
+<ns2:EntityDescriptor xmlns:ns2="urn:oasis:names:tc:SAML:2.0:metadata" xmlns="http://www.w3.org/2000/09/xmldsig#"
+                      entityID="https://fusionauth.io/samlv2/20a7ffc6-a7fb-4e17-a05d-ac2b571e5a72"
+                      ID="_20a7ffc6-a7fb-4e17-a05d-ac2b571e5a72">
+  <ns2:IDPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <ns2:KeyDescriptor use="signing">
+      <KeyInfo>
+        <X509Data>
+          <X509Certificate>
+            MIICqjCCAZKgAwIBAQIGAWxyqpdGMA0GCSqGSIb3DQEBCwUAMBUxEzARBgNVBAMTCkZ1c2lvbkF1dGgwIBcNNzAwMTAxMDAwMDAwWhgPMjExODA4MDgxOTE3NThaMBUxEzARBgNVBAMTCkZ1c2lvbkF1dGgwggEiMA0GCSqGSIb3DQEBAQUAA4IBDwAwggEKAoIBAQCewFMbPBaMTZFATBFn4wh6HKPJZsqpxS8nfU21WLBBPmkmWcMT7vbIFMr3bCSWfIizkJuFlICtuzUh9p27MzLBTy5Ol6ed9WIIB30lNilcr9kehg/QFlbx1XuKGMwqTXxoIiKcP9QScjq8zk3O/9YTN+YsHcstl1yn8DhwU7l0C+E6iyIOV9SJJEQbVpN8l88eMRNbZ1V9kna1BlcE0EwpufGQ5tedP0gIVXUcfZwtSOZ8uco2QJ9OPVPDS10Y6ipU96FOvk5C2YFpegB4Nc81sJX0aNCRW+Z4rdYhsR1AU3Xs/rgq3NMTruvGvMAEO2Sy0EgkKX649DcmZbrORK+1AgMBAAEwDQYJKoZIhvcNAQELBQADggEBADGUNo4AcOi4LYMNKn/zmV4LE36t4iGmE0NQz4UPKwSZKU2loWrlKte82j64Toy3cVfcQ95h0rMX5KW51h3CMTDi6x/QDl/DRJEspcpXGDV8ZKPTAlOzeFNthP2kbplN4vmkE2i4g+UYtSB8AnIpKyW8wjRT9KbhzjJsvs8PRVDNCK74CX4cgoEa0LccH6A910zJ/7jYolzMEeBv81AeSuAxnKCNgGOltNXBE8/SBm1DXfhf8rPujZenbPJsn+EHg6iIgiMPY+YdU0YJ2k3NS6E85j73lajT1bYGkvHLfwz3RX5+Z9oiK3mRbqOeFQ/XJMdC4fKN2RaAOgVOn1y9uso=
+          </X509Certificate>
+        </X509Data>
+      </KeyInfo>
+    </ns2:KeyDescriptor>
+    <ns2:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                             Location="https://fusionauth.io/samlv2/logout"/>
+    <ns2:SingleSignOnService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
+                             Location="https://fusionauth.io/samlv2/login"/>
+  </ns2:IDPSSODescriptor>
+</ns2:EntityDescriptor>

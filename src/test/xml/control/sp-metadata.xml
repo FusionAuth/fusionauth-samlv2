@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+
+<!--This is simply the output of the SP MetaData from the 'DefaultSAMLv2ServiceTest' test to make it easy to view to see the structure-->
+
+<ns2:EntityDescriptor xmlns:ns2="urn:oasis:names:tc:SAML:2.0:metadata" xmlns="http://www.w3.org/2000/09/xmldsig#"
+                      entityID="https://fusionauth.io/samlv2/sp/13400bb7-557e-447b-a910-2f5360ecfdc4"
+                      ID="_13400bb7-557e-447b-a910-2f5360ecfdc4">
+  <ns2:SPSSODescriptor protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
+    <ns2:NameIDFormat>urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress</ns2:NameIDFormat>
+    <ns2:AssertionConsumerService index="0"
+                                  Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
+                                  Location="https://fusionauth.io/oauth2/callback"/>
+  </ns2:SPSSODescriptor>
+</ns2:EntityDescriptor>

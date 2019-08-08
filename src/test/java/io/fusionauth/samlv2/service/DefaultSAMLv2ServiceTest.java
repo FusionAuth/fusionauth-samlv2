@@ -39,6 +39,8 @@ import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.MetaData;
+import io.fusionauth.samlv2.domain.MetaData.IDPMetaData;
+import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
@@ -104,12 +106,13 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
-  public void buildMetaData() throws Exception {
+  public void buildIdPMetaData() throws Exception {
     MetaData metaData = new MetaData();
     metaData.id = UUID.randomUUID().toString();
-    metaData.entityId = "https://fusionauth.io/saml-metadata";
-    metaData.idp.signInEndpoint = "https://fusionauth.io/login";
-    metaData.idp.logoutEndpoint = "https://fusionauth.io/logout";
+    metaData.entityId = "https://fusionauth.io/samlv2/" + metaData.id;
+    metaData.idp = new IDPMetaData();
+    metaData.idp.signInEndpoint = "https://fusionauth.io/samlv2/login";
+    metaData.idp.logoutEndpoint = "https://fusionauth.io/samlv2/logout";
 
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
@@ -133,6 +136,32 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(parsed.idp.signInEndpoint, metaData.idp.signInEndpoint);
     assertEquals(parsed.idp.logoutEndpoint, metaData.idp.logoutEndpoint);
     assertEquals(parsed.idp.certificates.get(0), metaData.idp.certificates.get(0));
+  }
+
+  @Test
+  public void buildSPMetaData() throws Exception {
+    MetaData metaData = new MetaData();
+    metaData.id = UUID.randomUUID().toString();
+    metaData.entityId = "https://fusionauth.io/samlv2/sp/" + metaData.id;
+    metaData.sp = new SPMetaData();
+    metaData.sp.acsEndpoint = "https://fusionauth.io/oauth2/callback";
+    metaData.sp.nameIDFormat = NameIDFormat.EmailAddress;
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String xml = service.buildMetadataResponse(metaData);
+    System.out.println(xml);
+    assertTrue(xml.contains("_" + metaData.id));
+    assertTrue(xml.contains(metaData.entityId));
+    assertTrue(xml.contains(metaData.sp.acsEndpoint));
+    assertTrue(xml.contains(metaData.sp.nameIDFormat.toSAMLFormat()));
+    assertTrue(xml.contains("<ns2:SPSSODescriptor protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
+
+    // Now parse it
+    MetaData parsed = service.parseMetaData(xml);
+    assertEquals(parsed.id, "_" + metaData.id);
+    assertEquals(parsed.entityId, metaData.entityId);
+    assertEquals(parsed.sp.acsEndpoint, metaData.sp.acsEndpoint);
+    assertEquals(parsed.sp.nameIDFormat, metaData.sp.nameIDFormat);
   }
 
   @Test

@@ -24,13 +24,21 @@ public class MetaData {
 
   public String id;
 
-  public IDP idp = new IDP();
+  public IDPMetaData idp;
 
-  public static class IDP {
+  public SPMetaData sp;
+
+  public static class IDPMetaData {
     public List<Certificate> certificates = new ArrayList<>();
 
     public String logoutEndpoint;
 
     public String signInEndpoint;
+  }
+
+  public static class SPMetaData {
+    public String acsEndpoint;
+
+    public NameIDFormat nameIDFormat;
   }
 }

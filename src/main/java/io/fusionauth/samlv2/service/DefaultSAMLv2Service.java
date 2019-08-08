@@ -82,6 +82,8 @@ import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.Conditions;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
 import io.fusionauth.samlv2.domain.MetaData;
+import io.fusionauth.samlv2.domain.MetaData.IDPMetaData;
+import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
 import io.fusionauth.samlv2.domain.NameID;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
@@ -105,9 +107,11 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.EndpointType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.EntityDescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.IDPSSODescriptorType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.IndexedEndpointType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.KeyDescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.KeyTypes;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.RoleDescriptorType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.SPSSODescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.NameIDPolicyType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ObjectFactory;
@@ -330,42 +334,63 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     root.setID("_" + metaData.id);
     root.setEntityID(metaData.entityId);
 
-    IDPSSODescriptorType idp = new IDPSSODescriptorType();
-    idp.getProtocolSupportEnumeration().add("urn:oasis:names:tc:SAML:2.0:protocol");
+    if (metaData.idp != null) {
+      IDPSSODescriptorType idp = new IDPSSODescriptorType();
+      idp.getProtocolSupportEnumeration().add("urn:oasis:names:tc:SAML:2.0:protocol");
 
-    if (metaData.idp.signInEndpoint != null) {
-      EndpointType signIn = new EndpointType();
-      signIn.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect");
-      signIn.setLocation(metaData.idp.signInEndpoint);
-      idp.getSingleSignOnService().add(signIn);
-    }
-
-    if (metaData.idp.logoutEndpoint != null) {
-      EndpointType logout = new EndpointType();
-      logout.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect");
-      logout.setLocation(metaData.idp.logoutEndpoint);
-      idp.getSingleLogoutService().add(logout);
-    }
-
-    metaData.idp.certificates.forEach(cert -> {
-      KeyDescriptorType key = new KeyDescriptorType();
-      key.setUse(KeyTypes.SIGNING);
-      KeyInfoType info = new KeyInfoType();
-      key.setKeyInfo(info);
-      X509DataType data = new X509DataType();
-      info.getContent().add(DSIG_OBJECT_FACTORY.createX509Data(data));
-
-      try {
-        JAXBElement<byte[]> certElement = DSIG_OBJECT_FACTORY.createX509DataTypeX509Certificate(cert.getEncoded());
-        data.getX509IssuerSerialOrX509SKIOrX509SubjectName().add(certElement);
-        idp.getKeyDescriptor().add(key);
-      } catch (Exception e) {
-        // Rethrow
-        throw new IllegalArgumentException(e);
+      if (metaData.idp.signInEndpoint != null) {
+        EndpointType signIn = new EndpointType();
+        signIn.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect");
+        signIn.setLocation(metaData.idp.signInEndpoint);
+        idp.getSingleSignOnService().add(signIn);
       }
-    });
 
-    root.getRoleDescriptorOrIDPSSODescriptorOrSPSSODescriptor().add(idp);
+      if (metaData.idp.logoutEndpoint != null) {
+        EndpointType logout = new EndpointType();
+        logout.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect");
+        logout.setLocation(metaData.idp.logoutEndpoint);
+        idp.getSingleLogoutService().add(logout);
+      }
+
+      metaData.idp.certificates.forEach(cert -> {
+        KeyDescriptorType key = new KeyDescriptorType();
+        key.setUse(KeyTypes.SIGNING);
+        KeyInfoType info = new KeyInfoType();
+        key.setKeyInfo(info);
+        X509DataType data = new X509DataType();
+        info.getContent().add(DSIG_OBJECT_FACTORY.createX509Data(data));
+
+        try {
+          JAXBElement<byte[]> certElement = DSIG_OBJECT_FACTORY.createX509DataTypeX509Certificate(cert.getEncoded());
+          data.getX509IssuerSerialOrX509SKIOrX509SubjectName().add(certElement);
+          idp.getKeyDescriptor().add(key);
+        } catch (Exception e) {
+          // Rethrow
+          throw new IllegalArgumentException(e);
+        }
+      });
+
+      root.getRoleDescriptorOrIDPSSODescriptorOrSPSSODescriptor().add(idp);
+    }
+
+    if (metaData.sp != null) {
+      SPSSODescriptorType sp = new SPSSODescriptorType();
+      sp.getProtocolSupportEnumeration().add("urn:oasis:names:tc:SAML:2.0:protocol");
+
+      if (metaData.sp.acsEndpoint != null) {
+        IndexedEndpointType acs = new IndexedEndpointType();
+        acs.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST");
+        acs.setLocation(metaData.sp.acsEndpoint);
+        // TODO Do I need to set the index?
+        sp.getAssertionConsumerService().add(acs);
+      }
+
+      if (metaData.sp.nameIDFormat != null) {
+        sp.getNameIDFormat().add(metaData.sp.nameIDFormat.toSAMLFormat());
+      }
+
+      root.getRoleDescriptorOrIDPSSODescriptorOrSPSSODescriptor().add(sp);
+    }
 
     // Convert to String
     byte[] bytes = marshallToBytes(METADATA_OBJECT_FACTORY.createEntityDescriptor(root), EntityDescriptorType.class);
@@ -381,30 +406,45 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     metaData.entityId = root.getEntityID();
 
     List<RoleDescriptorType> roles = root.getRoleDescriptorOrIDPSSODescriptorOrSPSSODescriptor();
-    Optional<RoleDescriptorType> optional = roles.stream()
-                                                 .filter(r -> r instanceof IDPSSODescriptorType)
-                                                 .findFirst();
-    if (!optional.isPresent()) {
-      return metaData;
+    Optional<RoleDescriptorType> idpDescriptor = roles.stream()
+                                                      .filter(r -> r instanceof IDPSSODescriptorType)
+                                                      .findFirst();
+    if (idpDescriptor.isPresent()) {
+      IDPSSODescriptorType idp = (IDPSSODescriptorType) idpDescriptor.get();
+
+      // Extract the URLs
+      metaData.idp = new IDPMetaData();
+      metaData.idp.signInEndpoint = idp.getSingleSignOnService().size() > 0 ? idp.getSingleSignOnService().get(0).getLocation() : null;
+      metaData.idp.logoutEndpoint = idp.getSingleLogoutService().size() > 0 ? idp.getSingleLogoutService().get(0).getLocation() : null;
+
+      // Extract the signing certificates
+      try {
+        metaData.idp.certificates = idp.getKeyDescriptor()
+                                       .stream()
+                                       .filter(kd -> kd.getUse() == KeyTypes.SIGNING)
+                                       .map(this::toCertificate)
+                                       .filter(Objects::nonNull)
+                                       .collect(Collectors.toList());
+      } catch (IllegalArgumentException e) {
+        // toPublicKey might throw this and we want to translate it back to a known exception
+        throw new SAMLException(e.getCause());
+      }
     }
 
-    IDPSSODescriptorType idp = (IDPSSODescriptorType) optional.get();
+    Optional<RoleDescriptorType> spDescriptor = roles.stream()
+                                                     .filter(r -> r instanceof SPSSODescriptorType)
+                                                     .findFirst();
 
-    // Extract the URLs
-    metaData.idp.signInEndpoint = idp.getSingleSignOnService().size() > 0 ? idp.getSingleSignOnService().get(0).getLocation() : null;
-    metaData.idp.logoutEndpoint = idp.getSingleLogoutService().size() > 0 ? idp.getSingleLogoutService().get(0).getLocation() : null;
-
-    // Extract the signing certificates
-    try {
-      metaData.idp.certificates = idp.getKeyDescriptor()
-                                     .stream()
-                                     .filter(kd -> kd.getUse() == KeyTypes.SIGNING)
-                                     .map(this::toCertificate)
-                                     .filter(Objects::nonNull)
-                                     .collect(Collectors.toList());
-    } catch (IllegalArgumentException e) {
-      // toPublicKey might throw this and we want to translate it back to a known exception
-      throw new SAMLException(e.getCause());
+    if (spDescriptor.isPresent()) {
+      SPSSODescriptorType sp = (SPSSODescriptorType) spDescriptor.get();
+      metaData.sp = new SPMetaData();
+      metaData.sp.acsEndpoint = sp.getAssertionConsumerService().size() > 0 ? sp.getAssertionConsumerService().get(0).getLocation() : null;
+      try {
+        metaData.sp.nameIDFormat = sp.getNameIDFormat().size() > 0 ? NameIDFormat.fromSAMLFormat(sp.getNameIDFormat().get(0)) : null;
+      } catch (Exception e) {
+        // fromSAMLFormat may throw an exception if the Name ID Format is not defined by our NameIDFormat enum.
+        throw new SAMLException(e.getCause());
+      }
     }
 
     return metaData;
