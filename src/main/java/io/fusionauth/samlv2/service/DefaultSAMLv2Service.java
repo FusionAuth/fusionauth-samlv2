@@ -500,13 +500,16 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   @Override
   public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, PublicKey key)
       throws SAMLException {
+
+    AuthenticationResponse response = new AuthenticationResponse();
     byte[] decodedResponse = Base64.getDecoder().decode(encodedResponse);
+    response.rawResponse = new String(decodedResponse, StandardCharsets.UTF_8);
+
     Document document = parseFromBytes(decodedResponse);
     if (verifySignature) {
       verifySignature(document, key);
     }
 
-    AuthenticationResponse response = new AuthenticationResponse();
     ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
     response.status.code = ResponseStatus.fromSAMLFormat(jaxbResponse.getStatus().getStatusCode().getValue());
     response.id = jaxbResponse.getID();

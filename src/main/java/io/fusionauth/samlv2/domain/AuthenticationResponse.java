@@ -35,6 +35,8 @@ public class AuthenticationResponse {
 
   public String issuer;
 
+  public String rawResponse;
+
   public Status status = new Status();
 
   public String version;
