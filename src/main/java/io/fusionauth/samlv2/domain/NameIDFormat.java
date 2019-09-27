@@ -153,6 +153,12 @@ public enum NameIDFormat {
       }
     }
 
+    // SAML sucks, so just guess.
+    // - It seems people are using urn:oasis:names:tc:SAML:2.0:nameid-format:emailAddress even though this is not valid.
+    if (samlFormat.toLowerCase().contains("email")) {
+      return EmailAddress;
+    }
+
     throw new IllegalArgumentException("Invalid SAML v2.0 Name ID format [" + samlFormat + "]");
   }
 
