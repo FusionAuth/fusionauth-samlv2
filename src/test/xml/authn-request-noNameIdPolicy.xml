@@ -1,0 +1,3 @@
+<saml2p:AuthnRequest xmlns:saml2p="urn:oasis:names:tc:SAML:2.0:protocol" AssertionConsumerServiceURL="https://medallia.com/sso/mlg/logonSubmit.do" ID="id_4c6e5aa3" IssueInstant="2019-10-15T06:27:45.541Z" ProtocolBinding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST" Version="2.0">
+  <saml2:Issuer xmlns:saml2="urn:oasis:names:tc:SAML:2.0:assertion">https://medallia.com/sso/mlg</saml2:Issuer>
+</saml2p:AuthnRequest>

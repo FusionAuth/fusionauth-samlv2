@@ -468,7 +468,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     result.id = authnRequest.getID();
     result.issuer = authnRequest.getIssuer().getValue();
     result.issueInstant = authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
-    result.nameIdFormat = NameIDFormat.fromSAMLFormat(authnRequest.getNameIDPolicy().getFormat());
+    NameIDPolicyType nameIdPolicyType = authnRequest.getNameIDPolicy();
+    if (nameIdPolicyType == null) {
+      result.nameIdFormat = NameIDFormat.EmailAddress;
+    } else {
+      result.nameIdFormat = NameIDFormat.fromSAMLFormat(nameIdPolicyType.getFormat());
+    }
     result.version = authnRequest.getVersion();
 
     if (verifySignature) {

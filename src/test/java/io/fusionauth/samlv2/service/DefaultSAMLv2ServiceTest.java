@@ -204,6 +204,37 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
+  public void parseResponse_noNameIdPolicy() throws Exception {
+    String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-noNameIdPolicy.xml")));
+    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-noNameIdPolicy.txt")));
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationRequest request = service.parseRequest(encodedXML, null, null, false, null, null);
+
+    // No Name Policy present in the request, we will default to Email
+    assertEquals(request.id, "id_4c6e5aa3");
+    assertEquals(request.issuer, "https://medallia.com/sso/mlg");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.version, "2.0");
+    assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
+  }
+
+  @Test
+  public void parseResponse_withNameIdPolicy() throws Exception {
+    String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-control.xml")));
+    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-control.txt")));
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationRequest request = service.parseRequest(encodedXML, null, null, false, null, null);
+
+    assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
+    assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.version, "2.0");
+    assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
+  }
+
+  @Test
   public void roundTripRequest() throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
