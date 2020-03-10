@@ -491,7 +491,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         Signature sig = Signature.getInstance(algorithm.name);
         sig.initVerify(key);
         sig.update(parameters.getBytes(StandardCharsets.UTF_8));
-        if (!sig.verify(Base64.getDecoder().decode(signature))) {
+        if (!sig.verify(Base64.getMimeDecoder().decode(signature))) {
           throw new SAMLException("Invalid signature");
         }
       } catch (Exception e) {
@@ -507,7 +507,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       throws SAMLException {
 
     AuthenticationResponse response = new AuthenticationResponse();
-    byte[] decodedResponse = Base64.getDecoder().decode(encodedResponse);
+    byte[] decodedResponse = Base64.getMimeDecoder().decode(encodedResponse);
     response.rawResponse = new String(decodedResponse, StandardCharsets.UTF_8);
 
     Document document = parseFromBytes(decodedResponse);
@@ -656,7 +656,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   private byte[] decodeAndInflate(String encodedRequest) throws SAMLException {
-    byte[] bytes = Base64.getDecoder().decode(encodedRequest);
+    byte[] bytes = Base64.getMimeDecoder().decode(encodedRequest);
     Inflater inflater = new Inflater(true);
     inflater.setInput(bytes);
     inflater.finished();

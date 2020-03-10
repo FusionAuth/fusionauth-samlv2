@@ -31,7 +31,9 @@ import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
 import java.util.Base64;
+import java.util.List;
 import java.util.UUID;
 import java.util.zip.Inflater;
 
@@ -44,6 +46,7 @@ import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
+import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
@@ -76,7 +79,7 @@ public class DefaultSAMLv2ServiceTest {
     int start = parameters.indexOf("=");
     int end = parameters.indexOf("&");
     String encodedRequest = URLDecoder.decode(parameters.substring(start + 1, end), "UTF-8");
-    byte[] bytes = Base64.getDecoder().decode(encodedRequest);
+    byte[] bytes = Base64.getMimeDecoder().decode(encodedRequest);
 
     // Decode and inflate the result and ensure it is equal to the raw and can be unmarshalled
     byte[] inflatedBytes = new byte[4096];
@@ -164,6 +167,17 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(parsed.sp.nameIDFormat, metaData.sp.nameIDFormat);
   }
 
+  @DataProvider(name = "maxLineLength")
+  public Object[][] maxLineLength() {
+    return new Object[][]{
+        {42},
+        {64},
+        {76},
+        {96},
+        {128}
+    };
+  }
+
   @Test
   public void parseMetaData() throws Exception {
     byte[] buf = Files.readAllBytes(Paths.get("src/test/xml/metadata.xml"));
@@ -174,6 +188,61 @@ public class DefaultSAMLv2ServiceTest {
     buf = Files.readAllBytes(Paths.get("src/test/xml/metadata-2.xml"));
     metaData = service.parseMetaData(new String(buf, StandardCharsets.UTF_8));
     assertEquals(metaData.idp.certificates.size(), 1);
+  }
+
+  @Test(dataProvider = "maxLineLength")
+  public void parseRequest_includeLineReturns(int maxLineLength) throws Exception {
+    String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-control.xml")));
+    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-control.txt")));
+
+    // Response has line returns, we've seen a customer that has line returns at 76
+    List<String> lines = new ArrayList<>();
+    for (int i = 0; i < encodedXML.length(); ) {
+      lines.add(encodedXML.substring(i, Math.min(i + maxLineLength, encodedXML.length())));
+      i = i + maxLineLength;
+    }
+
+    String withLineReturns = String.join("\n", lines);
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationRequest request = service.parseRequest(withLineReturns, null, null, false, null, null);
+
+    assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
+    assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.version, "2.0");
+    assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
+  }
+
+  @Test
+  public void parseRequest_noNameIdPolicy() throws Exception {
+    String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-noNameIdPolicy.xml")));
+    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-noNameIdPolicy.txt")));
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationRequest request = service.parseRequest(encodedXML, null, null, false, null, null);
+
+    // No Name Policy present in the request, we will default to Email
+    assertEquals(request.id, "id_4c6e5aa3");
+    assertEquals(request.issuer, "https://medallia.com/sso/mlg");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.version, "2.0");
+    assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
+  }
+
+  @Test
+  public void parseRequest_withNameIdPolicy() throws Exception {
+    String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-control.xml")));
+    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-control.txt")));
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationRequest request = service.parseRequest(encodedXML, null, null, false, null, null);
+
+    assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
+    assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.version, "2.0");
+    assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
 
   @Test
@@ -203,35 +272,40 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
   }
 
-  @Test
-  public void parseResponse_noNameIdPolicy() throws Exception {
-    String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-noNameIdPolicy.xml")));
-    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-noNameIdPolicy.txt")));
+  @Test(dataProvider = "maxLineLength")
+  public void parseResponse_includeLineReturns(int maxLineLength) throws Exception {
+    CertificateFactory cf = CertificateFactory.getInstance("X.509");
+    PublicKey key;
+    try (InputStream is = Files.newInputStream(Paths.get("src/test/certificates/certificate.cer"))) {
+      Certificate cert = cf.generateCertificate(is);
+      key = cert.getPublicKey();
+    }
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba);
+    // Response has line returns, we've seen a customer that has line returns at 76
+    List<String> lines = new ArrayList<>();
+    for (int i = 0; i < encodedResponse.length(); ) {
+      lines.add(encodedResponse.substring(i, Math.min(i + maxLineLength, encodedResponse.length())));
+      i = i + maxLineLength;
+    }
+
+    String withLineReturns = String.join("\n", lines);
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationRequest request = service.parseRequest(encodedXML, null, null, false, null, null);
+    AuthenticationResponse response = service.parseResponse(withLineReturns, true, key);
 
-    // No Name Policy present in the request, we will default to Email
-    assertEquals(request.id, "id_4c6e5aa3");
-    assertEquals(request.issuer, "https://medallia.com/sso/mlg");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
-    assertEquals(request.version, "2.0");
-    assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
-  }
-
-  @Test
-  public void parseResponse_withNameIdPolicy() throws Exception {
-    String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-control.xml")));
-    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-control.txt")));
-
-    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationRequest request = service.parseRequest(encodedXML, null, null, false, null, null);
-
-    assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
-    assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
-    assertEquals(request.version, "2.0");
-    assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
+    assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
+    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
+    assertTrue(ZonedDateTime.now().isAfter(response.assertion.conditions.notOnOrAfter));
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now()));
+    assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
+    assertEquals(response.status.code, ResponseStatus.Success);
+    assertEquals(response.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
+    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
+    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
+    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
+    assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
   }
 
   @Test
@@ -289,7 +363,7 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
     String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
-    System.out.println(new String(Base64.getDecoder().decode(encodedXML)));
+    System.out.println(new String(Base64.getMimeDecoder().decode(encodedXML)));
     response = service.parseResponse(encodedXML, true, kp.getPublic());
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
