@@ -15,7 +15,7 @@
  */
 savantVersion = "1.0.0"
 
-project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.2.4", licenses: ["ApacheV2_0"]) {
+project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.3.0", licenses: ["ApacheV2_0"]) {
   workflow {
     standard()
   }
@@ -27,6 +27,10 @@ project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.2.4", lic
   dependencies {
     group(name: "compile", export: false) {
       dependency(id: "org.slf4j:slf4j-api:1.7.21")
+      dependency(id: "jakarta.xml.bind:jakarta.xml.bind-api:2.3.2")
+    }
+    group(name: "runtime") {
+      dependency(id: "org.glassfish.jaxb:jaxb-runtime:2.3.2")
     }
     group(name: "test-compile", export: false) {
       dependency(id: "org.testng:testng:6.8.7")
@@ -45,14 +49,15 @@ javaTestNG = loadPlugin(id: "org.savantbuild.plugin:java-testng:1.0.2")
 idea = loadPlugin(id: "org.savantbuild.plugin:idea:1.0.1")
 release = loadPlugin(id: "org.savantbuild.plugin:release-git:${savantVersion}")
 
-java.settings.javaVersion = "1.8"
-javaTestNG.settings.javaVersion = "1.8"
+java.settings.javaVersion = "14"
+javaTestNG.settings.javaVersion = "14"
 
 target(name: "clean", description: "Cleans the project") {
   java.clean()
 }
 
 target(name: "compile", description: "Compiles the project") {
+  java.settings.compilerArguments = "--add-exports java.xml/com.sun.org.apache.xerces.internal.jaxp.datatype=ALL-UNNAMED --add-exports java.base/sun.security.x509=ALL-UNNAMED"
   java.compile()
 }
 
