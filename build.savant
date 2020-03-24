@@ -33,7 +33,7 @@ project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.3.0", lic
       dependency(id: "org.glassfish.jaxb:jaxb-runtime:2.3.2")
     }
     group(name: "test-compile", export: false) {
-      dependency(id: "org.testng:testng:6.8.7")
+      dependency(id: "org.testng:testng:6.14.3")
     }
   }
 
@@ -45,7 +45,7 @@ project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.3.0", lic
 // Plugins
 dependency = loadPlugin(id: "org.savantbuild.plugin:dependency:1.0.2")
 java = loadPlugin(id: "org.savantbuild.plugin:java:1.0.2")
-javaTestNG = loadPlugin(id: "org.savantbuild.plugin:java-testng:1.0.2")
+javaTestNG = loadPlugin(id: "org.savantbuild.plugin:java-testng:1.0.4")
 idea = loadPlugin(id: "org.savantbuild.plugin:idea:1.0.1")
 release = loadPlugin(id: "org.savantbuild.plugin:release-git:${savantVersion}")
 
