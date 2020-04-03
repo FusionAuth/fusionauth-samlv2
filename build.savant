@@ -15,7 +15,7 @@
  */
 savantVersion = "1.0.0"
 
-project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.3.0", licenses: ["ApacheV2_0"]) {
+project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.3.1", licenses: ["ApacheV2_0"]) {
   workflow {
     standard()
   }
@@ -45,19 +45,20 @@ project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.3.0", lic
 // Plugins
 dependency = loadPlugin(id: "org.savantbuild.plugin:dependency:1.0.2")
 java = loadPlugin(id: "org.savantbuild.plugin:java:1.0.2")
-javaTestNG = loadPlugin(id: "org.savantbuild.plugin:java-testng:1.0.4")
+javaTestNG = loadPlugin(id: "org.savantbuild.plugin:java-testng:1.0.5")
 idea = loadPlugin(id: "org.savantbuild.plugin:idea:1.0.1")
 release = loadPlugin(id: "org.savantbuild.plugin:release-git:${savantVersion}")
 
-java.settings.javaVersion = "14"
-javaTestNG.settings.javaVersion = "14"
+java.settings.javaVersion = "1.8"
+javaTestNG.settings.javaVersion = "1.8"
 
 target(name: "clean", description: "Cleans the project") {
   java.clean()
 }
 
 target(name: "compile", description: "Compiles the project") {
-  java.settings.compilerArguments = "--add-exports java.xml/com.sun.org.apache.xerces.internal.jaxp.datatype=ALL-UNNAMED --add-exports java.base/sun.security.x509=ALL-UNNAMED"
+  // Once we remove the use of the sun.security.x509 and other private classes, we can remove the ignore.symbols.file
+  java.settings.compilerArguments = "-XDignore.symbol.file"
   java.compile()
 }
 

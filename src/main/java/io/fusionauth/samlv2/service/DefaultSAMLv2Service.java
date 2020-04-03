@@ -48,7 +48,6 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
-import java.lang.reflect.Field;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
@@ -147,14 +146,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLv2Service.class);
 
   static {
-    try {
-      Class<?> utilClass = Class.forName("com.sun.org.apache.xml.internal.security.utils.XMLUtils");
-      Field f = utilClass.getDeclaredField("ignoreLineBreaks");
-      f.setAccessible(true);
-      f.set(null, Boolean.TRUE);
-    } catch (Exception e) {
-      e.printStackTrace();
-    }
+    System.setProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks", "true");
   }
 
   @Override
