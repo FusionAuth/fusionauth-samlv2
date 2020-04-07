@@ -67,6 +67,7 @@ target(name: "jar", description: "JARs the project", dependsOn: ["compile"]) {
 }
 
 target(name: "test", description: "Runs the project's tests", dependsOn: ["jar"]) {
+  javaTestNG.settings.jvmArguments = "-Dcom.sun.org.apache.xml.internal.security.ignoreLineBreaks=true"
   javaTestNG.test()
 }
 

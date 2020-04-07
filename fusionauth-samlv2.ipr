@@ -52,11 +52,6 @@
     </profile>
     <version value="1.0" />
   </component>
-  <component name="JavacSettings">
-    <option name="ADDITIONAL_OPTIONS_OVERRIDE">
-      <module name="fusionauth-samlv2" options="--add-exports java.xml/com.sun.org.apache.xerces.internal.jaxp.datatype=ALL-UNNAMED --add-exports java.base/sun.security.x509=ALL-UNNAMED" />
-    </option>
-  </component>
   <component name="JavadocGenerationManager">
     <option name="OTHER_OPTIONS" value="" />
   </component>

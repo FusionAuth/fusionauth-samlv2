@@ -146,7 +146,11 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLv2Service.class);
 
   static {
-    System.setProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks", "true");
+    String ignoreLineBreaks = System.getProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks");
+    if (!Boolean.parseBoolean(ignoreLineBreaks)) {
+      throw new IllegalStateException("When the fusionauth-samlv2 jar is included in the classpath, you must set the following system property:\n" +
+          "-Dcom.sun.org.apache.xml.internal.security.ignoreLineBreaks=true");
+    }
   }
 
   @Override

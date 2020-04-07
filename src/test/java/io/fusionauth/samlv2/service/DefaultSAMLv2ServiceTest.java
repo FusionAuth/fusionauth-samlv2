@@ -46,6 +46,7 @@ import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
+import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
@@ -60,6 +61,11 @@ import static org.testng.Assert.assertTrue;
 @SuppressWarnings({"unchecked"})
 @Test(groups = "unit")
 public class DefaultSAMLv2ServiceTest {
+  @BeforeClass
+  public void beforeClass() {
+    System.setProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks", "true");
+  }
+
   @Test
   public void buildHTTPRedirectAuthnRequest() throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
