@@ -55,7 +55,6 @@
   <component name="JavadocGenerationManager">
     <option name="OTHER_OPTIONS" value="" />
   </component>
-  <component name="MarkdownNavigator.ProfileManager" default="" pdf-export="" plain-text-search-scope="Project Files" />
   <component name="MarkdownProjectSettings" wasCopied="false">
     <PreviewSettings splitEditorLayout="SPLIT" splitEditorPreview="PREVIEW" useGrayscaleRendering="false" zoomFactor="1.0" maxImageWidth="0" showGitHubPageIfSynced="false" allowBrowsingInPreview="false" synchronizePreviewPosition="true" highlightPreviewType="NONE" highlightFadeOut="5" highlightOnTyping="true" synchronizeSourcePosition="true" verticallyAlignSourceAndPreviewSyncPosition="true" showSearchHighlightsInPreview="false" showSelectionInPreview="true" openRemoteLinks="true" replaceUnicodeEmoji="false" lastLayoutSetsDefault="false">
       <PanelProvider>
@@ -634,12 +633,12 @@
         <option name="SET_EL_COMMA" value="0" />
         <option name="WITH_EL_WRAP" value="0" />
         <option name="WITH_EL_COMMA" value="0" />
-        <option name="SELECT_EL_WRAP" value="0" />
+        <option name="SELECT_EL_WRAP" value="3" />
         <option name="SELECT_EL_COMMA" value="2" />
         <option name="FROM_EL_WRAP" value="2" />
         <option name="FROM_EL_COMMA" value="2" />
         <option name="FROM_PLACE_ON" value="10" />
-        <option name="WHERE_EL_WRAP" value="0" />
+        <option name="WHERE_EL_WRAP" value="3" />
         <option name="WHERE_EL_BOUND" value="2" />
         <option name="ORDER_EL_COMMA" value="2" />
         <option name="TABLE_OPENING" value="1" />
