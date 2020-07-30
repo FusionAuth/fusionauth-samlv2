@@ -46,13 +46,17 @@ import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
+import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNull;
+import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
+import static org.testng.Assert.fail;
 import static org.testng.Assert.fail;
 
 /**
@@ -293,12 +297,39 @@ public class DefaultSAMLv2ServiceTest {
     String encodedResponse = new String(ba);
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     try {
-       service.parseResponse(encodedResponse, true, key);
+      service.parseResponse(encodedResponse, true, key);
       fail("Should have thrown an exception");
     } catch (SAMLException e) {
       // Should throw
       assertEquals(e.getMessage(), "Invalid SAML v2.0 authentication response. The signature is missing from the XML but is required.");
     }
+  }
+
+  @Test
+  public void parseResponse_handleNilAttribute() throws Exception {
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encoded/example-response.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    assertEquals(response.destination, "http://sp.example.com/demo1/index.php?acs");
+    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
+    assertEquals(response.issuer, "http://idp.example.com/metadata.php");
+    assertEquals(response.status.code, ResponseStatus.Success);
+    assertEquals(response.assertion.attributes.get("uid").size(), 1);
+    assertEquals(response.assertion.attributes.get("uid").get(0), "test");
+    assertEquals(response.assertion.attributes.get("mail").size(), 1);
+    assertEquals(response.assertion.attributes.get("mail").get(0), "test@example.com");
+    assertEquals(response.assertion.attributes.get("eduPersonAffiliation").size(), 2);
+    assertEquals(response.assertion.attributes.get("eduPersonAffiliation").get(0), "users");
+    assertEquals(response.assertion.attributes.get("eduPersonAffiliation").get(1), "examplerole1");
+    assertEquals(response.assertion.attributes.get("memberOf").size(), 1);
+    assertEquals(response.assertion.attributes.get("memberOf").get(0), "");
+    // Ensure we can handle
+    //  <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true" xsi:type="xs:string"/>
+    assertEquals(response.assertion.attributes.get("PersonImmutableID").size(), 1);
+    assertNull(response.assertion.attributes.get("PersonImmutableID").get(0));
+    assertEquals(response.assertion.subject.nameID.format, NameIDFormat.Transient);
   }
 
   @Test(dataProvider = "maxLineLength")

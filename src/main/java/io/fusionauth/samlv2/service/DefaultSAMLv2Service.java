@@ -634,6 +634,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   private String attributeToString(Object attribute) {
+    if (attribute == null) {
+      return null;
+    }
+
     if (attribute instanceof Number) {
       return attribute.toString();
     } else if (attribute instanceof String) {
