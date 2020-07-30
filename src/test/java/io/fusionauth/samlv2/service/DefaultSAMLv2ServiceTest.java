@@ -46,7 +46,6 @@ import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
-import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -54,9 +53,7 @@ import org.testng.annotations.Test;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
-import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
-import static org.testng.Assert.fail;
 import static org.testng.Assert.fail;
 
 /**
@@ -285,27 +282,6 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
-  public void parseResponse_signatureCheck() throws Exception {
-    CertificateFactory cf = CertificateFactory.getInstance("X.509");
-    PublicKey key;
-    try (InputStream is = Files.newInputStream(Paths.get("src/test/certificates/certificate.cer"))) {
-      Certificate cert = cf.generateCertificate(is);
-      key = cert.getPublicKey();
-    }
-
-    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse-signatureRemoved.txt"));
-    String encodedResponse = new String(ba);
-    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    try {
-      service.parseResponse(encodedResponse, true, key);
-      fail("Should have thrown an exception");
-    } catch (SAMLException e) {
-      // Should throw
-      assertEquals(e.getMessage(), "Invalid SAML v2.0 authentication response. The signature is missing from the XML but is required.");
-    }
-  }
-
-  @Test
   public void parseResponse_handleNilAttribute() throws Exception {
     byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encoded/example-response.txt"));
     String encodedResponse = new String(ba);
@@ -366,6 +342,27 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
     assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
+  }
+
+  @Test
+  public void parseResponse_signatureCheck() throws Exception {
+    CertificateFactory cf = CertificateFactory.getInstance("X.509");
+    PublicKey key;
+    try (InputStream is = Files.newInputStream(Paths.get("src/test/certificates/certificate.cer"))) {
+      Certificate cert = cf.generateCertificate(is);
+      key = cert.getPublicKey();
+    }
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse-signatureRemoved.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    try {
+      service.parseResponse(encodedResponse, true, key);
+      fail("Should have thrown an exception");
+    } catch (SAMLException e) {
+      // Should throw
+      assertEquals(e.getMessage(), "Invalid SAML v2.0 authentication response. The signature is missing from the XML but is required.");
+    }
   }
 
   @Test
