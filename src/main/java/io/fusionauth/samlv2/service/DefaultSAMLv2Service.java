@@ -561,6 +561,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         response.assertion.conditions.notOnOrAfter = convertToZonedDateTime(conditionsType.getNotOnOrAfter());
 
         List<ConditionAbstractType> conditionAbstractTypes = conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse();
+        // Only handling the AudienceRestriction.
+        // - Optional additional conditions include OneTimeUse and ProxyRestriction.  See section 2.5.1 in the SAML v2 core spec,
+        //   the way these additional conditions are described, I see no use for them.
+        //   - OneTimeUse specifics are in section 2.5.1.5
+        //   - ProxyRestriction specifics are in section 2.6.1.6
+        //   http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
         for (ConditionAbstractType conditionAbstractType : conditionAbstractTypes) {
           if (conditionAbstractType instanceof AudienceRestrictionType) {
             AudienceRestrictionType restrictionType = (AudienceRestrictionType) conditionAbstractType;
@@ -738,6 +744,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     SubjectConfirmation subjectConfirmation = new SubjectConfirmation();
     SubjectConfirmationDataType data = subjectConfirmationType.getSubjectConfirmationData();
     if (data != null) {
+      subjectConfirmation.address = data.getAddress();
       subjectConfirmation.inResponseTo = data.getInResponseTo();
       subjectConfirmation.notBefore = toZonedDateTime(data.getNotBefore());
       subjectConfirmation.notOnOrAfter = toZonedDateTime(data.getNotOnOrAfter());
