@@ -514,6 +514,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
     response.status.code = ResponseStatus.fromSAMLFormat(jaxbResponse.getStatus().getStatusCode().getValue());
     response.id = jaxbResponse.getID();
+    response.inResponseTo = jaxbResponse.getInResponseTo();
     response.issuer = jaxbResponse.getIssuer() != null ? jaxbResponse.getIssuer().getValue() : null;
     response.issueInstant = toZonedDateTime(jaxbResponse.getIssueInstant());
     response.destination = jaxbResponse.getDestination();
