@@ -2,9 +2,19 @@
 
 This repository is SAML v2.0 bindings in Java using JAXB.
 
-You'd use this library to process SAML requests and responses.
+You'd use this library to process SAML requests and responses. See the tests for example code.
 
-See the tests for example code.
+## Security disclosures
+If you find a vulnerability or other security related bug, please send a note to security@fusionauth.io before opening a GitHub issue. This will allow us to assess the disclosure and prepare a fix prior to a public disclosure. 
+
+We are very interested in compensating anyone that can identify a security related bug or vulnerability and properly disclose it to us.
+
+### Disclosures
+
+- CNSC-2020-002 Signature Exclusion Attack
+  - Thanks to [Compass Security](https://compass-security.com/) for responsibly disclosing this issue.
+  - See [CNSC-2020-002](https://compass-security.com/fileadmin/Research/Advisories/2020-06_CSNC-2020-002_FusionAuth_Signature_Exclusion_Attack.txt)
+  - Affects versions prior to `0.3.3`, ensure you are using version `0.3.3` or later. 
 
 ## Build 
 
