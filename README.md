@@ -13,6 +13,7 @@ We are very interested in compensating anyone that can identify a security relat
 
 - CNSC-2020-002 Signature Exclusion Attack
   - Thanks to [Compass Security](https://compass-security.com/) for responsibly disclosing this issue.
+  - See [CVE-2020-12676](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-12676)
   - See [CNSC-2020-002](https://compass-security.com/fileadmin/Research/Advisories/2020-06_CSNC-2020-002_FusionAuth_Signature_Exclusion_Attack.txt)
   - Affects versions prior to `0.3.3`, ensure you are using version `0.3.3` or later. 
 
