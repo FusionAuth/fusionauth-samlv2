@@ -48,8 +48,10 @@ import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.GeneralSecurityException;
 import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -448,71 +450,23 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public AuthenticationRequest parseRequestFromHttpPostBinding(String encodedRequest, String relayState,
-                                                               boolean verifySignature, PublicKey key)
+  public AuthenticationRequest parseRequestPostBinding(String encodedRequest, String relayState,
+                                                       boolean verifySignature, PublicKey key)
       throws SAMLException {
-    byte[] requestBytes = decode(encodedRequest);
-    String xml = new String(requestBytes, StandardCharsets.UTF_8);
-    if (logger.isDebugEnabled()) {
-      logger.debug("SAMLRequest XML is\n{}", xml);
-    }
-
-    Document document = parseFromBytes(requestBytes);
-    AuthnRequestType authnRequest = unmarshallFromDocument(document, AuthnRequestType.class);
-    //
-    // In JAXB, the document and authnRequest may be used to validate the "document" when using POST bindings
-    //
-    AuthenticationRequest result = new AuthenticationRequest();
-    result.xml = xml;
-    result.id = authnRequest.getID();
-    result.issuer = authnRequest.getIssuer().getValue();
-    result.issueInstant = authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
-    NameIDPolicyType nameIdPolicyType = authnRequest.getNameIDPolicy();
-    if (nameIdPolicyType == null) {
-      result.nameIdFormat = NameIDFormat.EmailAddress;
-    } else {
-      result.nameIdFormat = NameIDFormat.fromSAMLFormat(nameIdPolicyType.getFormat());
-    }
-    result.version = authnRequest.getVersion();
-
+    AuthnRequestParseResult result = parseRequest(decode(encodedRequest));
     if (verifySignature) {
-      // Verify the signature embedded in the XML document
-
-      // See XML Signature Assertions in the SAML Response Processing.
-      // For POST Bindings w/ embedded signature, see verifySignature()
-
+      verifySignature(result.document, key);
     }
 
-    return result;
+    return result.request;
   }
 
   @Override
-  public AuthenticationRequest parseRequestFromHttpRedirectBinding(String encodedRequest, String relayState,
-                                                                   boolean verifySignature, String signature,
-                                                                   PublicKey key, Algorithm algorithm)
+  public AuthenticationRequest parseRequestRedirectBinding(String encodedRequest, String relayState,
+                                                           boolean verifySignature, String signature,
+                                                           PublicKey key, Algorithm algorithm)
       throws SAMLException {
-    byte[] requestBytes = decodeAndInflate(encodedRequest);
-    String xml = new String(requestBytes, StandardCharsets.UTF_8);
-    if (logger.isDebugEnabled()) {
-      logger.debug("SAMLRequest XML is\n{}", xml);
-    }
-
-    Document document = parseFromBytes(requestBytes);
-    AuthnRequestType authnRequest = unmarshallFromDocument(document, AuthnRequestType.class);
-
-    AuthenticationRequest result = new AuthenticationRequest();
-    result.xml = xml;
-    result.id = authnRequest.getID();
-    result.issuer = authnRequest.getIssuer().getValue();
-    result.issueInstant = authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
-    NameIDPolicyType nameIdPolicyType = authnRequest.getNameIDPolicy();
-    if (nameIdPolicyType == null) {
-      result.nameIdFormat = NameIDFormat.EmailAddress;
-    } else {
-      result.nameIdFormat = NameIDFormat.fromSAMLFormat(nameIdPolicyType.getFormat());
-    }
-    result.version = authnRequest.getVersion();
-
+    AuthnRequestParseResult result = parseRequest(decodeAndInflate(encodedRequest));
     if (verifySignature) {
       if (signature == null || key == null || algorithm == null) {
         throw new NullPointerException("You must specify a signature, key and algorithm if you want to verify the SAML request signature");
@@ -529,14 +483,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         sig.initVerify(key);
         sig.update(parameters.getBytes(StandardCharsets.UTF_8));
         if (!sig.verify(Base64.getMimeDecoder().decode(signature))) {
-          throw new SAMLException("Invalid signature");
+          throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.");
         }
-      } catch (Exception e) {
+      } catch (GeneralSecurityException | UnsupportedEncodingException e) {
         throw new SAMLException("Unable to verify signature", e);
       }
     }
 
-    return result;
+    return result.request;
   }
 
   @Override
@@ -820,6 +774,30 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return nameId;
   }
 
+  private AuthnRequestParseResult parseRequest(byte[] xmlBytes) throws SAMLException {
+    String xml = new String(xmlBytes, StandardCharsets.UTF_8);
+    if (logger.isDebugEnabled()) {
+      logger.debug("SAMLRequest XML is\n{}", xml);
+    }
+
+    AuthnRequestParseResult result = new AuthnRequestParseResult();
+    result.document = parseFromBytes(xmlBytes);
+    result.authnRequest = unmarshallFromDocument(result.document, AuthnRequestType.class);
+    result.request = new AuthenticationRequest();
+    result.request.xml = xml;
+    result.request.id = result.authnRequest.getID();
+    result.request.issuer = result.authnRequest.getIssuer().getValue();
+    result.request.issueInstant = result.authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
+    NameIDPolicyType nameIdPolicyType = result.authnRequest.getNameIDPolicy();
+    if (nameIdPolicyType == null) {
+      result.request.nameIdFormat = NameIDFormat.EmailAddress;
+    } else {
+      result.request.nameIdFormat = NameIDFormat.fromSAMLFormat(nameIdPolicyType.getFormat());
+    }
+    result.request.version = result.authnRequest.getVersion();
+    return result;
+  }
+
   private Certificate toCertificate(KeyDescriptorType keyDescriptorType) {
     try {
       List<Object> keyData = keyDescriptorType.getKeyInfo().getContent();
@@ -880,7 +858,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     NodeList nl = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
     if (nl.getLength() == 0) {
-      throw new SAMLException("Invalid SAML v2.0 authentication response. The signature is missing from the XML but is required.");
+      throw new SAMLException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
     }
 
     for (int i = 0; i < nl.getLength(); i++) {
@@ -890,13 +868,21 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         XMLSignature signature = factory.unmarshalXMLSignature(validateContext);
         boolean valid = signature.validate(validateContext);
         if (!valid) {
-          throw new SAMLException("Invalid SAML v2.0 authentication response. The signature is invalid.");
+          throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.");
         }
       } catch (MarshalException e) {
-        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 authentication response because we couldn't unmarshall the XML Signature element", e);
+        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. We couldn't unmarshall the XML Signature element.", e);
       } catch (XMLSignatureException e) {
-        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 authentication response. The signature was unmarshalled we couldn't validate it for an unknown reason", e);
+        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. The signature was unmarshalled we couldn't validate it for an unknown reason.", e);
       }
     }
+  }
+
+  private static class AuthnRequestParseResult {
+    public AuthnRequestType authnRequest;
+
+    public Document document;
+
+    public AuthenticationRequest request;
   }
 }

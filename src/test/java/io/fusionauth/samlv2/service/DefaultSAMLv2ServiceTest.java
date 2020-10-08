@@ -25,11 +25,13 @@ import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
+import java.security.spec.X509EncodedKeySpec;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -223,7 +225,7 @@ public class DefaultSAMLv2ServiceTest {
     String withLineReturns = String.join("\n", lines);
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationRequest request = service.parseRequestFromHttpRedirectBinding(withLineReturns, null, false, null, null, null);
+    AuthenticationRequest request = service.parseRequestRedirectBinding(withLineReturns, null, false, null, null, null);
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
@@ -241,8 +243,8 @@ public class DefaultSAMLv2ServiceTest {
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseRequestFromHttpRedirectBinding(encodedXML, null, false, null, null, null)
-        : service.parseRequestFromHttpPostBinding(encodedXML, null, false, null);
+        ? service.parseRequestRedirectBinding(encodedXML, null, false, null, null, null)
+        : service.parseRequestPostBinding(encodedXML, null, false, null);
 
     // No Name Policy present in the request, we will default to Email
     assertEquals(request.id, "id_4c6e5aa3");
@@ -250,6 +252,78 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
     assertEquals(request.version, "2.0");
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
+  }
+
+  @Test(dataProvider = "Bindings")
+  public void parseRequest_verifySignature(Binding binding) throws Exception {
+    String xml = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
+        ? Paths.get("src/test/xml/authn-request-redirect-signed.xml")
+        : Paths.get("src/test/xml/authn-request-post-signed.xml")));
+    String relayState = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
+        ? Paths.get("src/test/xml/relay-state/authn-request-redirect.txt")
+        : Paths.get("src/test/xml/relay-state/authn-request-post.txt")));
+    String encodedXML = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
+        ? Paths.get("src/test/xml/deflated/authn-request-signed.txt")
+        : Paths.get("src/test/xml/encoded/authn-request-signed.txt")));
+    String signature = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
+        ? Paths.get("src/test/xml/signature/authn-request-redirect.txt")
+        : Paths.get("src/test/xml/signature/authn-request-post.txt")));
+    PublicKey publicKey = KeyFactory.getInstance("RSA")
+                                    .generatePublic(
+                                        new X509EncodedKeySpec(
+                                            Base64.getDecoder()
+                                                  .decode(
+                                                      Files.readAllBytes(binding == Binding.HTTP_Redirect
+                                                          ? Paths.get("src/test/xml/public-key/authn-request-redirect.txt")
+                                                          : Paths.get("src/test/xml/public-key/authn-request-post.txt"))
+
+                                                  )));
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationRequest request = binding == Binding.HTTP_Redirect
+        ? service.parseRequestRedirectBinding(encodedXML, relayState, true, signature, publicKey, Algorithm.RS256)
+        : service.parseRequestPostBinding(encodedXML, relayState, true, publicKey);
+
+    assertEquals(request.id, binding == Binding.HTTP_Redirect ? "ID_025417c8-50c8-4916-bfe0-e05694f8cea7" : "ID_26d69170-fc73-4b62-8bb6-c72769216134");
+    assertEquals(request.issuer, "http://localhost:8080/auth/realms/master");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.version, "2.0");
+    assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
+  }
+
+  @Test(dataProvider = "Bindings")
+  public void parseRequest_verifySignature_badSignature(Binding binding) throws Exception {
+    String relayState = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
+        ? Paths.get("src/test/xml/relay-state/authn-request-redirect.txt")
+        : Paths.get("src/test/xml/relay-state/authn-request-post.txt")));
+    String encodedXML = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
+        ? Paths.get("src/test/xml/deflated/authn-request-signed.txt")
+        : Paths.get("src/test/xml/encoded/authn-request-signed-badSignature.txt")));
+    String signature = new String(Files.readAllBytes(Paths.get("src/test/xml/signature/authn-request-redirect-bad.txt"))); // Not used for POST binding
+    PublicKey publicKey = KeyFactory.getInstance("RSA")
+                                    .generatePublic(
+                                        new X509EncodedKeySpec(
+                                            Base64.getDecoder()
+                                                  .decode(
+                                                      Files.readAllBytes(binding == Binding.HTTP_Redirect
+                                                          ? Paths.get("src/test/xml/public-key/authn-request-redirect.txt")
+                                                          : Paths.get("src/test/xml/public-key/authn-request-post.txt"))
+
+                                                  )));
+
+    try {
+      DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+      if (binding == Binding.HTTP_Redirect) {
+        service.parseRequestRedirectBinding(encodedXML, relayState, true, signature, publicKey, Algorithm.RS256);
+      } else {
+        service.parseRequestPostBinding(encodedXML, relayState, true, publicKey);
+      }
+
+      fail("Should have failed signature validation");
+    } catch (SAMLException e) {
+      // Should throw
+      assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is invalid.");
+    }
   }
 
   @Test(dataProvider = "Bindings")
@@ -261,8 +335,8 @@ public class DefaultSAMLv2ServiceTest {
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseRequestFromHttpRedirectBinding(encodedXML, null, false, null, null, null)
-        : service.parseRequestFromHttpPostBinding(encodedXML, null, false, null);
+        ? service.parseRequestRedirectBinding(encodedXML, null, false, null, null, null)
+        : service.parseRequestPostBinding(encodedXML, null, false, null);
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
@@ -362,7 +436,28 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
-  public void parseResponse_signatureCheck() throws Exception {
+  public void parseResponse_signatureCheck_badSignature() throws Exception {
+    CertificateFactory cf = CertificateFactory.getInstance("X.509");
+    PublicKey key;
+    try (InputStream is = Files.newInputStream(Paths.get("src/test/certificates/certificate.cer"))) {
+      Certificate cert = cf.generateCertificate(is);
+      key = cert.getPublicKey();
+    }
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse-badSignature.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    try {
+      service.parseResponse(encodedResponse, true, key);
+      fail("Should have thrown an exception");
+    } catch (SAMLException e) {
+      // Should throw
+      assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is invalid.");
+    }
+  }
+
+  @Test
+  public void parseResponse_signatureCheck_missing() throws Exception {
     CertificateFactory cf = CertificateFactory.getInstance("X.509");
     PublicKey key;
     try (InputStream is = Files.newInputStream(Paths.get("src/test/certificates/certificate.cer"))) {
@@ -378,7 +473,7 @@ public class DefaultSAMLv2ServiceTest {
       fail("Should have thrown an exception");
     } catch (SAMLException e) {
       // Should throw
-      assertEquals(e.getMessage(), "Invalid SAML v2.0 authentication response. The signature is missing from the XML but is required.");
+      assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
     }
   }
 
@@ -418,7 +513,7 @@ public class DefaultSAMLv2ServiceTest {
     String signature = URLDecoder.decode(parameters.substring(start + "Signature=".length(), end), "UTF-8");
 
     // Parse the request
-    request = service.parseRequestFromHttpRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
+    request = service.parseRequestRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
@@ -461,7 +556,7 @@ public class DefaultSAMLv2ServiceTest {
     String signature = URLDecoder.decode(parameters.substring(start + "Signature=".length(), end), "UTF-8");
 
     // Parse the request
-    request = service.parseRequestFromHttpRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
+    request = service.parseRequestRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);

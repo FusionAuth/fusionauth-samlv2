@@ -104,12 +104,12 @@ public interface SAMLv2Service {
    * @return The request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationRequest parseRequestFromHttpPostBinding(String encodedRequest, String relayState,
-                                                        boolean verifySignature, PublicKey key)
+  AuthenticationRequest parseRequestPostBinding(String encodedRequest, String relayState, boolean verifySignature,
+                                                PublicKey key)
       throws SAMLException;
 
   /**
-   * Parses the authentication request from the given String and verifies that it is valid.
+   * Parses the authentication request from an HTTP redirect binding and verifies that it is valid.
    *
    * @param encodedRequest  The encoded SAML request. When a request is accepted from an HTTP Redirect Binding, the
    *                        request will be assumed to be encoded an deflated.
@@ -121,9 +121,8 @@ public interface SAMLv2Service {
    * @return The request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationRequest parseRequestFromHttpRedirectBinding(String encodedRequest, String relayState,
-                                                            boolean verifySignature, String signature, PublicKey key,
-                                                            Algorithm algorithm)
+  AuthenticationRequest parseRequestRedirectBinding(String encodedRequest, String relayState, boolean verifySignature,
+                                                    String signature, PublicKey key, Algorithm algorithm)
       throws SAMLException;
 
   /**
