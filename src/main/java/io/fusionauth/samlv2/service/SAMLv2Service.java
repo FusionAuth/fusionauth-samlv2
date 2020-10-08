@@ -36,30 +36,16 @@ public interface SAMLv2Service {
    *
    * @param response               The authentication response that is converted to a AuthnResponse.
    * @param sign                   Determines if the XML should be signed or not.
-   * @param privateKey             The key that is used to sign the request (private key, shared, secret, etc).
+   * @param privateKey             The key that is used to sign the response (private key, shared, secret, etc).
    * @param certificate            The certificate that is included in the response.
    * @param algorithm              The signing algorithm to use (if any).
-   * @param xmlSignatureX14nMethod The XML signature canonicalization method used.
+   * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
    * @return The response base-64 encoded.
    * @throws SAMLException If any unrecoverable errors occur.
    */
   String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
-                            X509Certificate certificate, Algorithm algorithm, String xmlSignatureX14nMethod)
+                            X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
       throws SAMLException;
-
-  /**
-   * Builds a HTTP-Redirect binding to a AuthnRequest protocol.
-   *
-   * @param request    The AuthnRequest information.
-   * @param relayState The relay state parameter (required if signing).
-   * @param sign       Determines if the request should be signed or not.
-   * @param key        The key that is used to sign the request (private key, shared, secret, etc).
-   * @param algorithm  The signing algorithm to use (if any).
-   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
-   * @throws SAMLException If any unrecoverable errors occur.
-   */
-  String buildHTTPRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign, PrivateKey key,
-                                       Algorithm algorithm) throws SAMLException;
 
   /**
    * Builds an invalid HTTP-Redirect binding to a AuthnRequest protocol for testing.
@@ -73,8 +59,8 @@ public interface SAMLv2Service {
    * @throws SAMLException If any unrecoverable errors occur.
    */
   @SuppressWarnings("unused")
-  String buildInvalidTestingHTTPRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
-                                                     PrivateKey key, Algorithm algorithm) throws SAMLException;
+  String buildInvalidTestingRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
+                                                 PrivateKey key, Algorithm algorithm) throws SAMLException;
 
   /**
    * Builds the metadata response for a SAML IdP.
@@ -84,6 +70,35 @@ public interface SAMLv2Service {
    * @throws SAMLException If the JAXB marshalling failed.
    */
   String buildMetadataResponse(MetaData metaData) throws SAMLException;
+
+  /**
+   * Builds a HTTP-POST binding to a AuthnRequest protocol.
+   *
+   * @param request                The AuthnRequest information.
+   * @param privateKey             The key that is used to sign the request (private key, shared, secret, etc).
+   * @param certificate            The certificate that is included in the request.
+   * @param algorithm              The signing algorithm to use (if any).
+   * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
+   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  String buildPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
+                               X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+      throws SAMLException;
+
+  /**
+   * Builds a HTTP-Redirect binding to a AuthnRequest protocol.
+   *
+   * @param request    The AuthnRequest information.
+   * @param relayState The relay state parameter (required if signing).
+   * @param sign       Determines if the request should be signed or not.
+   * @param key        The key that is used to sign the request (private key, shared, secret, etc).
+   * @param algorithm  The signing algorithm to use (if any).
+   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  String buildRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign, PrivateKey key,
+                                   Algorithm algorithm) throws SAMLException;
 
   /**
    * Parses a SAML 2.0 MetaData response and converts it to a simple to use object.
@@ -98,13 +113,12 @@ public interface SAMLv2Service {
    * Parses the authentication request from an HTTP POST binding and verifies that it is valid.
    *
    * @param encodedRequest  The encoded SAML request from an HTTP POST binding.
-   * @param relayState      The RelayState URL parameter (only needed if verifying signatures).
    * @param verifySignature True if the signature should be verified.
    * @param key             (Optional) The key (signing certificate) used to verify the signature.
    * @return The request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationRequest parseRequestPostBinding(String encodedRequest, String relayState, boolean verifySignature,
+  AuthenticationRequest parseRequestPostBinding(String encodedRequest, boolean verifySignature,
                                                 PublicKey key)
       throws SAMLException;
 

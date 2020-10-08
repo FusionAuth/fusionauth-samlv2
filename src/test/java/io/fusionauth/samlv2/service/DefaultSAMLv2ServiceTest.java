@@ -21,6 +21,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
+import java.math.BigInteger;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
@@ -31,10 +32,12 @@ import java.security.KeyPairGenerator;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
+import java.security.cert.X509Certificate;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.zip.Inflater;
@@ -53,6 +56,15 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import sun.security.x509.AlgorithmId;
+import sun.security.x509.CertificateAlgorithmId;
+import sun.security.x509.CertificateSerialNumber;
+import sun.security.x509.CertificateValidity;
+import sun.security.x509.CertificateVersion;
+import sun.security.x509.CertificateX509Key;
+import sun.security.x509.X500Name;
+import sun.security.x509.X509CertImpl;
+import sun.security.x509.X509CertInfo;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
 import static org.testng.Assert.assertNull;
@@ -72,7 +84,7 @@ public class DefaultSAMLv2ServiceTest {
     System.setProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks", "true");
   }
 
-  @DataProvider(name = "Bindings")
+  @DataProvider(name = "bindings")
   public Object[][] bindings() {
     return new Object[][]{
         {Binding.HTTP_Redirect},
@@ -81,7 +93,40 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
-  public void buildHTTPRedirectAuthnRequest() throws Exception {
+  public void buildIdPMetaData() throws Exception {
+    MetaData metaData = new MetaData();
+    metaData.id = UUID.randomUUID().toString();
+    metaData.entityId = "https://fusionauth.io/samlv2/" + metaData.id;
+    metaData.idp = new IDPMetaData();
+    metaData.idp.signInEndpoint = "https://fusionauth.io/samlv2/login";
+    metaData.idp.logoutEndpoint = "https://fusionauth.io/samlv2/logout";
+
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+    Certificate cert = CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FusionAuth");
+    metaData.idp.certificates.add(cert);
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String xml = service.buildMetadataResponse(metaData);
+    System.out.println(xml);
+    assertTrue(xml.contains("_" + metaData.id));
+    assertTrue(xml.contains(metaData.entityId));
+    assertTrue(xml.contains(metaData.idp.signInEndpoint));
+    assertTrue(xml.contains(metaData.idp.logoutEndpoint));
+    assertTrue(xml.contains("<ns2:IDPSSODescriptor protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
+
+    // Now parse it
+    MetaData parsed = service.parseMetaData(xml);
+    assertEquals(parsed.id, "_" + metaData.id);
+    assertEquals(parsed.entityId, metaData.entityId);
+    assertEquals(parsed.idp.signInEndpoint, metaData.idp.signInEndpoint);
+    assertEquals(parsed.idp.logoutEndpoint, metaData.idp.logoutEndpoint);
+    assertEquals(parsed.idp.certificates.get(0), metaData.idp.certificates.get(0));
+  }
+
+  @Test
+  public void buildRedirectAuthnRequest() throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
@@ -91,7 +136,7 @@ public class DefaultSAMLv2ServiceTest {
     request.issuer = "https://local.fusionauth.io";
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String parameters = service.buildHTTPRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+    String parameters = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
     System.out.println(parameters);
 //    assertEquals(parameters, "SAMLRequest=eJx9kNtOwzAMhl8lMtdt0rQ7RU2niQlpEiDEBvdZ63WVsmQkKWVvTzZON8Cl7c%2BW%2F6%2Bcvx00eUXnO2skZCkDgqa2TWdaCU%2Bbm2QKxAdlGqWtQQnGwrwqjc%2BF6sPePOJLjz5sTkck8ZLxIo4k9M4Iq3wXS3VAL0It1ou7W8FTJo7OBltbDR8L%2F8PKe3Qh%2Fgbf57mEfQhHQekwDOmQp9a1lDPGKJvRCDW%2Ba69%2B8OIPPKOsOOMxbaRXSwmIBZ%2Fkiifb0bhOijzLk%2BlEYTKabTnjE9bsxuNIet%2FjypydBAlAnr%2FcxXehKi9jV4UoJSokGc9L%2Btm7WLuPEVfLB6u7%2BkQWWtvh2qEK0exOaY9Aq5L%2BZrd6BwQejFI%3D&RelayState=Relay-State-String&SigAlg=http%3A%2F%2Fwww.w3.org%2F2000%2F09%2Fxmldsig%23rsa-sha1&Signature=MCwCFCZDBcWxZD65RY0AR8K4WhNzs0tZAhRQFyc80lMy7yTl9a8UQMSST4wioA%3D%3D");
 
@@ -129,39 +174,6 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
-  public void buildIdPMetaData() throws Exception {
-    MetaData metaData = new MetaData();
-    metaData.id = UUID.randomUUID().toString();
-    metaData.entityId = "https://fusionauth.io/samlv2/" + metaData.id;
-    metaData.idp = new IDPMetaData();
-    metaData.idp.signInEndpoint = "https://fusionauth.io/samlv2/login";
-    metaData.idp.logoutEndpoint = "https://fusionauth.io/samlv2/logout";
-
-    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-    kpg.initialize(2048);
-    KeyPair kp = kpg.generateKeyPair();
-    Certificate cert = CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FusionAuth");
-    metaData.idp.certificates.add(cert);
-
-    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String xml = service.buildMetadataResponse(metaData);
-    System.out.println(xml);
-    assertTrue(xml.contains("_" + metaData.id));
-    assertTrue(xml.contains(metaData.entityId));
-    assertTrue(xml.contains(metaData.idp.signInEndpoint));
-    assertTrue(xml.contains(metaData.idp.logoutEndpoint));
-    assertTrue(xml.contains("<ns2:IDPSSODescriptor protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
-
-    // Now parse it
-    MetaData parsed = service.parseMetaData(xml);
-    assertEquals(parsed.id, "_" + metaData.id);
-    assertEquals(parsed.entityId, metaData.entityId);
-    assertEquals(parsed.idp.signInEndpoint, metaData.idp.signInEndpoint);
-    assertEquals(parsed.idp.logoutEndpoint, metaData.idp.logoutEndpoint);
-    assertEquals(parsed.idp.certificates.get(0), metaData.idp.certificates.get(0));
-  }
-
-  @Test
   public void buildSPMetaData() throws Exception {
     MetaData metaData = new MetaData();
     metaData.id = UUID.randomUUID().toString();
@@ -185,6 +197,27 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(parsed.entityId, metaData.entityId);
     assertEquals(parsed.sp.acsEndpoint, metaData.sp.acsEndpoint);
     assertEquals(parsed.sp.nameIDFormat, metaData.sp.nameIDFormat);
+  }
+
+  public X509Certificate generateX509Certificate(KeyPair keyPair) throws IllegalArgumentException {
+    try {
+      ZonedDateTime now = ZonedDateTime.now();
+      X509CertInfo certInfo = new X509CertInfo();
+      CertificateX509Key certKey = new CertificateX509Key(keyPair.getPublic());
+      certInfo.set(X509CertInfo.KEY, certKey);
+      certInfo.set(X509CertInfo.VERSION, new CertificateVersion(1));
+      certInfo.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(AlgorithmId.sha256WithRSAEncryption_oid)));
+      certInfo.set(X509CertInfo.ISSUER, new X500Name("CN=FusionAuth"));
+      certInfo.set(X509CertInfo.SUBJECT, new X500Name("CN=FusionAuth"));
+      certInfo.set(X509CertInfo.VALIDITY, new CertificateValidity(Date.from(now.toInstant()), Date.from(now.plusYears(10).toInstant())));
+      certInfo.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(new BigInteger(UUID.randomUUID().toString().replace("-", ""), 16)));
+
+      X509CertImpl impl = new X509CertImpl(certInfo);
+      impl.sign(keyPair.getPrivate(), "SHA256withRSA");
+      return impl;
+    } catch (Exception e) {
+      throw new IllegalArgumentException(e);
+    }
   }
 
   @DataProvider(name = "maxLineLength")
@@ -234,7 +267,7 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
 
-  @Test(dataProvider = "Bindings")
+  @Test(dataProvider = "bindings")
   public void parseRequest_noNameIdPolicy(Binding binding) throws Exception {
     String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-noNameIdPolicy.xml")));
     String encodedXML = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
@@ -244,7 +277,7 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
         ? service.parseRequestRedirectBinding(encodedXML, null, false, null, null, null)
-        : service.parseRequestPostBinding(encodedXML, null, false, null);
+        : service.parseRequestPostBinding(encodedXML, false, null);
 
     // No Name Policy present in the request, we will default to Email
     assertEquals(request.id, "id_4c6e5aa3");
@@ -254,7 +287,7 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
 
-  @Test(dataProvider = "Bindings")
+  @Test(dataProvider = "bindings")
   public void parseRequest_verifySignature(Binding binding) throws Exception {
     String xml = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
         ? Paths.get("src/test/xml/authn-request-redirect-signed.xml")
@@ -282,7 +315,7 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
         ? service.parseRequestRedirectBinding(encodedXML, relayState, true, signature, publicKey, Algorithm.RS256)
-        : service.parseRequestPostBinding(encodedXML, relayState, true, publicKey);
+        : service.parseRequestPostBinding(encodedXML, true, publicKey);
 
     assertEquals(request.id, binding == Binding.HTTP_Redirect ? "ID_025417c8-50c8-4916-bfe0-e05694f8cea7" : "ID_26d69170-fc73-4b62-8bb6-c72769216134");
     assertEquals(request.issuer, "http://localhost:8080/auth/realms/master");
@@ -291,7 +324,7 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
 
-  @Test(dataProvider = "Bindings")
+  @Test(dataProvider = "bindings")
   public void parseRequest_verifySignature_badSignature(Binding binding) throws Exception {
     String relayState = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
         ? Paths.get("src/test/xml/relay-state/authn-request-redirect.txt")
@@ -316,7 +349,7 @@ public class DefaultSAMLv2ServiceTest {
       if (binding == Binding.HTTP_Redirect) {
         service.parseRequestRedirectBinding(encodedXML, relayState, true, signature, publicKey, Algorithm.RS256);
       } else {
-        service.parseRequestPostBinding(encodedXML, relayState, true, publicKey);
+        service.parseRequestPostBinding(encodedXML, true, publicKey);
       }
 
       fail("Should have failed signature validation");
@@ -326,7 +359,7 @@ public class DefaultSAMLv2ServiceTest {
     }
   }
 
-  @Test(dataProvider = "Bindings")
+  @Test(dataProvider = "bindings")
   public void parseRequest_withNameIdPolicy(Binding binding) throws Exception {
     String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-control.xml")));
     String encodedXML = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
@@ -336,7 +369,7 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
         ? service.parseRequestRedirectBinding(encodedXML, null, false, null, null, null)
-        : service.parseRequestPostBinding(encodedXML, null, false, null);
+        : service.parseRequestPostBinding(encodedXML, false, null);
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
@@ -477,8 +510,8 @@ public class DefaultSAMLv2ServiceTest {
     }
   }
 
-  @Test
-  public void roundTripRequestHttpPostBinding() throws Exception {
+  @Test(dataProvider = "bindings")
+  public void roundTripAuthnRequest(Binding binding) throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
@@ -488,75 +521,41 @@ public class DefaultSAMLv2ServiceTest {
     request.issuer = "https://local.fusionauth.io";
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String parameters = service.buildHTTPRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
-    System.out.println(parameters);
+    String encoded;
+    if (binding == Binding.HTTP_Redirect) {
+      encoded = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+    } else {
+      X509Certificate cert = generateX509Certificate(kp);
+      encoded = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+    }
 
-    // Unwind the request
-    int start = parameters.indexOf("=");
-    int end = parameters.indexOf("&");
-    String encodedRequest = URLDecoder.decode(parameters.substring(start + 1, end), "UTF-8");
+    if (binding == Binding.HTTP_Redirect) {
+      // Unwind the request
+      int start = encoded.indexOf("=");
+      int end = encoded.indexOf("&");
+      String encodedRequest = URLDecoder.decode(encoded.substring(start + 1, end), "UTF-8");
 
-    // Unwind the RelayState
-    start = parameters.indexOf("RelayState=");
-    end = parameters.indexOf("&", start);
-    String relayState = parameters.substring(start + "RelayState=".length(), end);
-    assertEquals(relayState, "Relay-State-String");
+      // Unwind the RelayState
+      start = encoded.indexOf("RelayState=");
+      end = encoded.indexOf("&", start);
+      String relayState = encoded.substring(start + "RelayState=".length(), end);
+      assertEquals(relayState, "Relay-State-String");
 
-    // Unwind the SigAlg
-    start = parameters.indexOf("SigAlg=");
-    end = parameters.indexOf("&", start);
-    String sigAlg = URLDecoder.decode(parameters.substring(start + "SigAlg=".length(), end), "UTF-8");
+      // Unwind the SigAlg
+      start = encoded.indexOf("SigAlg=");
+      end = encoded.indexOf("&", start);
+      String sigAlg = URLDecoder.decode(encoded.substring(start + "SigAlg=".length(), end), "UTF-8");
 
-    // Unwind the Signature
-    start = parameters.indexOf("Signature=");
-    end = parameters.length();
-    String signature = URLDecoder.decode(parameters.substring(start + "Signature=".length(), end), "UTF-8");
-
-    // Parse the request
-    request = service.parseRequestRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
-    assertEquals(request.id, "foobarbaz");
-    assertEquals(request.issuer, "https://local.fusionauth.io");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
-    assertEquals(request.version, "2.0");
-  }
-
-  @Test
-  public void roundTripRequestHttpRedirectBinding() throws Exception {
-    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-    kpg.initialize(2048);
-    KeyPair kp = kpg.generateKeyPair();
-
-    AuthenticationRequest request = new AuthenticationRequest();
-    request.id = "foobarbaz";
-    request.issuer = "https://local.fusionauth.io";
-
-    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String parameters = service.buildHTTPRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
-    System.out.println(parameters);
-
-    // Unwind the request
-    int start = parameters.indexOf("=");
-    int end = parameters.indexOf("&");
-    String encodedRequest = URLDecoder.decode(parameters.substring(start + 1, end), "UTF-8");
-
-    // Unwind the RelayState
-    start = parameters.indexOf("RelayState=");
-    end = parameters.indexOf("&", start);
-    String relayState = parameters.substring(start + "RelayState=".length(), end);
-    assertEquals(relayState, "Relay-State-String");
-
-    // Unwind the SigAlg
-    start = parameters.indexOf("SigAlg=");
-    end = parameters.indexOf("&", start);
-    String sigAlg = URLDecoder.decode(parameters.substring(start + "SigAlg=".length(), end), "UTF-8");
-
-    // Unwind the Signature
-    start = parameters.indexOf("Signature=");
-    end = parameters.length();
-    String signature = URLDecoder.decode(parameters.substring(start + "Signature=".length(), end), "UTF-8");
+      // Unwind the Signature
+      start = encoded.indexOf("Signature=");
+      end = encoded.length();
+      String signature = URLDecoder.decode(encoded.substring(start + "Signature=".length(), end), "UTF-8");
+      request = service.parseRequestRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
+    } else {
+      request = service.parseRequestPostBinding(encoded, true, kp.getPublic());
+    }
 
     // Parse the request
-    request = service.parseRequestRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);

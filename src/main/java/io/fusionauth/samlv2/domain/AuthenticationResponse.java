@@ -37,6 +37,10 @@ public class AuthenticationResponse {
 
   public String rawResponse;
 
+  public ZonedDateTime sessionExpiry;
+
+  public String sessionIndex;
+
   public Status status = new Status();
 
   public String version;

@@ -41,6 +41,7 @@ import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
 import javax.xml.transform.Transformer;
+import javax.xml.transform.TransformerException;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
@@ -52,7 +53,9 @@ import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
+import java.security.InvalidAlgorithmParameterException;
 import java.security.Key;
+import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
@@ -254,6 +257,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       authnStatement.setAuthnInstant(toXMLGregorianCalendar(now));
       authnStatement.setAuthnContext(new AuthnContextType());
       authnStatement.getAuthnContext().getContent().add(ASSERTION_OBJECT_FACTORY.createAuthnContextClassRef("urn:oasis:names:tc:SAML:2.0:ac:classes:Password"));
+      authnStatement.setSessionIndex(response.sessionIndex);
+      authnStatement.setSessionNotOnOrAfter(toXMLGregorianCalendar(response.sessionExpiry));
       assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement().add(authnStatement);
 
       // Add the assertion (element - order doesn't matter)
@@ -273,38 +278,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         insertBefore = null;
       }
 
-      // Set the id attribute node. Yucky! Yuck!
-      toSign.setIdAttributeNode(toSign.getAttributeNode("ID"), true);
-
-      // If there is an insert before, set it so that the signature is in the place that some IdPs require
-      DOMSignContext dsc = new DOMSignContext(privateKey, toSign);
-      if (insertBefore != null) {
-        dsc.setNextSibling(insertBefore);
-      }
-
-      // Sign away
-      XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
-      CanonicalizationMethod c14n = factory.newCanonicalizationMethod(xmlSignatureC14nMethod, (C14NMethodParameterSpec) null);
-      Reference ref = factory.newReference("#" + toSign.getAttribute("ID"),
-          factory.newDigestMethod(DigestMethod.SHA256, null),
-          Arrays.asList(factory.newTransform(Transform.ENVELOPED, (TransformParameterSpec) null), c14n),
-          null,
-          null);
-      SignedInfo si = factory.newSignedInfo(c14n,
-          factory.newSignatureMethod(algorithm.uri, null),
-          Collections.singletonList(ref));
-      KeyInfoFactory kif = factory.getKeyInfoFactory();
-      X509Data data = kif.newX509Data(Collections.singletonList(certificate));
-      KeyInfo ki = kif.newKeyInfo(Collections.singletonList(data));
-      XMLSignature signature = factory.newXMLSignature(si, ki);
-
-      signature.sign(dsc);
-
-      StringWriter sw = new StringWriter();
-      TransformerFactory tf = TransformerFactory.newInstance();
-      Transformer transformer = tf.newTransformer();
-      transformer.transform(new DOMSource(document), new StreamResult(sw));
-      String xml = sw.toString();
+      String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore);
       return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));
     } catch (Exception e) {
       throw new SAMLException("Unable to sign XML SAML response", e);
@@ -312,18 +286,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public String buildHTTPRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
-                                              PrivateKey key,
-                                              Algorithm algorithm)
+  public String buildInvalidTestingRedirectAuthnRequest(AuthenticationRequest request, String relayState,
+                                                        boolean sign, PrivateKey key, Algorithm algorithm)
       throws SAMLException {
-    return _buildAuthnRequest(request, "2.0", relayState, sign, key, algorithm);
-  }
-
-  @Override
-  public String buildInvalidTestingHTTPRedirectAuthnRequest(AuthenticationRequest request, String relayState,
-                                                            boolean sign,
-                                                            PrivateKey key, Algorithm algorithm) throws SAMLException {
-    return _buildAuthnRequest(request, "bad", relayState, sign, key, algorithm);
+    AuthnRequestType authnRequest = toAuthnRequest(request, "bad");
+    byte[] xml = marshallToBytes(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
+    return buildRedirectAuthnRequest(xml, relayState, sign, key, algorithm);
   }
 
   @Override
@@ -397,6 +365,31 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
+  public String buildPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
+                                      X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+      throws SAMLException {
+    AuthnRequestType authnRequest = toAuthnRequest(request, "2.0");
+    Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
+    try {
+      Element toSign = document.getDocumentElement();
+      String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null);
+      return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));
+    } catch (Exception e) {
+      throw new SAMLException("Unable to sign XML SAML response", e);
+    }
+  }
+
+  @Override
+  public String buildRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
+                                          PrivateKey key,
+                                          Algorithm algorithm)
+      throws SAMLException {
+    AuthnRequestType authnRequest = toAuthnRequest(request, "2.0");
+    byte[] xml = marshallToBytes(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
+    return buildRedirectAuthnRequest(xml, relayState, sign, key, algorithm);
+  }
+
+  @Override
   public MetaData parseMetaData(String metaDataXML) throws SAMLException {
     Document document = parseFromBytes(metaDataXML.getBytes(StandardCharsets.UTF_8));
     EntityDescriptorType root = unmarshallFromDocument(document, EntityDescriptorType.class);
@@ -450,10 +443,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public AuthenticationRequest parseRequestPostBinding(String encodedRequest, String relayState,
-                                                       boolean verifySignature, PublicKey key)
+  public AuthenticationRequest parseRequestPostBinding(String encodedRequest, boolean verifySignature, PublicKey key)
       throws SAMLException {
-    AuthnRequestParseResult result = parseRequest(decode(encodedRequest));
+    byte[] xml = Base64.getMimeDecoder().decode(encodedRequest);
+    AuthnRequestParseResult result = parseRequest(xml);
     if (verifySignature) {
       verifySignature(result.document, key);
     }
@@ -595,23 +588,28 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return response;
   }
 
-  private String _buildAuthnRequest(AuthenticationRequest request, String version, String relayState, boolean sign,
-                                    PrivateKey key, Algorithm algorithm) throws SAMLException {
-    // SAML Web SSO profile requirements (section 4.1.4.1)
-    AuthnRequestType authnRequest = new AuthnRequestType();
-    authnRequest.setAssertionConsumerServiceURL(request.acsURL);
-    authnRequest.setIssuer(new NameIDType());
-    authnRequest.getIssuer().setValue(request.issuer);
-    authnRequest.setNameIDPolicy(new NameIDPolicyType());
-    authnRequest.getNameIDPolicy().setFormat(NameIDFormat.EmailAddress.toSAMLFormat());
-    authnRequest.getNameIDPolicy().setAllowCreate(false);
-    authnRequest.setID(request.id);
-    authnRequest.setVersion(version);
-    authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+  private String attributeToString(Object attribute) {
+    if (attribute == null) {
+      return null;
+    }
 
+    if (attribute instanceof Number) {
+      return attribute.toString();
+    } else if (attribute instanceof String) {
+      return (String) attribute;
+    } else if (attribute instanceof Element) {
+      return ((Element) attribute).getTextContent();
+    } else {
+      logger.warn("This library currently doesn't handle attributes of type [" + attribute.getClass() + "]");
+    }
+
+    return null;
+  }
+
+  private String buildRedirectAuthnRequest(byte[] xml, String relayState, boolean sign, PrivateKey key,
+                                           Algorithm algorithm) throws SAMLException {
     try {
-      byte[] rawResult = marshallToBytes(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
-      String encodedResult = deflateAndEncode(rawResult);
+      String encodedResult = deflateAndEncode(xml);
       String parameters = "SAMLRequest=" + URLEncoder.encode(encodedResult, "UTF-8");
       if (relayState != null) {
         parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
@@ -635,34 +633,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
-  private String attributeToString(Object attribute) {
-    if (attribute == null) {
-      return null;
-    }
-
-    if (attribute instanceof Number) {
-      return attribute.toString();
-    } else if (attribute instanceof String) {
-      return (String) attribute;
-    } else if (attribute instanceof Element) {
-      return ((Element) attribute).getTextContent();
-    } else {
-      logger.warn("This library currently doesn't handle attributes of type [" + attribute.getClass() + "]");
-    }
-
-    return null;
-  }
-
   private ZonedDateTime convertToZonedDateTime(XMLGregorianCalendar cal) {
     return cal != null ? cal.toGregorianCalendar().toZonedDateTime() : null;
   }
 
-  private byte[] decode(String encodedRequest) {
-    return Base64.getMimeDecoder().decode(encodedRequest);
-  }
-
   private byte[] decodeAndInflate(String encodedRequest) throws SAMLException {
-    byte[] bytes = decode(encodedRequest);
+    byte[] bytes = Base64.getMimeDecoder().decode(encodedRequest);
     Inflater inflater = new Inflater(true);
     inflater.setInput(bytes);
     inflater.finished();
@@ -796,6 +772,58 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
     result.request.version = result.authnRequest.getVersion();
     return result;
+  }
+
+  private String signXML(PrivateKey privateKey, X509Certificate certificate, Algorithm algorithm,
+                         String xmlSignatureC14nMethod, Document document, Element toSign, Node insertBefore)
+      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, MarshalException, XMLSignatureException, TransformerException {
+    // Set the id attribute node. Yucky! Yuck!
+    toSign.setIdAttributeNode(toSign.getAttributeNode("ID"), true);
+
+    // If there is an insert before, set it so that the signature is in the place that some IdPs require
+    DOMSignContext dsc = new DOMSignContext(privateKey, toSign);
+    if (insertBefore != null) {
+      dsc.setNextSibling(insertBefore);
+    }
+
+    // Sign away
+    XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
+    CanonicalizationMethod c14n = factory.newCanonicalizationMethod(xmlSignatureC14nMethod, (C14NMethodParameterSpec) null);
+    Reference ref = factory.newReference("#" + toSign.getAttribute("ID"),
+        factory.newDigestMethod(DigestMethod.SHA256, null),
+        Arrays.asList(factory.newTransform(Transform.ENVELOPED, (TransformParameterSpec) null), c14n),
+        null,
+        null);
+    SignedInfo si = factory.newSignedInfo(c14n,
+        factory.newSignatureMethod(algorithm.uri, null),
+        Collections.singletonList(ref));
+    KeyInfoFactory kif = factory.getKeyInfoFactory();
+    X509Data data = kif.newX509Data(Collections.singletonList(certificate));
+    KeyInfo ki = kif.newKeyInfo(Collections.singletonList(data));
+    XMLSignature signature = factory.newXMLSignature(si, ki);
+
+    signature.sign(dsc);
+
+    StringWriter sw = new StringWriter();
+    TransformerFactory tf = TransformerFactory.newInstance();
+    Transformer transformer = tf.newTransformer();
+    transformer.transform(new DOMSource(document), new StreamResult(sw));
+    return sw.toString();
+  }
+
+  private AuthnRequestType toAuthnRequest(AuthenticationRequest request, String version) {
+    // SAML Web SSO profile requirements (section 4.1.4.1)
+    AuthnRequestType authnRequest = new AuthnRequestType();
+    authnRequest.setAssertionConsumerServiceURL(request.acsURL);
+    authnRequest.setIssuer(new NameIDType());
+    authnRequest.getIssuer().setValue(request.issuer);
+    authnRequest.setNameIDPolicy(new NameIDPolicyType());
+    authnRequest.getNameIDPolicy().setFormat(NameIDFormat.EmailAddress.toSAMLFormat());
+    authnRequest.getNameIDPolicy().setAllowCreate(false);
+    authnRequest.setID(request.id);
+    authnRequest.setVersion(version);
+    authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+    return authnRequest;
   }
 
   private Certificate toCertificate(KeyDescriptorType keyDescriptorType) {
