@@ -40,6 +40,7 @@ import java.util.zip.Inflater;
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
+import io.fusionauth.samlv2.domain.Binding;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.MetaData.IDPMetaData;
 import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
@@ -67,6 +68,14 @@ public class DefaultSAMLv2ServiceTest {
   @BeforeClass
   public void beforeClass() {
     System.setProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks", "true");
+  }
+
+  @DataProvider(name = "Bindings")
+  public Object[][] bindings() {
+    return new Object[][]{
+        {Binding.HTTP_Redirect},
+        {Binding.HTTP_POST}
+    };
   }
 
   @Test
@@ -202,7 +211,7 @@ public class DefaultSAMLv2ServiceTest {
   @Test(dataProvider = "maxLineLength")
   public void parseRequest_includeLineReturns(int maxLineLength) throws Exception {
     String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-control.xml")));
-    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-control.txt")));
+    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/deflated/authn-request-control.txt")));
 
     // Response has line returns, we've seen a customer that has line returns at 76
     List<String> lines = new ArrayList<>();
@@ -214,7 +223,7 @@ public class DefaultSAMLv2ServiceTest {
     String withLineReturns = String.join("\n", lines);
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationRequest request = service.parseRequest(withLineReturns, null, null, false, null, null);
+    AuthenticationRequest request = service.parseRequestFromHttpRedirectBinding(withLineReturns, null, false, null, null, null);
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
@@ -223,13 +232,17 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
 
-  @Test
-  public void parseRequest_noNameIdPolicy() throws Exception {
+  @Test(dataProvider = "Bindings")
+  public void parseRequest_noNameIdPolicy(Binding binding) throws Exception {
     String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-noNameIdPolicy.xml")));
-    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-noNameIdPolicy.txt")));
+    String encodedXML = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
+        ? Paths.get("src/test/xml/deflated/authn-request-noNameIdPolicy.txt")
+        : Paths.get("src/test/xml/encoded/authn-request-noNameIdPolicy.txt")));
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationRequest request = service.parseRequest(encodedXML, null, null, false, null, null);
+    AuthenticationRequest request = binding == Binding.HTTP_Redirect
+        ? service.parseRequestFromHttpRedirectBinding(encodedXML, null, false, null, null, null)
+        : service.parseRequestFromHttpPostBinding(encodedXML, null, false, null);
 
     // No Name Policy present in the request, we will default to Email
     assertEquals(request.id, "id_4c6e5aa3");
@@ -239,13 +252,17 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
 
-  @Test
-  public void parseRequest_withNameIdPolicy() throws Exception {
+  @Test(dataProvider = "Bindings")
+  public void parseRequest_withNameIdPolicy(Binding binding) throws Exception {
     String xml = new String(Files.readAllBytes(Paths.get("src/test/xml/authn-request-control.xml")));
-    String encodedXML = new String(Files.readAllBytes(Paths.get("src/test/xml/encoded/authn-request-control.txt")));
+    String encodedXML = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
+        ? Paths.get("src/test/xml/deflated/authn-request-control.txt")
+        : Paths.get("src/test/xml/encoded/authn-request-control.txt")));
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationRequest request = service.parseRequest(encodedXML, null, null, false, null, null);
+    AuthenticationRequest request = binding == Binding.HTTP_Redirect
+        ? service.parseRequestFromHttpRedirectBinding(encodedXML, null, false, null, null, null)
+        : service.parseRequestFromHttpPostBinding(encodedXML, null, false, null);
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
@@ -283,7 +300,7 @@ public class DefaultSAMLv2ServiceTest {
 
   @Test
   public void parseResponse_handleNilAttribute() throws Exception {
-    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encoded/example-response.txt"));
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/deflated/example-response.txt"));
     String encodedResponse = new String(ba);
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
@@ -366,7 +383,7 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
-  public void roundTripRequest() throws Exception {
+  public void roundTripRequestHttpPostBinding() throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
@@ -401,7 +418,50 @@ public class DefaultSAMLv2ServiceTest {
     String signature = URLDecoder.decode(parameters.substring(start + "Signature=".length(), end), "UTF-8");
 
     // Parse the request
-    request = service.parseRequest(encodedRequest, relayState, signature, true, kp.getPublic(), Algorithm.fromURI(sigAlg));
+    request = service.parseRequestFromHttpRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
+    assertEquals(request.id, "foobarbaz");
+    assertEquals(request.issuer, "https://local.fusionauth.io");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.version, "2.0");
+  }
+
+  @Test
+  public void roundTripRequestHttpRedirectBinding() throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "https://local.fusionauth.io";
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String parameters = service.buildHTTPRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+    System.out.println(parameters);
+
+    // Unwind the request
+    int start = parameters.indexOf("=");
+    int end = parameters.indexOf("&");
+    String encodedRequest = URLDecoder.decode(parameters.substring(start + 1, end), "UTF-8");
+
+    // Unwind the RelayState
+    start = parameters.indexOf("RelayState=");
+    end = parameters.indexOf("&", start);
+    String relayState = parameters.substring(start + "RelayState=".length(), end);
+    assertEquals(relayState, "Relay-State-String");
+
+    // Unwind the SigAlg
+    start = parameters.indexOf("SigAlg=");
+    end = parameters.indexOf("&", start);
+    String sigAlg = URLDecoder.decode(parameters.substring(start + "SigAlg=".length(), end), "UTF-8");
+
+    // Unwind the Signature
+    start = parameters.indexOf("Signature=");
+    end = parameters.length();
+    String signature = URLDecoder.decode(parameters.substring(start + "Signature=".length(), end), "UTF-8");
+
+    // Parse the request
+    request = service.parseRequestFromHttpRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);

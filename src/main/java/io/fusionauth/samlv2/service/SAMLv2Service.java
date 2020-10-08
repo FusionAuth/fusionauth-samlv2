@@ -72,6 +72,7 @@ public interface SAMLv2Service {
    * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
    * @throws SAMLException If any unrecoverable errors occur.
    */
+  @SuppressWarnings("unused")
   String buildInvalidTestingHTTPRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
                                                      PrivateKey key, Algorithm algorithm) throws SAMLException;
 
@@ -94,19 +95,36 @@ public interface SAMLv2Service {
   MetaData parseMetaData(String metaDataXML) throws SAMLException;
 
   /**
+   * Parses the authentication request from an HTTP POST binding and verifies that it is valid.
+   *
+   * @param encodedRequest  The encoded SAML request from an HTTP POST binding.
+   * @param relayState      The RelayState URL parameter (only needed if verifying signatures).
+   * @param verifySignature True if the signature should be verified.
+   * @param key             (Optional) The key (signing certificate) used to verify the signature.
+   * @return The request.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  AuthenticationRequest parseRequestFromHttpPostBinding(String encodedRequest, String relayState,
+                                                        boolean verifySignature, PublicKey key)
+      throws SAMLException;
+
+  /**
    * Parses the authentication request from the given String and verifies that it is valid.
    *
-   * @param encodedRequest  The encoded (and deflated) request from the URL parameter.
+   * @param encodedRequest  The encoded SAML request. When a request is accepted from an HTTP Redirect Binding, the
+   *                        request will be assumed to be encoded an deflated.
    * @param relayState      The RelayState URL parameter (only needed if verifying signatures).
-   * @param signature       (Optional) The signature to validate.
    * @param verifySignature True if the signature should be verified.
+   * @param signature       (Optional) The signature to validate.
    * @param key             (Optional) The key (signing certificate) used to verify the signature.
    * @param algorithm       (Optional) The key algorithm used to verify the signature.
    * @return The request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationRequest parseRequest(String encodedRequest, String relayState, String signature,
-                                     boolean verifySignature, PublicKey key, Algorithm algorithm) throws SAMLException;
+  AuthenticationRequest parseRequestFromHttpRedirectBinding(String encodedRequest, String relayState,
+                                                            boolean verifySignature, String signature, PublicKey key,
+                                                            Algorithm algorithm)
+      throws SAMLException;
 
   /**
    * Parses the authentication response from the given String and verifies that it is valid.

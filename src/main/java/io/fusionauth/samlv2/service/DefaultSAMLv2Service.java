@@ -448,8 +448,48 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public AuthenticationRequest parseRequest(String encodedRequest, String relayState, String signature,
-                                            boolean verifySignature, PublicKey key, Algorithm algorithm)
+  public AuthenticationRequest parseRequestFromHttpPostBinding(String encodedRequest, String relayState,
+                                                               boolean verifySignature, PublicKey key)
+      throws SAMLException {
+    byte[] requestBytes = decode(encodedRequest);
+    String xml = new String(requestBytes, StandardCharsets.UTF_8);
+    if (logger.isDebugEnabled()) {
+      logger.debug("SAMLRequest XML is\n{}", xml);
+    }
+
+    Document document = parseFromBytes(requestBytes);
+    AuthnRequestType authnRequest = unmarshallFromDocument(document, AuthnRequestType.class);
+    //
+    // In JAXB, the document and authnRequest may be used to validate the "document" when using POST bindings
+    //
+    AuthenticationRequest result = new AuthenticationRequest();
+    result.xml = xml;
+    result.id = authnRequest.getID();
+    result.issuer = authnRequest.getIssuer().getValue();
+    result.issueInstant = authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
+    NameIDPolicyType nameIdPolicyType = authnRequest.getNameIDPolicy();
+    if (nameIdPolicyType == null) {
+      result.nameIdFormat = NameIDFormat.EmailAddress;
+    } else {
+      result.nameIdFormat = NameIDFormat.fromSAMLFormat(nameIdPolicyType.getFormat());
+    }
+    result.version = authnRequest.getVersion();
+
+    if (verifySignature) {
+      // Verify the signature embedded in the XML document
+
+      // See XML Signature Assertions in the SAML Response Processing.
+      // For POST Bindings w/ embedded signature, see verifySignature()
+
+    }
+
+    return result;
+  }
+
+  @Override
+  public AuthenticationRequest parseRequestFromHttpRedirectBinding(String encodedRequest, String relayState,
+                                                                   boolean verifySignature, String signature,
+                                                                   PublicKey key, Algorithm algorithm)
       throws SAMLException {
     byte[] requestBytes = decodeAndInflate(encodedRequest);
     String xml = new String(requestBytes, StandardCharsets.UTF_8);
@@ -459,6 +499,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     Document document = parseFromBytes(requestBytes);
     AuthnRequestType authnRequest = unmarshallFromDocument(document, AuthnRequestType.class);
+
     AuthenticationRequest result = new AuthenticationRequest();
     result.xml = xml;
     result.id = authnRequest.getID();
@@ -662,8 +703,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return cal != null ? cal.toGregorianCalendar().toZonedDateTime() : null;
   }
 
+  private byte[] decode(String encodedRequest) {
+    return Base64.getMimeDecoder().decode(encodedRequest);
+  }
+
   private byte[] decodeAndInflate(String encodedRequest) throws SAMLException {
-    byte[] bytes = Base64.getMimeDecoder().decode(encodedRequest);
+    byte[] bytes = decode(encodedRequest);
     Inflater inflater = new Inflater(true);
     inflater.setInput(bytes);
     inflater.finished();
