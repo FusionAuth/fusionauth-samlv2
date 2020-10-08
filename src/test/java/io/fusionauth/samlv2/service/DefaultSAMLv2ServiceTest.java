@@ -199,27 +199,6 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(parsed.sp.nameIDFormat, metaData.sp.nameIDFormat);
   }
 
-  public X509Certificate generateX509Certificate(KeyPair keyPair) throws IllegalArgumentException {
-    try {
-      ZonedDateTime now = ZonedDateTime.now();
-      X509CertInfo certInfo = new X509CertInfo();
-      CertificateX509Key certKey = new CertificateX509Key(keyPair.getPublic());
-      certInfo.set(X509CertInfo.KEY, certKey);
-      certInfo.set(X509CertInfo.VERSION, new CertificateVersion(1));
-      certInfo.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(AlgorithmId.sha256WithRSAEncryption_oid)));
-      certInfo.set(X509CertInfo.ISSUER, new X500Name("CN=FusionAuth"));
-      certInfo.set(X509CertInfo.SUBJECT, new X500Name("CN=FusionAuth"));
-      certInfo.set(X509CertInfo.VALIDITY, new CertificateValidity(Date.from(now.toInstant()), Date.from(now.plusYears(10).toInstant())));
-      certInfo.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(new BigInteger(UUID.randomUUID().toString().replace("-", ""), 16)));
-
-      X509CertImpl impl = new X509CertImpl(certInfo);
-      impl.sign(keyPair.getPrivate(), "SHA256withRSA");
-      return impl;
-    } catch (Exception e) {
-      throw new IllegalArgumentException(e);
-    }
-  }
-
   @DataProvider(name = "maxLineLength")
   public Object[][] maxLineLength() {
     return new Object[][]{
@@ -588,5 +567,26 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
     assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
+  }
+
+  private X509Certificate generateX509Certificate(KeyPair keyPair) throws IllegalArgumentException {
+    try {
+      ZonedDateTime now = ZonedDateTime.now();
+      X509CertInfo certInfo = new X509CertInfo();
+      CertificateX509Key certKey = new CertificateX509Key(keyPair.getPublic());
+      certInfo.set(X509CertInfo.KEY, certKey);
+      certInfo.set(X509CertInfo.VERSION, new CertificateVersion(1));
+      certInfo.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(AlgorithmId.sha256WithRSAEncryption_oid)));
+      certInfo.set(X509CertInfo.ISSUER, new X500Name("CN=FusionAuth"));
+      certInfo.set(X509CertInfo.SUBJECT, new X500Name("CN=FusionAuth"));
+      certInfo.set(X509CertInfo.VALIDITY, new CertificateValidity(Date.from(now.toInstant()), Date.from(now.plusYears(10).toInstant())));
+      certInfo.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(new BigInteger(UUID.randomUUID().toString().replace("-", ""), 16)));
+
+      X509CertImpl impl = new X509CertImpl(certInfo);
+      impl.sign(keyPair.getPrivate(), "SHA256withRSA");
+      return impl;
+    } catch (Exception e) {
+      throw new IllegalArgumentException(e);
+    }
   }
 }
