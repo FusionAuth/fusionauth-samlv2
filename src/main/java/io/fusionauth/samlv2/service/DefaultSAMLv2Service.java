@@ -20,6 +20,7 @@ import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.MarshalException;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
 import javax.xml.crypto.dsig.DigestMethod;
@@ -54,7 +55,6 @@ import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
-import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -443,12 +443,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public AuthenticationRequest parseRequestPostBinding(String encodedRequest, boolean verifySignature, PublicKey key)
+  public AuthenticationRequest parseRequestPostBinding(String encodedRequest, boolean verifySignature,
+                                                       KeySelector keySelector)
       throws SAMLException {
     byte[] xml = Base64.getMimeDecoder().decode(encodedRequest);
     AuthnRequestParseResult result = parseRequest(xml);
     if (verifySignature) {
-      verifySignature(result.document, key);
+      verifySignature(result.document, keySelector);
     }
 
     return result.request;
@@ -487,7 +488,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, PublicKey key)
+  public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, KeySelector keySelector)
       throws SAMLException {
 
     AuthenticationResponse response = new AuthenticationResponse();
@@ -496,7 +497,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     Document document = parseFromBytes(decodedResponse);
     if (verifySignature) {
-      verifySignature(document, key);
+      verifySignature(document, keySelector);
     }
 
     ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
@@ -880,7 +881,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
-  private void verifySignature(Document document, Key key) throws SAMLException {
+  private void verifySignature(Document document, KeySelector keySelector) throws SAMLException {
     // Fix the IDs in the entire document per the suggestions at http://stackoverflow.com/questions/17331187/xml-dig-sig-error-after-upgrade-to-java7u25
     fixIDs(document.getDocumentElement());
 
@@ -890,7 +891,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     for (int i = 0; i < nl.getLength(); i++) {
-      DOMValidateContext validateContext = new DOMValidateContext(key, nl.item(i));
+      DOMValidateContext validateContext = new DOMValidateContext(keySelector, nl.item(i));
       XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
       try {
         XMLSignature signature = factory.unmarshalXMLSignature(validateContext);

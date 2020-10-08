@@ -15,6 +15,7 @@
  */
 package io.fusionauth.samlv2.service;
 
+import javax.xml.crypto.KeySelector;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
@@ -114,12 +115,12 @@ public interface SAMLv2Service {
    *
    * @param encodedRequest  The encoded SAML request from an HTTP POST binding.
    * @param verifySignature True if the signature should be verified.
-   * @param key             (Optional) The key (signing certificate) used to verify the signature.
+   * @param keySelector     The key selector that is used to find the correct key to verify the signature in the
+   *                        response.
    * @return The request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationRequest parseRequestPostBinding(String encodedRequest, boolean verifySignature,
-                                                PublicKey key)
+  AuthenticationRequest parseRequestPostBinding(String encodedRequest, boolean verifySignature, KeySelector keySelector)
       throws SAMLException;
 
   /**
@@ -144,9 +145,11 @@ public interface SAMLv2Service {
    *
    * @param response        The response in base 64 deflated format.
    * @param verifySignature Determines if the responses signature should be verified or not.
-   * @param key             The key (signing certificate) used to verify the signature in the response.
+   * @param keySelector     The key selector that is used to find the correct key to verify the signature in the
+   *                        response.
    * @return The response.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationResponse parseResponse(String response, boolean verifySignature, PublicKey key) throws SAMLException;
+  AuthenticationResponse parseResponse(String response, boolean verifySignature, KeySelector keySelector)
+      throws SAMLException;
 }

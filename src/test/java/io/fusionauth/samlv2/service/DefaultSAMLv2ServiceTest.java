@@ -18,6 +18,7 @@ package io.fusionauth.samlv2.service;
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
@@ -294,7 +295,7 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
         ? service.parseRequestRedirectBinding(encodedXML, relayState, true, signature, publicKey, Algorithm.RS256)
-        : service.parseRequestPostBinding(encodedXML, true, publicKey);
+        : service.parseRequestPostBinding(encodedXML, true, KeySelector.singletonKeySelector(publicKey));
 
     assertEquals(request.id, binding == Binding.HTTP_Redirect ? "ID_025417c8-50c8-4916-bfe0-e05694f8cea7" : "ID_26d69170-fc73-4b62-8bb6-c72769216134");
     assertEquals(request.issuer, "http://localhost:8080/auth/realms/master");
@@ -328,7 +329,7 @@ public class DefaultSAMLv2ServiceTest {
       if (binding == Binding.HTTP_Redirect) {
         service.parseRequestRedirectBinding(encodedXML, relayState, true, signature, publicKey, Algorithm.RS256);
       } else {
-        service.parseRequestPostBinding(encodedXML, true, publicKey);
+        service.parseRequestPostBinding(encodedXML, true, KeySelector.singletonKeySelector(publicKey));
       }
 
       fail("Should have failed signature validation");
@@ -369,7 +370,7 @@ public class DefaultSAMLv2ServiceTest {
     byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
     String encodedResponse = new String(ba);
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationResponse response = service.parseResponse(encodedResponse, true, key);
+    AuthenticationResponse response = service.parseResponse(encodedResponse, true, KeySelector.singletonKeySelector(key));
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
     assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
@@ -432,7 +433,7 @@ public class DefaultSAMLv2ServiceTest {
     String withLineReturns = String.join("\n", lines);
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationResponse response = service.parseResponse(withLineReturns, true, key);
+    AuthenticationResponse response = service.parseResponse(withLineReturns, true, KeySelector.singletonKeySelector(key));
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
     assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
@@ -460,7 +461,7 @@ public class DefaultSAMLv2ServiceTest {
     String encodedResponse = new String(ba);
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     try {
-      service.parseResponse(encodedResponse, true, key);
+      service.parseResponse(encodedResponse, true, KeySelector.singletonKeySelector(key));
       fail("Should have thrown an exception");
     } catch (SAMLException e) {
       // Should throw
@@ -481,7 +482,7 @@ public class DefaultSAMLv2ServiceTest {
     String encodedResponse = new String(ba);
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     try {
-      service.parseResponse(encodedResponse, true, key);
+      service.parseResponse(encodedResponse, true, KeySelector.singletonKeySelector(key));
       fail("Should have thrown an exception");
     } catch (SAMLException e) {
       // Should throw
@@ -531,7 +532,7 @@ public class DefaultSAMLv2ServiceTest {
       String signature = URLDecoder.decode(encoded.substring(start + "Signature=".length(), end), "UTF-8");
       request = service.parseRequestRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
     } else {
-      request = service.parseRequestPostBinding(encoded, true, kp.getPublic());
+      request = service.parseRequestPostBinding(encoded, true, KeySelector.singletonKeySelector(kp.getPublic()));
     }
 
     // Parse the request
@@ -554,7 +555,7 @@ public class DefaultSAMLv2ServiceTest {
 
     String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
     System.out.println(new String(Base64.getMimeDecoder().decode(encodedXML)));
-    response = service.parseResponse(encodedXML, true, kp.getPublic());
+    response = service.parseResponse(encodedXML, true, KeySelector.singletonKeySelector(kp.getPublic()));
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
     assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
