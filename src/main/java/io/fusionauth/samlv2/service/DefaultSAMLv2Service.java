@@ -463,7 +463,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     AuthnRequestParseResult result = parseRequest(decodeAndInflate(encodedRequest));
     if (verifySignature) {
       if (signature == null || key == null || algorithm == null) {
-        throw new NullPointerException("You must specify a signature, key and algorithm if you want to verify the SAML request signature");
+        throw new SAMLException("You must specify a signature, key and algorithm if you want to verify the SAML request signature");
       }
 
       try {
@@ -902,7 +902,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       } catch (MarshalException e) {
         throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. We couldn't unmarshall the XML Signature element.", e);
       } catch (XMLSignatureException e) {
-        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. The signature was unmarshalled we couldn't validate it for an unknown reason.", e);
+        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. The signature was unmarshalled we couldn't validate it. Possible reasons include a key was not provided that was eligible to verify the signature, or an un-expected exception occurred.", e);
       }
     }
   }
