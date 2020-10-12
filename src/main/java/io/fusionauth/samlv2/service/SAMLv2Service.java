@@ -19,6 +19,8 @@ import javax.xml.crypto.KeySelector;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.X509Certificate;
+import java.util.function.Function;
+import java.util.function.Function;
 
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
@@ -80,11 +82,11 @@ public interface SAMLv2Service {
    * @param certificate            The certificate that is included in the request.
    * @param algorithm              The signing algorithm to use (if any).
    * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
-   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
+   * @return The encoded value to be sent in the HTTP POST body.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  String buildPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
-                               X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+  String buildPostAuthnRequest(AuthenticationRequest request, PrivateKey privateKey, X509Certificate certificate,
+                               Algorithm algorithm, String xmlSignatureC14nMethod)
       throws SAMLException;
 
   /**
@@ -114,13 +116,13 @@ public interface SAMLv2Service {
    * Parses the authentication request from an HTTP POST binding and verifies that it is valid.
    *
    * @param encodedRequest  The encoded SAML request from an HTTP POST binding.
-   * @param verifySignature True if the signature should be verified.
-   * @param keySelector     The key selector that is used to find the correct key to verify the signature in the
-   *                        response.
+   * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
+   *                        necessary details to complete signature verification.
    * @return The request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationRequest parseRequestPostBinding(String encodedRequest, boolean verifySignature, KeySelector keySelector)
+  AuthenticationRequest parseRequestPostBinding(String encodedRequest,
+                                                Function<AuthenticationRequest, PostBindingSignatureHelper> signatureHelper)
       throws SAMLException;
 
   /**
@@ -129,15 +131,13 @@ public interface SAMLv2Service {
    * @param encodedRequest  The encoded SAML request. When a request is accepted from an HTTP Redirect Binding, the
    *                        request will be assumed to be encoded an deflated.
    * @param relayState      The RelayState URL parameter (only needed if verifying signatures).
-   * @param verifySignature True if the signature should be verified.
-   * @param signature       (Optional) The signature to validate.
-   * @param key             (Optional) The key (signing certificate) used to verify the signature.
-   * @param algorithm       (Optional) The key algorithm used to verify the signature.
+   * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
+   *                        necessary details to complete signature verification.
    * @return The request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationRequest parseRequestRedirectBinding(String encodedRequest, String relayState, boolean verifySignature,
-                                                    String signature, PublicKey key, Algorithm algorithm)
+  AuthenticationRequest parseRequestRedirectBinding(String encodedRequest, String relayState,
+                                                    Function<AuthenticationRequest, RedirectBindingSignatureHelper> signatureHelper)
       throws SAMLException;
 
   /**
@@ -152,4 +152,39 @@ public interface SAMLv2Service {
    */
   AuthenticationResponse parseResponse(String response, boolean verifySignature, KeySelector keySelector)
       throws SAMLException;
+
+
+  interface PostBindingSignatureHelper {
+    /**
+     * @return the key selector to be used to find the correct key to verify the signature.
+     */
+    KeySelector keySelector();
+
+    /**
+     * @return true if the signature should be verified.
+     */
+    boolean verifySignature();
+  }
+
+  interface RedirectBindingSignatureHelper {
+    /**
+     * @return the algorithm used to verify the signature.
+     */
+    Algorithm algorithm();
+
+    /**
+     * @return the public key used to verify the signature.
+     */
+    PublicKey publicKey();
+
+    /**
+     * @return the signature string from the HTTP request to verify.
+     */
+    String signature();
+
+    /**
+     * @return true if the signature should be verified.
+     */
+    boolean verifySignature();
+  }
 }

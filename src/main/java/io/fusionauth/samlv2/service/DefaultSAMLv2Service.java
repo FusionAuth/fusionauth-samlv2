@@ -57,7 +57,6 @@ import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
-import java.security.PublicKey;
 import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
@@ -74,6 +73,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
@@ -365,9 +365,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public String buildPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
-                                      X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
-      throws SAMLException {
+  public String buildPostAuthnRequest(AuthenticationRequest request, PrivateKey privateKey, X509Certificate certificate,
+                                      Algorithm algorithm, String xmlSignatureC14nMethod) throws SAMLException {
     AuthnRequestType authnRequest = toAuthnRequest(request, "2.0");
     Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
     try {
@@ -443,13 +442,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public AuthenticationRequest parseRequestPostBinding(String encodedRequest, boolean verifySignature,
-                                                       KeySelector keySelector)
+  public AuthenticationRequest parseRequestPostBinding(String encodedRequest,
+                                                       Function<AuthenticationRequest, PostBindingSignatureHelper> signatureHelperFunction)
       throws SAMLException {
     byte[] xml = Base64.getMimeDecoder().decode(encodedRequest);
     AuthnRequestParseResult result = parseRequest(xml);
-    if (verifySignature) {
-      verifySignature(result.document, keySelector);
+    PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
+    if (signatureHelper.verifySignature()) {
+      verifySignature(result.document, signatureHelper.keySelector());
     }
 
     return result.request;
@@ -457,12 +457,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
   @Override
   public AuthenticationRequest parseRequestRedirectBinding(String encodedRequest, String relayState,
-                                                           boolean verifySignature, String signature,
-                                                           PublicKey key, Algorithm algorithm)
+                                                           Function<AuthenticationRequest, RedirectBindingSignatureHelper> signatureHelperFunction)
       throws SAMLException {
     AuthnRequestParseResult result = parseRequest(decodeAndInflate(encodedRequest));
-    if (verifySignature) {
-      if (signature == null || key == null || algorithm == null) {
+    RedirectBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
+    if (signatureHelper.verifySignature()) {
+      if (signatureHelper.signature() == null || signatureHelper.publicKey() == null || signatureHelper.algorithm() == null) {
         throw new SAMLException("You must specify a signature, key and algorithm if you want to verify the SAML request signature");
       }
 
@@ -471,12 +471,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         if (relayState != null) {
           parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
         }
-        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, "UTF-8");
+        parameters += "&SigAlg=" + URLEncoder.encode(signatureHelper.algorithm().uri, "UTF-8");
 
-        Signature sig = Signature.getInstance(algorithm.name);
-        sig.initVerify(key);
+        Signature sig = Signature.getInstance(signatureHelper.algorithm().name);
+        sig.initVerify(signatureHelper.publicKey());
         sig.update(parameters.getBytes(StandardCharsets.UTF_8));
-        if (!sig.verify(Base64.getMimeDecoder().decode(signature))) {
+        if (!sig.verify(Base64.getMimeDecoder().decode(signatureHelper.signature()))) {
           throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.");
         }
       } catch (GeneralSecurityException | UnsupportedEncodingException e) {

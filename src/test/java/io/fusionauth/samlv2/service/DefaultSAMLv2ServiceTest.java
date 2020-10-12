@@ -238,7 +238,7 @@ public class DefaultSAMLv2ServiceTest {
     String withLineReturns = String.join("\n", lines);
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationRequest request = service.parseRequestRedirectBinding(withLineReturns, null, false, null, null, null);
+    AuthenticationRequest request = service.parseRequestRedirectBinding(withLineReturns, null, authRequest -> new TestRedirectBindingSignatureHelper());
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
@@ -256,8 +256,8 @@ public class DefaultSAMLv2ServiceTest {
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseRequestRedirectBinding(encodedXML, null, false, null, null, null)
-        : service.parseRequestPostBinding(encodedXML, false, null);
+        ? service.parseRequestRedirectBinding(encodedXML, null, authRequest -> new TestRedirectBindingSignatureHelper())
+        : service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper());
 
     // No Name Policy present in the request, we will default to Email
     assertEquals(request.id, "id_4c6e5aa3");
@@ -294,8 +294,8 @@ public class DefaultSAMLv2ServiceTest {
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseRequestRedirectBinding(encodedXML, relayState, true, signature, publicKey, Algorithm.RS256)
-        : service.parseRequestPostBinding(encodedXML, true, KeySelector.singletonKeySelector(publicKey));
+        ? service.parseRequestRedirectBinding(encodedXML, relayState, authRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS256, publicKey, signature, true))
+        : service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), true));
 
     assertEquals(request.id, binding == Binding.HTTP_Redirect ? "ID_025417c8-50c8-4916-bfe0-e05694f8cea7" : "ID_26d69170-fc73-4b62-8bb6-c72769216134");
     assertEquals(request.issuer, "http://localhost:8080/auth/realms/master");
@@ -327,9 +327,9 @@ public class DefaultSAMLv2ServiceTest {
     try {
       DefaultSAMLv2Service service = new DefaultSAMLv2Service();
       if (binding == Binding.HTTP_Redirect) {
-        service.parseRequestRedirectBinding(encodedXML, relayState, true, signature, publicKey, Algorithm.RS256);
+        service.parseRequestRedirectBinding(encodedXML, relayState, request -> new TestRedirectBindingSignatureHelper(Algorithm.RS256, publicKey, signature, true));
       } else {
-        service.parseRequestPostBinding(encodedXML, true, KeySelector.singletonKeySelector(publicKey));
+        service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), true));
       }
 
       fail("Should have failed signature validation");
@@ -348,8 +348,8 @@ public class DefaultSAMLv2ServiceTest {
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseRequestRedirectBinding(encodedXML, null, false, null, null, null)
-        : service.parseRequestPostBinding(encodedXML, false, null);
+        ? service.parseRequestRedirectBinding(encodedXML, null, authRequest -> new TestRedirectBindingSignatureHelper())
+        : service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper());
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
@@ -506,7 +506,7 @@ public class DefaultSAMLv2ServiceTest {
       encoded = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
     } else {
       X509Certificate cert = generateX509Certificate(kp);
-      encoded = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+      encoded = service.buildPostAuthnRequest(request, kp.getPrivate(), cert, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
     }
 
     if (binding == Binding.HTTP_Redirect) {
@@ -530,9 +530,9 @@ public class DefaultSAMLv2ServiceTest {
       start = encoded.indexOf("Signature=");
       end = encoded.length();
       String signature = URLDecoder.decode(encoded.substring(start + "Signature=".length(), end), "UTF-8");
-      request = service.parseRequestRedirectBinding(encodedRequest, relayState, true, signature, kp.getPublic(), Algorithm.fromURI(sigAlg));
+      request = service.parseRequestRedirectBinding(encodedRequest, relayState, authRequest -> new TestRedirectBindingSignatureHelper(Algorithm.fromURI(sigAlg), kp.getPublic(), signature, true));
     } else {
-      request = service.parseRequestPostBinding(encoded, true, KeySelector.singletonKeySelector(kp.getPublic()));
+      request = service.parseRequestPostBinding(encoded, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
     }
 
     // Parse the request
