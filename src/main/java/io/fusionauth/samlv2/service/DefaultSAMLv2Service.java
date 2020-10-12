@@ -816,6 +816,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     // SAML Web SSO profile requirements (section 4.1.4.1)
     AuthnRequestType authnRequest = new AuthnRequestType();
     authnRequest.setAssertionConsumerServiceURL(request.acsURL);
+    authnRequest.setDestination(request.destination);
     authnRequest.setIssuer(new NameIDType());
     authnRequest.getIssuer().setValue(request.issuer);
     authnRequest.setNameIDPolicy(new NameIDPolicyType());

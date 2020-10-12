@@ -25,7 +25,7 @@ import java.time.ZonedDateTime;
 public class AuthenticationRequest {
   public String acsURL;
 
-  public String xml;
+  public String destination;
 
   public String id;
 
@@ -36,4 +36,6 @@ public class AuthenticationRequest {
   public NameIDFormat nameIdFormat;
 
   public String version;
+
+  public String xml;
 }
