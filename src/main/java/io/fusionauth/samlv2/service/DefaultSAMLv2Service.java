@@ -286,12 +286,18 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public String buildInvalidTestingRedirectAuthnRequest(AuthenticationRequest request, String relayState,
-                                                        boolean sign, PrivateKey key, Algorithm algorithm)
-      throws SAMLException {
+  public String buildInvalidTestingPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
+                                                    X509Certificate certificate, Algorithm algorithm,
+                                                    String xmlSignatureC14nMethod) throws SAMLException {
     AuthnRequestType authnRequest = toAuthnRequest(request, "bad");
-    byte[] xml = marshallToBytes(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
-    return buildRedirectAuthnRequest(xml, relayState, sign, key, algorithm);
+    return buildPostAuthnRequest(authnRequest, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
+  }
+
+  @Override
+  public String buildInvalidTestingRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
+                                                        PrivateKey key, Algorithm algorithm) throws SAMLException {
+    AuthnRequestType authnRequest = toAuthnRequest(request, "bad");
+    return buildRedirectAuthnRequest(authnRequest, relayState, sign, key, algorithm);
   }
 
   @Override
@@ -369,20 +375,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                       X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
       throws SAMLException {
     AuthnRequestType authnRequest = toAuthnRequest(request, "2.0");
-    Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
-    try {
-      Element toSign = document.getDocumentElement();
-      String xml;
-      if (sign) {
-        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null);
-      } else {
-        xml = marshallToString(document);
-      }
-
-      return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));
-    } catch (Exception e) {
-      throw new SAMLException("Unable to sign XML SAML response", e);
-    }
+    return buildPostAuthnRequest(authnRequest, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
   }
 
   @Override
@@ -391,8 +384,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                           Algorithm algorithm)
       throws SAMLException {
     AuthnRequestType authnRequest = toAuthnRequest(request, "2.0");
-    byte[] xml = marshallToBytes(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
-    return buildRedirectAuthnRequest(xml, relayState, sign, key, algorithm);
+    return buildRedirectAuthnRequest(authnRequest, relayState, sign, key, algorithm);
   }
 
   @Override
@@ -614,9 +606,29 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return null;
   }
 
-  private String buildRedirectAuthnRequest(byte[] xml, String relayState, boolean sign, PrivateKey key,
-                                           Algorithm algorithm) throws SAMLException {
+  private String buildPostAuthnRequest(AuthnRequestType authnRequest, boolean sign, PrivateKey privateKey,
+                                       X509Certificate certificate,
+                                       Algorithm algorithm, String xmlSignatureC14nMethod) throws SAMLException {
+    Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
     try {
+      Element toSign = document.getDocumentElement();
+      String xml;
+      if (sign) {
+        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null);
+      } else {
+        xml = marshallToString(document);
+      }
+
+      return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));
+    } catch (Exception e) {
+      throw new SAMLException("Unable to sign XML SAML response", e);
+    }
+  }
+
+  private String buildRedirectAuthnRequest(AuthnRequestType authnRequest, String relayState, boolean sign,
+                                           PrivateKey key, Algorithm algorithm) throws SAMLException {
+    try {
+      byte[] xml = marshallToBytes(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
       String encodedResult = deflateAndEncode(xml);
       String parameters = "SAMLRequest=" + URLEncoder.encode(encodedResult, "UTF-8");
       if (relayState != null) {

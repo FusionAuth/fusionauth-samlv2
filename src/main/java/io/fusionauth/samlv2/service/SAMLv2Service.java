@@ -50,6 +50,23 @@ public interface SAMLv2Service {
       throws SAMLException;
 
   /**
+   * Builds an invalid POST binding to a AuthnRequest protocol for testing.
+   *
+   * @param request                The AuthnRequest information.
+   * @param sign                   Determines if the request should be signed or not.
+   * @param privateKey             The key that is used to sign the request (private key, shared, secret, etc).
+   * @param certificate            The certificate that is included in the request.
+   * @param algorithm              The signing algorithm to use (if any).
+   * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
+   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  @SuppressWarnings("unused")
+  String buildInvalidTestingPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
+                                             X509Certificate certificate, Algorithm algorithm,
+                                             String xmlSignatureC14nMethod) throws SAMLException;
+
+  /**
    * Builds an invalid HTTP-Redirect binding to a AuthnRequest protocol for testing.
    *
    * @param request    The AuthnRequest information.
