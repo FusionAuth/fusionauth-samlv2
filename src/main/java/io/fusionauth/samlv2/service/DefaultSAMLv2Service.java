@@ -93,6 +93,7 @@ import io.fusionauth.samlv2.domain.NameID;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
+import io.fusionauth.samlv2.domain.SignatureNotFoundException;
 import io.fusionauth.samlv2.domain.Subject;
 import io.fusionauth.samlv2.domain.SubjectConfirmation;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AssertionType;
@@ -493,7 +494,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     RedirectBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
       if (signatureHelper.signature() == null || signatureHelper.publicKey() == null || signatureHelper.algorithm() == null) {
-        throw new SAMLException("You must specify a signature, key and algorithm if you want to verify the SAML request signature");
+        throw new SignatureNotFoundException("You must specify a signature, key and algorithm if you want to verify the SAML request signature");
       }
 
       try {
