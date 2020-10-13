@@ -311,33 +311,33 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       IDPSSODescriptorType idp = new IDPSSODescriptorType();
       idp.getProtocolSupportEnumeration().add("urn:oasis:names:tc:SAML:2.0:protocol");
 
-      if (metaData.idp.redirectBindingSignInEndpoint != null) {
+      metaData.idp.redirectBindingSignInEndpoints.forEach(endpoint -> {
         EndpointType signIn = new EndpointType();
         signIn.setBinding(Binding.HTTP_Redirect.toSAMLFormat());
-        signIn.setLocation(metaData.idp.redirectBindingSignInEndpoint);
+        signIn.setLocation(endpoint);
         idp.getSingleSignOnService().add(signIn);
-      }
+      });
 
-      if (metaData.idp.postBindingSignInEndpoint != null) {
+      metaData.idp.postBindingSignInEndpoints.forEach(endpoint -> {
         EndpointType signIn = new EndpointType();
         signIn.setBinding(Binding.HTTP_POST.toSAMLFormat());
-        signIn.setLocation(metaData.idp.postBindingSignInEndpoint);
+        signIn.setLocation(endpoint);
         idp.getSingleSignOnService().add(signIn);
-      }
+      });
 
-      if (metaData.idp.redirectBindingLogoutEndpoint != null) {
-        EndpointType logout = new EndpointType();
-        logout.setBinding(Binding.HTTP_Redirect.toSAMLFormat());
-        logout.setLocation(metaData.idp.redirectBindingLogoutEndpoint);
-        idp.getSingleLogoutService().add(logout);
-      }
+      metaData.idp.redirectBindingLogoutEndpoints.forEach(endpoint -> {
+        EndpointType logOut = new EndpointType();
+        logOut.setBinding(Binding.HTTP_Redirect.toSAMLFormat());
+        logOut.setLocation(endpoint);
+        idp.getSingleLogoutService().add(logOut);
+      });
 
-      if (metaData.idp.postBindingLogoutEndpoint != null) {
-        EndpointType logout = new EndpointType();
-        logout.setBinding(Binding.HTTP_POST.toSAMLFormat());
-        logout.setLocation(metaData.idp.postBindingLogoutEndpoint);
-        idp.getSingleLogoutService().add(logout);
-      }
+      metaData.idp.postBindingLogoutEndpoints.forEach(endpoint -> {
+        EndpointType logOut = new EndpointType();
+        logOut.setBinding(Binding.HTTP_POST.toSAMLFormat());
+        logOut.setLocation(endpoint);
+        idp.getSingleLogoutService().add(logOut);
+      });
 
       metaData.idp.certificates.forEach(cert -> {
         KeyDescriptorType key = new KeyDescriptorType();
@@ -423,18 +423,18 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       // Extract SignIn URLs
       for (EndpointType endpoint : idp.getSingleSignOnService()) {
         if (Binding.HTTP_Redirect.toSAMLFormat().equals(endpoint.getBinding())) {
-          metaData.idp.redirectBindingSignInEndpoint = endpoint.getLocation();
+          metaData.idp.redirectBindingSignInEndpoints.add(endpoint.getLocation());
         } else if (Binding.HTTP_POST.toSAMLFormat().equals(endpoint.getBinding())) {
-          metaData.idp.postBindingSignInEndpoint = endpoint.getLocation();
+          metaData.idp.postBindingSignInEndpoints.add(endpoint.getLocation());
         }
       }
 
       // Extract Logout URLs
       for (EndpointType endpoint : idp.getSingleLogoutService()) {
         if (Binding.HTTP_Redirect.toSAMLFormat().equals(endpoint.getBinding())) {
-          metaData.idp.redirectBindingLogoutEndpoint = endpoint.getLocation();
+          metaData.idp.redirectBindingLogoutEndpoints.add(endpoint.getLocation());
         } else if (Binding.HTTP_POST.toSAMLFormat().equals(endpoint.getBinding())) {
-          metaData.idp.postBindingLogoutEndpoint = endpoint.getLocation();
+          metaData.idp.postBindingLogoutEndpoints.add(endpoint.getLocation());
         }
       }
 

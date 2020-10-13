@@ -31,13 +31,13 @@ public class MetaData {
   public static class IDPMetaData {
     public List<Certificate> certificates = new ArrayList<>();
 
-    public String postBindingLogoutEndpoint;
+    public List<String> postBindingLogoutEndpoints = new ArrayList<>();
 
-    public String postBindingSignInEndpoint;
+    public List<String> postBindingSignInEndpoints = new ArrayList<>();
 
-    public String redirectBindingLogoutEndpoint;
+    public List<String> redirectBindingLogoutEndpoints = new ArrayList<>();
 
-    public String redirectBindingSignInEndpoint;
+    public List<String> redirectBindingSignInEndpoints = new ArrayList<>();
   }
 
   public static class SPMetaData {

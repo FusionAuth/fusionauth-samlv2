@@ -99,11 +99,11 @@ public class DefaultSAMLv2ServiceTest {
     metaData.id = UUID.randomUUID().toString();
     metaData.entityId = "https://fusionauth.io/samlv2/" + metaData.id;
     metaData.idp = new IDPMetaData();
-    metaData.idp.postBindingSignInEndpoint = "https://fusionauth.io/samlv2/login/POST";
-    metaData.idp.postBindingLogoutEndpoint = "https://fusionauth.io/samlv2/login/REDIRECT";
+    metaData.idp.postBindingSignInEndpoints.add("https://fusionauth.io/samlv2/login/POST");
+    metaData.idp.redirectBindingSignInEndpoints.add("https://fusionauth.io/samlv2/login/REDIRECT");
 
-    metaData.idp.redirectBindingLogoutEndpoint = "https://fusionauth.io/samlv2/logout/POST";
-    metaData.idp.redirectBindingLogoutEndpoint = "https://fusionauth.io/samlv2/logout/REDIRECT";
+    metaData.idp.postBindingLogoutEndpoints.add("https://fusionauth.io/samlv2/logout/POST");
+    metaData.idp.redirectBindingLogoutEndpoints.add("https://fusionauth.io/samlv2/logout/REDIRECT");
 
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
@@ -116,19 +116,21 @@ public class DefaultSAMLv2ServiceTest {
     System.out.println(xml);
     assertTrue(xml.contains("_" + metaData.id));
     assertTrue(xml.contains(metaData.entityId));
-    assertTrue(xml.contains(metaData.idp.postBindingSignInEndpoint));
-    assertTrue(xml.contains(metaData.idp.postBindingLogoutEndpoint));
-    assertTrue(xml.contains(metaData.idp.redirectBindingLogoutEndpoint));
-    assertTrue(xml.contains(metaData.idp.redirectBindingLogoutEndpoint));
+    assertTrue(xml.contains(metaData.idp.postBindingSignInEndpoints.get(0)));
+    assertTrue(xml.contains(metaData.idp.postBindingLogoutEndpoints.get(0)));
+    assertTrue(xml.contains(metaData.idp.redirectBindingLogoutEndpoints.get(0)));
+    assertTrue(xml.contains(metaData.idp.redirectBindingLogoutEndpoints.get(0)));
     assertTrue(xml.contains("<ns2:IDPSSODescriptor protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
 
     // Now parse it
     MetaData parsed = service.parseMetaData(xml);
     assertEquals(parsed.id, "_" + metaData.id);
     assertEquals(parsed.entityId, metaData.entityId);
-    assertEquals(parsed.idp.redirectBindingSignInEndpoint, metaData.idp.redirectBindingSignInEndpoint);
-    assertEquals(parsed.idp.redirectBindingLogoutEndpoint, metaData.idp.redirectBindingLogoutEndpoint);
-    assertEquals(parsed.idp.certificates.get(0), metaData.idp.certificates.get(0));
+    assertEquals(parsed.idp.postBindingSignInEndpoints, metaData.idp.postBindingSignInEndpoints);
+    assertEquals(parsed.idp.redirectBindingSignInEndpoints, metaData.idp.redirectBindingSignInEndpoints);
+    assertEquals(parsed.idp.postBindingLogoutEndpoints, metaData.idp.postBindingLogoutEndpoints);
+    assertEquals(parsed.idp.redirectBindingLogoutEndpoints, metaData.idp.redirectBindingLogoutEndpoints);
+    assertEquals(parsed.idp.certificates, metaData.idp.certificates);
   }
 
   @Test
