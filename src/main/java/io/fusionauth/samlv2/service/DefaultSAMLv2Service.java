@@ -942,7 +942,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     NodeList nl = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
     if (nl.getLength() == 0) {
-      throw new SAMLException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
+      throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
     }
 
     for (int i = 0; i < nl.getLength(); i++) {
