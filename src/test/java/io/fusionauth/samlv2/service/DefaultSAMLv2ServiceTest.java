@@ -506,7 +506,7 @@ public class DefaultSAMLv2ServiceTest {
       encoded = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
     } else {
       X509Certificate cert = generateX509Certificate(kp);
-      encoded = service.buildPostAuthnRequest(request, kp.getPrivate(), cert, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+      encoded = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
     }
 
     if (binding == Binding.HTTP_Redirect) {

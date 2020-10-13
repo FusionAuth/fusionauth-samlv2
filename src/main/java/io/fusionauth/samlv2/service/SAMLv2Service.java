@@ -77,6 +77,7 @@ public interface SAMLv2Service {
    * Builds a HTTP-POST binding to a AuthnRequest protocol.
    *
    * @param request                The AuthnRequest information.
+   * @param sign                   Determines if the request should be signed or not.
    * @param privateKey             The key that is used to sign the request (private key, shared, secret, etc).
    * @param certificate            The certificate that is included in the request.
    * @param algorithm              The signing algorithm to use (if any).
@@ -84,8 +85,8 @@ public interface SAMLv2Service {
    * @return The encoded value to be sent in the HTTP POST body.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  String buildPostAuthnRequest(AuthenticationRequest request, PrivateKey privateKey, X509Certificate certificate,
-                               Algorithm algorithm, String xmlSignatureC14nMethod)
+  String buildPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
+                               X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
       throws SAMLException;
 
   /**

@@ -365,13 +365,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public String buildPostAuthnRequest(AuthenticationRequest request, PrivateKey privateKey, X509Certificate certificate,
-                                      Algorithm algorithm, String xmlSignatureC14nMethod) throws SAMLException {
+  public String buildPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
+                                      X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+      throws SAMLException {
     AuthnRequestType authnRequest = toAuthnRequest(request, "2.0");
     Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
     try {
       Element toSign = document.getDocumentElement();
-      String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null);
+      String xml;
+      if (sign) {
+        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null);
+      } else {
+        xml = marshallToString(document);
+      }
+
       return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));
     } catch (Exception e) {
       throw new SAMLException("Unable to sign XML SAML response", e);
@@ -717,6 +724,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
+  private String marshallToString(Document document) throws TransformerException {
+    StringWriter sw = new StringWriter();
+    TransformerFactory tf = TransformerFactory.newInstance();
+    Transformer transformer = tf.newTransformer();
+    transformer.transform(new DOMSource(document), new StreamResult(sw));
+    return sw.toString();
+  }
+
   private SubjectConfirmation parseConfirmation(SubjectConfirmationType subjectConfirmationType) {
     SubjectConfirmation subjectConfirmation = new SubjectConfirmation();
     SubjectConfirmationDataType data = subjectConfirmationType.getSubjectConfirmationData();
@@ -804,12 +819,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     XMLSignature signature = factory.newXMLSignature(si, ki);
 
     signature.sign(dsc);
-
-    StringWriter sw = new StringWriter();
-    TransformerFactory tf = TransformerFactory.newInstance();
-    Transformer transformer = tf.newTransformer();
-    transformer.transform(new DOMSource(document), new StreamResult(sw));
-    return sw.toString();
+    return marshallToString(document);
   }
 
   private AuthnRequestType toAuthnRequest(AuthenticationRequest request, String version) {
