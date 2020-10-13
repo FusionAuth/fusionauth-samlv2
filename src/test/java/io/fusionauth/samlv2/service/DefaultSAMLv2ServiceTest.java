@@ -99,8 +99,11 @@ public class DefaultSAMLv2ServiceTest {
     metaData.id = UUID.randomUUID().toString();
     metaData.entityId = "https://fusionauth.io/samlv2/" + metaData.id;
     metaData.idp = new IDPMetaData();
-    metaData.idp.signInEndpoint = "https://fusionauth.io/samlv2/login";
-    metaData.idp.logoutEndpoint = "https://fusionauth.io/samlv2/logout";
+    metaData.idp.postBindingSignInEndpoint = "https://fusionauth.io/samlv2/login/POST";
+    metaData.idp.postBindingLogoutEndpoint = "https://fusionauth.io/samlv2/login/REDIRECT";
+
+    metaData.idp.redirectBindingLogoutEndpoint = "https://fusionauth.io/samlv2/logout/POST";
+    metaData.idp.redirectBindingLogoutEndpoint = "https://fusionauth.io/samlv2/logout/REDIRECT";
 
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
@@ -113,16 +116,18 @@ public class DefaultSAMLv2ServiceTest {
     System.out.println(xml);
     assertTrue(xml.contains("_" + metaData.id));
     assertTrue(xml.contains(metaData.entityId));
-    assertTrue(xml.contains(metaData.idp.signInEndpoint));
-    assertTrue(xml.contains(metaData.idp.logoutEndpoint));
+    assertTrue(xml.contains(metaData.idp.postBindingSignInEndpoint));
+    assertTrue(xml.contains(metaData.idp.postBindingLogoutEndpoint));
+    assertTrue(xml.contains(metaData.idp.redirectBindingLogoutEndpoint));
+    assertTrue(xml.contains(metaData.idp.redirectBindingLogoutEndpoint));
     assertTrue(xml.contains("<ns2:IDPSSODescriptor protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
 
     // Now parse it
     MetaData parsed = service.parseMetaData(xml);
     assertEquals(parsed.id, "_" + metaData.id);
     assertEquals(parsed.entityId, metaData.entityId);
-    assertEquals(parsed.idp.signInEndpoint, metaData.idp.signInEndpoint);
-    assertEquals(parsed.idp.logoutEndpoint, metaData.idp.logoutEndpoint);
+    assertEquals(parsed.idp.redirectBindingSignInEndpoint, metaData.idp.redirectBindingSignInEndpoint);
+    assertEquals(parsed.idp.redirectBindingLogoutEndpoint, metaData.idp.redirectBindingLogoutEndpoint);
     assertEquals(parsed.idp.certificates.get(0), metaData.idp.certificates.get(0));
   }
 
