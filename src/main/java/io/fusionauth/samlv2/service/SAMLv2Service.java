@@ -26,6 +26,7 @@ import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.SAMLException;
+import io.fusionauth.samlv2.domain.SignatureOption;
 
 /**
  * Service that can be used for the SAML v2.0 bindings to SAML core schemas and protocols.
@@ -42,11 +43,13 @@ public interface SAMLv2Service {
    * @param certificate            The certificate that is included in the response.
    * @param algorithm              The signing algorithm to use (if any).
    * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
+   * @param signatureOption        The signature option that instructs where to place the signature in the response.
    * @return The response base-64 encoded.
    * @throws SAMLException If any unrecoverable errors occur.
    */
   String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
-                            X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+                            X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
+                            SignatureOption signatureOption)
       throws SAMLException;
 
   /**

@@ -20,7 +20,12 @@ import javax.xml.bind.JAXBElement;
 import javax.xml.bind.Unmarshaller;
 import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
+import javax.xml.crypto.dsig.XMLSignature;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.URLDecoder;
@@ -53,10 +58,14 @@ import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
+import io.fusionauth.samlv2.domain.SignatureOption;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
+import org.w3c.dom.Document;
+import org.w3c.dom.Node;
+import org.xml.sax.SAXException;
 import sun.security.x509.AlgorithmId;
 import sun.security.x509.CertificateAlgorithmId;
 import sun.security.x509.CertificateSerialNumber;
@@ -549,8 +558,8 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.version, "2.0");
   }
 
-  @Test
-  public void roundTripResponse() throws Exception {
+  @Test(dataProvider = "SignatureOptions")
+  public void roundTripResponseSignedAssertion(SignatureOption signatureOption) throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
@@ -560,9 +569,18 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
-    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureOption);
     System.out.println(new String(Base64.getMimeDecoder().decode(encodedXML)));
     response = service.parseResponse(encodedXML, true, KeySelector.singletonKeySelector(kp.getPublic()));
+
+    // Assert the signature is in the correct location based upon the signature option provided.
+    Document document = parseDocument(encodedXML);
+    Node signature = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature").item(0);
+    if (signatureOption == SignatureOption.Assertion) {
+      assertEquals(signature.getParentNode().getLocalName(), "Assertion");
+    } else {
+      assertEquals(signature.getParentNode().getLocalName(), "Response");
+    }
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
     assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
@@ -575,6 +593,14 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
     assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
+  }
+
+  @DataProvider(name = "SignatureOptions")
+  public Object[][] signatureOptions() {
+    return new Object[][]{
+        {SignatureOption.Assertion},
+        {SignatureOption.Response}
+    };
   }
 
   private X509Certificate generateX509Certificate(KeyPair keyPair) throws IllegalArgumentException {
@@ -595,6 +621,18 @@ public class DefaultSAMLv2ServiceTest {
       return impl;
     } catch (Exception e) {
       throw new IllegalArgumentException(e);
+    }
+  }
+
+  private Document parseDocument(String encoded) {
+    byte[] bytes = Base64.getMimeDecoder().decode(encoded);
+    DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+    documentBuilderFactory.setNamespaceAware(true);
+    try {
+      DocumentBuilder builder = documentBuilderFactory.newDocumentBuilder();
+      return builder.parse(new ByteArrayInputStream(bytes));
+    } catch (ParserConfigurationException | SAXException | IOException e) {
+      throw new RuntimeException(e);
     }
   }
 }
