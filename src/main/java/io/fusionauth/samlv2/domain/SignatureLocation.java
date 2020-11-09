@@ -16,11 +16,11 @@
 package io.fusionauth.samlv2.domain;
 
 /**
- * Options for signing the SAML response.
+ * Location for the signature in the response.
  *
  * @author Daniel DeGroff
  */
-public enum SignatureOption {
+public enum SignatureLocation {
   Assertion,
   Response
 }

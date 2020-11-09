@@ -93,8 +93,8 @@ import io.fusionauth.samlv2.domain.NameID;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
+import io.fusionauth.samlv2.domain.SignatureLocation;
 import io.fusionauth.samlv2.domain.SignatureNotFoundException;
-import io.fusionauth.samlv2.domain.SignatureOption;
 import io.fusionauth.samlv2.domain.Subject;
 import io.fusionauth.samlv2.domain.SubjectConfirmation;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.AssertionType;
@@ -164,7 +164,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   @Override
   public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
                                    X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
-                                   SignatureOption signatureOption) throws SAMLException {
+                                   SignatureLocation signatureOption) throws SAMLException {
     ResponseType jaxbResponse = new ResponseType();
 
     // Status (element)
@@ -273,7 +273,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       // If successful, sign the assertion if requested, otherwise, sign the root
       Element toSign;
       Node insertBefore;
-      if (response.status.code == ResponseStatus.Success && signatureOption == SignatureOption.Assertion) {
+      if (response.status.code == ResponseStatus.Success && signatureOption == SignatureLocation.Assertion) {
         toSign = (Element) document.getElementsByTagName("Assertion").item(0);
         insertBefore = toSign.getElementsByTagName("Subject").item(0);
       } else {

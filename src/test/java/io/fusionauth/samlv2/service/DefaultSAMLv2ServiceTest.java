@@ -58,7 +58,7 @@ import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
-import io.fusionauth.samlv2.domain.SignatureOption;
+import io.fusionauth.samlv2.domain.SignatureLocation;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -558,8 +558,8 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.version, "2.0");
   }
 
-  @Test(dataProvider = "SignatureOptions")
-  public void roundTripResponseSignedAssertion(SignatureOption signatureOption) throws Exception {
+  @Test(dataProvider = "signatureLocation")
+  public void roundTripResponseSignedAssertion(SignatureLocation signatureLocation) throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
@@ -569,14 +569,14 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
-    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureOption);
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureLocation);
     System.out.println(new String(Base64.getMimeDecoder().decode(encodedXML)));
     response = service.parseResponse(encodedXML, true, KeySelector.singletonKeySelector(kp.getPublic()));
 
     // Assert the signature is in the correct location based upon the signature option provided.
     Document document = parseDocument(encodedXML);
     Node signature = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature").item(0);
-    if (signatureOption == SignatureOption.Assertion) {
+    if (signatureLocation == SignatureLocation.Assertion) {
       assertEquals(signature.getParentNode().getLocalName(), "Assertion");
     } else {
       assertEquals(signature.getParentNode().getLocalName(), "Response");
@@ -595,11 +595,11 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
   }
 
-  @DataProvider(name = "SignatureOptions")
-  public Object[][] signatureOptions() {
+  @DataProvider(name = "signatureLocation")
+  public Object[][] signatureLocation() {
     return new Object[][]{
-        {SignatureOption.Assertion},
-        {SignatureOption.Response}
+        {SignatureLocation.Assertion},
+        {SignatureLocation.Response}
     };
   }
 
