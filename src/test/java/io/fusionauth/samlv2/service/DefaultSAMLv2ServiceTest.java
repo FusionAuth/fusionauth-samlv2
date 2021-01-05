@@ -577,6 +577,10 @@ public class DefaultSAMLv2ServiceTest {
     Document document = parseDocument(encodedXML);
     Node signature = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature").item(0);
     if (signatureLocation == SignatureLocation.Assertion) {
+      // Previous sibling is expected to be the Issuer, and the next sibling should be Subject.
+      assertEquals(signature.getPreviousSibling().getLocalName(), "Issuer");
+      assertEquals(signature.getNextSibling().getLocalName(), "Subject");
+      // The parent node should be the assertion.
       assertEquals(signature.getParentNode().getLocalName(), "Assertion");
     } else {
       assertEquals(signature.getParentNode().getLocalName(), "Response");
