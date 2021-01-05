@@ -583,7 +583,9 @@ public class DefaultSAMLv2ServiceTest {
       // The parent node should be the assertion.
       assertEquals(signature.getParentNode().getLocalName(), "Assertion");
     } else {
+      // The Signature should be a child of the Response, and come immediately following the Issuer.
       assertEquals(signature.getParentNode().getLocalName(), "Response");
+      assertEquals(signature.getPreviousSibling().getLocalName(), "Issuer");
     }
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");

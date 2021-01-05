@@ -278,7 +278,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         insertBefore = toSign.getElementsByTagName("Subject").item(0);
       } else {
         toSign = document.getDocumentElement();
-        insertBefore = null;
+        Node issuer = toSign.getElementsByTagName("Issuer").item(0);
+        insertBefore = issuer.getNextSibling();
       }
 
       String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore);
