@@ -272,14 +272,29 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     try {
       // If successful, sign the assertion if requested, otherwise, sign the root
       Element toSign;
-      Node insertBefore;
+      Node insertBefore = null;
+      // The 'Signature' must come directly after the 'Issuer' element.
       if (response.status.code == ResponseStatus.Success && signatureOption == SignatureLocation.Assertion) {
         toSign = (Element) document.getElementsByTagName("Assertion").item(0);
-        insertBefore = toSign.getElementsByTagName("Subject").item(0);
-      } else {
-        toSign = document.getDocumentElement();
+        // Issuer is the only required element. See schema for AssertionType in section 2.3.3 of SAML Core.
+        // - The next sibling of the 'Issuer' may be null, this will cause the Signature to be inserted as the last element
+        //   of the assertion which is what we want.
         Node issuer = toSign.getElementsByTagName("Issuer").item(0);
         insertBefore = issuer.getNextSibling();
+      } else {
+        toSign = document.getDocumentElement();
+        // The only required element in the StatusResponseType is Status. See Section 3.2.2 in SAML Core.
+        // The children will be a sequence that must exist in the order of 'Issuer', 'Signature', 'Extensions', and then 'Status'
+        // - If the first element is 'Issuer', then the next sibling will be used for 'insertBefore'.
+        // - If the first element is NOT 'Issuer', it MUST be 'Extensions' or 'Status', and thus is the 'insertBefore' node.
+        NodeList children = toSign.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+          Node n = children.item(i);
+          if (n instanceof Element) {
+            insertBefore = n.getLocalName().equals("Issuer") ? n.getNextSibling() : n;
+            break;
+          }
+        }
       }
 
       String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore);
@@ -843,10 +858,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     toSign.setIdAttributeNode(toSign.getAttributeNode("ID"), true);
 
     // If there is an insert before, set it so that the signature is in the place that some IdPs require
+    // - If insertBefore is 'null' the signature will be inserted as the last element.
     DOMSignContext dsc = new DOMSignContext(privateKey, toSign);
-    if (insertBefore != null) {
-      dsc.setNextSibling(insertBefore);
-    }
+    dsc.setNextSibling(insertBefore);
 
     // Sign away
     XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
