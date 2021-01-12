@@ -973,7 +973,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       } catch (MarshalException e) {
         throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. We couldn't unmarshall the XML Signature element.", e);
       } catch (XMLSignatureException e) {
-        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. The signature was unmarshalled we couldn't validate it. Possible reasons include a key was not provided that was eligible to verify the signature, or an un-expected exception occurred.", e);
+        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. The signature was unmarshalled but we couldn't validate it. Possible reasons include a key was not provided that was eligible to verify the signature, or an un-expected exception occurred.", e);
       }
     }
   }
