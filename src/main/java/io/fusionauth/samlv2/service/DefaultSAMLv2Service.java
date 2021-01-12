@@ -119,6 +119,7 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.KeyDescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.KeyTypes;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.RoleDescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.SPSSODescriptorType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.SSODescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.NameIDPolicyType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ObjectFactory;
@@ -357,23 +358,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         idp.getSingleLogoutService().add(logOut);
       });
 
-      metaData.idp.certificates.forEach(cert -> {
-        KeyDescriptorType key = new KeyDescriptorType();
-        key.setUse(KeyTypes.SIGNING);
-        KeyInfoType info = new KeyInfoType();
-        key.setKeyInfo(info);
-        X509DataType data = new X509DataType();
-        info.getContent().add(DSIG_OBJECT_FACTORY.createX509Data(data));
-
-        try {
-          JAXBElement<byte[]> certElement = DSIG_OBJECT_FACTORY.createX509DataTypeX509Certificate(cert.getEncoded());
-          data.getX509IssuerSerialOrX509SKIOrX509SubjectName().add(certElement);
-          idp.getKeyDescriptor().add(key);
-        } catch (Exception e) {
-          // Rethrow
-          throw new IllegalArgumentException(e);
-        }
-      });
+      // Add certificates
+      addKeyDescriptors(idp, metaData.idp.certificates);
 
       root.getRoleDescriptorOrIDPSSODescriptorOrSPSSODescriptor().add(idp);
     }
@@ -394,6 +380,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       if (metaData.sp.nameIDFormat != null) {
         sp.getNameIDFormat().add(metaData.sp.nameIDFormat.toSAMLFormat());
       }
+
+      // Add certificates
+      addKeyDescriptors(sp, metaData.sp.certificates);
 
       root.getRoleDescriptorOrIDPSSODescriptorOrSPSSODescriptor().add(sp);
     }
@@ -635,6 +624,26 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     return response;
+  }
+
+  private void addKeyDescriptors(SSODescriptorType descriptor, List<Certificate> certificates) {
+    certificates.forEach(cert -> {
+      KeyDescriptorType key = new KeyDescriptorType();
+      key.setUse(KeyTypes.SIGNING);
+      KeyInfoType info = new KeyInfoType();
+      key.setKeyInfo(info);
+      X509DataType data = new X509DataType();
+      info.getContent().add(DSIG_OBJECT_FACTORY.createX509Data(data));
+
+      try {
+        JAXBElement<byte[]> certElement = DSIG_OBJECT_FACTORY.createX509DataTypeX509Certificate(cert.getEncoded());
+        data.getX509IssuerSerialOrX509SKIOrX509SubjectName().add(certElement);
+        descriptor.getKeyDescriptor().add(key);
+      } catch (Exception e) {
+        // Rethrow
+        throw new IllegalArgumentException(e);
+      }
+    });
   }
 
   private String attributeToString(Object attribute) {

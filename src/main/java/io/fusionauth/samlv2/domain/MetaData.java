@@ -45,6 +45,8 @@ public class MetaData {
 
     public boolean authnRequestsSigned;
 
+    public List<Certificate> certificates = new ArrayList<>();
+
     public NameIDFormat nameIDFormat;
 
     public boolean wantAssertionsSigned;
