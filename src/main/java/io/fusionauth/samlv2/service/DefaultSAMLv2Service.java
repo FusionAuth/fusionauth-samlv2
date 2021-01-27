@@ -372,7 +372,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
       if (metaData.sp.acsEndpoint != null) {
         IndexedEndpointType acs = new IndexedEndpointType();
-        acs.setBinding("urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST");
+        acs.setBinding(Binding.HTTP_POST.toSAMLFormat());
         acs.setLocation(metaData.sp.acsEndpoint);
         sp.getAssertionConsumerService().add(acs);
       }
@@ -752,7 +752,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     NamedNodeMap attributes = element.getAttributes();
     for (int i = 0; i < attributes.getLength(); i++) {
       Attr attribute = (Attr) attributes.item(i);
-      if (attribute.getLocalName().toLowerCase().equals("id")) {
+      if (attribute.getLocalName().equalsIgnoreCase("id")) {
         element.setIdAttributeNode(attribute, true);
       }
     }
