@@ -24,13 +24,16 @@ import javax.xml.crypto.dsig.XMLSignature;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
 import java.math.BigInteger;
 import java.net.URLDecoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.KeyPair;
@@ -60,6 +63,7 @@ import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.SignatureLocation;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
+import io.fusionauth.samlv2.util.SAMLTools;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
@@ -254,6 +258,70 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.issuer, "urn:example:sp");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
     assertEquals(request.version, "2.0");
+  }
+
+  @Test
+  public void parseRequest_expandedEntity() throws Exception {
+    // Expanded entity, fail. The entity definition is within the DOCTYPE, which is not allowed, the error will be with regards to the DOCTYPE.
+    try {
+      DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+      byte[] xml = Files.readAllBytes(Paths.get("src/test/xml/authn-request-expanded-entity.xml"));
+      String deflated = SAMLTools.deflateAndEncode(xml);
+      AuthenticationRequest request = service.parseRequestRedirectBinding(deflated, null, authRequest -> new TestRedirectBindingSignatureHelper());
+      fail("Expected an exception because we are declaring a DOCTYPE and expanding an entity. The issuer is now set to [" + request.issuer + "] which is not good.");
+    } catch (SAMLException e) {
+      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 authentication response");
+      assertEquals(e.getCause().getClass().getCanonicalName(), "org.xml.sax.SAXParseException");
+      assertEquals(e.getCause().getMessage(), "DOCTYPE is disallowed when the feature \"http://apache.org/xml/features/disallow-doctype-decl\" set to true.");
+    }
+  }
+
+  @Test
+  public void parseRequest_externalDTD() throws Exception {
+    // Load an external DTD, fail, this is defined within the DOCTYPE, so the error will be with regards to the DOCTYPE.
+    Path tempFile = null;
+    try {
+      tempFile = Files.createTempFile("readThisFile", ".tmp");
+      try (BufferedWriter writer = new BufferedWriter(new FileWriter(tempFile.toFile()))) {
+        writer.write("You've been pwned.");
+      }
+
+      DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+      byte[] xml = Files.readAllBytes(Paths.get("src/test/xml/authn-request-external-dtd.xml"));
+
+      // Set the filename in the XML
+      String xmlString = new String(xml);
+      xmlString = xmlString.replace("{{tempFile}}", tempFile.toFile().getAbsolutePath());
+      xml = xmlString.getBytes(StandardCharsets.UTF_8);
+
+      String deflated = SAMLTools.deflateAndEncode(xml);
+      AuthenticationRequest request = service.parseRequestRedirectBinding(deflated, null, authRequest -> new TestRedirectBindingSignatureHelper());
+      fail("Expected an exception because we are declaring a DOCTYPE. The issuer is now set to [" + request.issuer + "] which is not good.");
+    } catch (SAMLException e) {
+      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 authentication response");
+      assertEquals(e.getCause().getClass().getCanonicalName(), "org.xml.sax.SAXParseException");
+      assertEquals(e.getCause().getMessage(), "DOCTYPE is disallowed when the feature \"http://apache.org/xml/features/disallow-doctype-decl\" set to true.");
+    } finally {
+      if (tempFile != null) {
+        Files.deleteIfExists(tempFile);
+      }
+    }
+  }
+
+  @Test
+  public void parseRequest_hasDocType() throws Exception {
+    // Has DOCTYPE, fail. No DOCTYPE for you!
+    try {
+      DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+      byte[] xml = Files.readAllBytes(Paths.get("src/test/xml/authn-request-has-doctype.xml"));
+      String deflated = SAMLTools.deflateAndEncode(xml);
+      service.parseRequestRedirectBinding(deflated, null, authRequest -> new TestRedirectBindingSignatureHelper());
+      fail("expected an exception because we are declaring a DOCTYPE");
+    } catch (SAMLException e) {
+      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 authentication response");
+      assertEquals(e.getCause().getClass().getCanonicalName(), "org.xml.sax.SAXParseException");
+      assertEquals(e.getCause().getMessage(), "DOCTYPE is disallowed when the feature \"http://apache.org/xml/features/disallow-doctype-decl\" set to true.");
+    }
   }
 
   @Test(dataProvider = "maxLineLength")
