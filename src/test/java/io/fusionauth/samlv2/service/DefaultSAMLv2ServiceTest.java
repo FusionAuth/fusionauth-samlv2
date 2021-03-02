@@ -66,6 +66,8 @@ import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.SignatureLocation;
 import io.fusionauth.samlv2.domain.Status;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.LogoutRequestType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusResponseType;
 import io.fusionauth.samlv2.util.SAMLTools;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
@@ -170,6 +172,43 @@ public class DefaultSAMLv2ServiceTest {
         : service.buildPostLogoutRequest(logoutRequest, true, privateKey, certificate, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
 
     assertNotNull(rawRequest);
+
+    String samlRequest = rawRequest;
+    if (binding == Binding.HTTP_Redirect) {
+      int start = samlRequest.indexOf("=");
+      int end = samlRequest.indexOf("&");
+      samlRequest = samlRequest.substring(start + 1, end);
+      samlRequest = URLDecoder.decode(samlRequest, "UTF-8");
+    }
+
+    byte[] bytes = binding == Binding.HTTP_Redirect
+        ? SAMLTools.decodeAndInflate(samlRequest)
+        : SAMLTools.decode(samlRequest);
+
+    JAXBContext context = JAXBContext.newInstance(AuthnRequestType.class);
+    Unmarshaller unmarshaller = context.createUnmarshaller();
+
+    JAXBElement<LogoutRequestType> element = (JAXBElement<LogoutRequestType>) unmarshaller.unmarshal(new ByteArrayInputStream(bytes));
+    assertEquals(element.getValue().getID(), "_1245");
+    assertEquals(element.getValue().getIssuer().getValue(), "https://acme.corp/saml");
+    assertEquals(element.getValue().getSessionIndex().size(), 1);
+    assertEquals(element.getValue().getSessionIndex().get(0), "42");
+    assertEquals(element.getValue().getVersion(), "2.0");
+
+    // For HTTP Redirect, pull out the RelayState and SigAlg values from the request parameter.
+    if (binding == Binding.HTTP_Redirect) {
+      // Unwind the RelayState
+      int start = rawRequest.indexOf("RelayState=");
+      int end = rawRequest.indexOf("&", start);
+      String relayState = URLDecoder.decode(rawRequest.substring(start + "RelayState=".length(), end), "UTF-8");
+      assertEquals(relayState, "Relay-State-String");
+
+      // Unwind the SigAlg
+      start = rawRequest.indexOf("SigAlg=");
+      end = rawRequest.indexOf("&", start);
+      String sigAlg = URLDecoder.decode(rawRequest.substring(start + "SigAlg=".length(), end), "UTF-8");
+      assertEquals(sigAlg, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256");
+    }
   }
 
   @Test(dataProvider = "bindings")
@@ -194,6 +233,41 @@ public class DefaultSAMLv2ServiceTest {
         : service.buildPostLogoutResponse(logoutResponse, true, privateKey, certificate, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
 
     assertNotNull(rawResponse);
+
+    String samlResponse = rawResponse;
+    if (binding == Binding.HTTP_Redirect) {
+      int start = samlResponse.indexOf("=");
+      int end = samlResponse.indexOf("&");
+      samlResponse = samlResponse.substring(start + 1, end);
+      samlResponse = URLDecoder.decode(samlResponse, "UTF-8");
+    }
+
+    byte[] bytes = binding == Binding.HTTP_Redirect
+        ? SAMLTools.decodeAndInflate(samlResponse)
+        : SAMLTools.decode(samlResponse);
+
+    JAXBContext context = JAXBContext.newInstance(AuthnRequestType.class);
+    Unmarshaller unmarshaller = context.createUnmarshaller();
+
+    JAXBElement<StatusResponseType> element = (JAXBElement<StatusResponseType>) unmarshaller.unmarshal(new ByteArrayInputStream(bytes));
+    assertEquals(element.getValue().getID(), "_1245");
+    assertEquals(element.getValue().getIssuer().getValue(), "https://acme.corp/saml");
+    assertEquals(element.getValue().getVersion(), "2.0");
+
+    // For HTTP Redirect, pull out the RelayState and SigAlg values from the request parameter.
+    if (binding == Binding.HTTP_Redirect) {
+      // Unwind the RelayState
+      int start = rawResponse.indexOf("RelayState=");
+      int end = rawResponse.indexOf("&", start);
+      String relayState = URLDecoder.decode(rawResponse.substring(start + "RelayState=".length(), end), "UTF-8");
+      assertEquals(relayState, "Relay-State-String");
+
+      // Unwind the SigAlg
+      start = rawResponse.indexOf("SigAlg=");
+      end = rawResponse.indexOf("&", start);
+      String sigAlg = URLDecoder.decode(rawResponse.substring(start + "SigAlg=".length(), end), "UTF-8");
+      assertEquals(sigAlg, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256");
+    }
   }
 
   @Test(dataProvider = "bindings")
