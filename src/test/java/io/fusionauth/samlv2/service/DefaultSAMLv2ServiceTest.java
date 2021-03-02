@@ -38,6 +38,7 @@ import java.nio.file.Paths;
 import java.security.KeyFactory;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
+import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
@@ -49,7 +50,6 @@ import java.util.Base64;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
-import java.util.zip.Inflater;
 
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
@@ -64,6 +64,7 @@ import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.SignatureLocation;
+import io.fusionauth.samlv2.domain.Status;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import io.fusionauth.samlv2.util.SAMLTools;
 import org.testng.annotations.BeforeClass;
@@ -150,52 +151,106 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(parsed.idp.certificates, metaData.idp.certificates);
   }
 
-  @Test
-  public void buildRedirectAuthnRequest() throws Exception {
+  @Test(dataProvider = "bindings")
+  public void buildLogoutRequest(Binding binding) throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
+    PrivateKey privateKey = kp.getPrivate();
+    X509Certificate certificate = generateX509Certificate(kp);
+
+    LogoutRequest logoutRequest = new LogoutRequest();
+    logoutRequest.id = "_1245";
+    logoutRequest.issuer = "https://acme.corp/saml";
+    logoutRequest.sessionIndex = "42";
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+
+    String rawRequest = binding == Binding.HTTP_Redirect
+        ? service.buildRedirectLogoutRequest(logoutRequest, "Relay-State-String", true, privateKey, Algorithm.RS256)
+        : service.buildPostLogoutRequest(logoutRequest, true, privateKey, certificate, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+
+    assertNotNull(rawRequest);
+  }
+
+  @Test(dataProvider = "bindings")
+  public void buildLogoutResponse(Binding binding) throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+    PrivateKey privateKey = kp.getPrivate();
+    X509Certificate certificate = generateX509Certificate(kp);
+
+    LogoutResponse logoutResponse = new LogoutResponse();
+    logoutResponse.id = "_1245";
+    logoutResponse.issuer = "https://acme.corp/saml";
+    logoutResponse.sessionIndex = "42";
+    logoutResponse.status = new Status();
+    logoutResponse.status.code = ResponseStatus.Success;
+    logoutResponse.status.message = "Ok";
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+
+    String rawResponse = binding == Binding.HTTP_Redirect
+        ? service.buildRedirectLogoutResponse(logoutResponse, "Relay-State-String", true, privateKey, Algorithm.RS256)
+        : service.buildPostLogoutResponse(logoutResponse, true, privateKey, certificate, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+
+    assertNotNull(rawResponse);
+  }
+
+  @Test(dataProvider = "bindings")
+  public void buildRedirectAuthnRequest(Binding binding) throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+    PrivateKey privateKey = kp.getPrivate();
+    X509Certificate certificate = generateX509Certificate(kp);
 
     AuthenticationRequest request = new AuthenticationRequest();
     request.id = "foobarbaz";
     request.issuer = "https://local.fusionauth.io";
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String parameters = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
-    System.out.println(parameters);
-//    assertEquals(parameters, "SAMLRequest=eJx9kNtOwzAMhl8lMtdt0rQ7RU2niQlpEiDEBvdZ63WVsmQkKWVvTzZON8Cl7c%2BW%2F6%2Bcvx00eUXnO2skZCkDgqa2TWdaCU%2Bbm2QKxAdlGqWtQQnGwrwqjc%2BF6sPePOJLjz5sTkck8ZLxIo4k9M4Iq3wXS3VAL0It1ou7W8FTJo7OBltbDR8L%2F8PKe3Qh%2Fgbf57mEfQhHQekwDOmQp9a1lDPGKJvRCDW%2Ba69%2B8OIPPKOsOOMxbaRXSwmIBZ%2Fkiifb0bhOijzLk%2BlEYTKabTnjE9bsxuNIet%2FjypydBAlAnr%2FcxXehKi9jV4UoJSokGc9L%2Btm7WLuPEVfLB6u7%2BkQWWtvh2qEK0exOaY9Aq5L%2BZrd6BwQejFI%3D&RelayState=Relay-State-String&SigAlg=http%3A%2F%2Fwww.w3.org%2F2000%2F09%2Fxmldsig%23rsa-sha1&Signature=MCwCFCZDBcWxZD65RY0AR8K4WhNzs0tZAhRQFyc80lMy7yTl9a8UQMSST4wioA%3D%3D");
 
-    // Unwind the request and assert its components
-    int start = parameters.indexOf("=");
-    int end = parameters.indexOf("&");
-    String encodedRequest = URLDecoder.decode(parameters.substring(start + 1, end), "UTF-8");
-    byte[] bytes = Base64.getMimeDecoder().decode(encodedRequest);
+    String rawRequest = binding == Binding.HTTP_Redirect
+        ? service.buildRedirectAuthnRequest(request, "Relay-State-String", true, privateKey, Algorithm.RS256)
+        : service.buildPostAuthnRequest(request, true, privateKey, certificate, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+    assertNotNull(rawRequest);
 
-    // Decode and inflate the result and ensure it is equal to the raw and can be unmarshalled
-    byte[] inflatedBytes = new byte[4096];
-    Inflater inflater = new Inflater(true);
-    inflater.setInput(bytes);
-    int length = inflater.inflate(inflatedBytes);
+    String samlRequest = rawRequest;
+    if (binding == Binding.HTTP_Redirect) {
+      int start = samlRequest.indexOf("=");
+      int end = samlRequest.indexOf("&");
+      samlRequest = samlRequest.substring(start + 1, end);
+      samlRequest = URLDecoder.decode(samlRequest, "UTF-8");
+    }
+
+    byte[] bytes = binding == Binding.HTTP_Redirect
+        ? SAMLTools.decodeAndInflate(samlRequest)
+        : SAMLTools.decode(samlRequest);
+
     JAXBContext context = JAXBContext.newInstance(AuthnRequestType.class);
     Unmarshaller unmarshaller = context.createUnmarshaller();
 
-    JAXBElement<AuthnRequestType> fromEncoded = (JAXBElement<AuthnRequestType>) unmarshaller.unmarshal(new ByteArrayInputStream(inflatedBytes, 0, length));
+    JAXBElement<AuthnRequestType> fromEncoded = (JAXBElement<AuthnRequestType>) unmarshaller.unmarshal(new ByteArrayInputStream(bytes));
     assertEquals(fromEncoded.getValue().getID(), "foobarbaz");
     assertEquals(fromEncoded.getValue().getIssuer().getValue(), "https://local.fusionauth.io");
     assertEquals(fromEncoded.getValue().getVersion(), "2.0");
     assertFalse(fromEncoded.getValue().getNameIDPolicy().isAllowCreate());
+    assertFalse(fromEncoded.getValue().getNameIDPolicy().isAllowCreate());
 
-    // Unwind the RelayState
-    start = parameters.indexOf("RelayState=");
-    end = parameters.indexOf("&", start);
-    String relayState = parameters.substring(start + "RelayState=".length(), end);
-    assertEquals(relayState, "Relay-State-String");
+    // For HTTP Redirect, pull out the RelayState and SigAlg values from the request parameter.
+    if (binding == Binding.HTTP_Redirect) {
+      // Unwind the RelayState
+      int start = rawRequest.indexOf("RelayState=");
+      int end = rawRequest.indexOf("&", start);
+      String relayState = URLDecoder.decode(rawRequest.substring(start + "RelayState=".length(), end), "UTF-8");
+      assertEquals(relayState, "Relay-State-String");
 
-    // Unwind the SigAlg
-    start = parameters.indexOf("SigAlg=");
-    end = parameters.indexOf("&", start);
-    String sigAlg = URLDecoder.decode(parameters.substring(start + "SigAlg=".length(), end), "UTF-8");
-    assertEquals(sigAlg, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256");
+      // Unwind the SigAlg
+      start = rawRequest.indexOf("SigAlg=");
+      end = rawRequest.indexOf("&", start);
+      String sigAlg = URLDecoder.decode(rawRequest.substring(start + "SigAlg=".length(), end), "UTF-8");
+      assertEquals(sigAlg, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256");
+    }
   }
 
   @Test
