@@ -22,26 +22,12 @@ import java.time.ZonedDateTime;
  *
  * @author Brian Pontarelli
  */
-public class AuthenticationResponse {
+public class AuthenticationResponse extends SAMLResponse {
   public Assertion assertion = new Assertion();
-
-  public String destination;
-
-  public String id;
-
-  public String inResponseTo;
-
-  public ZonedDateTime issueInstant;
-
-  public String issuer;
 
   public String rawResponse;
 
   public ZonedDateTime sessionExpiry;
 
   public String sessionIndex;
-
-  public Status status = new Status();
-
-  public String version;
 }

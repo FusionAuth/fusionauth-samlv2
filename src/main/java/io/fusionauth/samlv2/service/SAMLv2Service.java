@@ -24,6 +24,8 @@ import java.util.function.Function;
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
+import io.fusionauth.samlv2.domain.LogoutRequest;
+import io.fusionauth.samlv2.domain.LogoutResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.SignatureLocation;
@@ -53,38 +55,6 @@ public interface SAMLv2Service {
       throws SAMLException;
 
   /**
-   * Builds an invalid POST binding to a AuthnRequest protocol for testing.
-   *
-   * @param request                The AuthnRequest information.
-   * @param sign                   Determines if the request should be signed or not.
-   * @param privateKey             The key that is used to sign the request (private key, shared, secret, etc).
-   * @param certificate            The certificate that is included in the request.
-   * @param algorithm              The signing algorithm to use (if any).
-   * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
-   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
-   * @throws SAMLException If any unrecoverable errors occur.
-   */
-  @SuppressWarnings("unused")
-  String buildInvalidTestingPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
-                                             X509Certificate certificate, Algorithm algorithm,
-                                             String xmlSignatureC14nMethod) throws SAMLException;
-
-  /**
-   * Builds an invalid HTTP-Redirect binding to a AuthnRequest protocol for testing.
-   *
-   * @param request    The AuthnRequest information.
-   * @param relayState The relay state parameter (required if signing).
-   * @param sign       Determines if the request should be signed or not.
-   * @param key        The key that is used to sign the request (private key, shared, secret, etc).
-   * @param algorithm  The signing algorithm to use (if any).
-   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
-   * @throws SAMLException If any unrecoverable errors occur.
-   */
-  @SuppressWarnings("unused")
-  String buildInvalidTestingRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
-                                                 PrivateKey key, Algorithm algorithm) throws SAMLException;
-
-  /**
    * Builds the metadata response for a SAML IdP.
    *
    * @param metaData The metadata to build XMl from.
@@ -110,6 +80,38 @@ public interface SAMLv2Service {
       throws SAMLException;
 
   /**
+   * Build a Logout Request for an HTTP-POST binding for a session participant.
+   *
+   * @param logoutRequest          the logout request.
+   * @param sign                   Determines if the request should be signed or not.
+   * @param privateKey             The key that is used to sign the request (private key, shared, secret, etc).
+   * @param certificate            The certificate that is included in the request.
+   * @param algorithm              The signing algorithm to use (if any).
+   * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
+   * @return The encoded value to be sent in the HTTP POST body.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  String buildPostLogoutRequest(LogoutRequest logoutRequest, boolean sign, PrivateKey privateKey,
+                                X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+      throws SAMLException;
+
+  /**
+   * Build a Logout Response for an HTTP-POST binding for an SP.
+   *
+   * @param logoutResponse         the logout response.
+   * @param sign                   Determines if the response should be signed or not.
+   * @param privateKey             The key that is used to sign the response (private key, shared, secret, etc).
+   * @param certificate            The certificate that is included in the response.
+   * @param algorithm              The signing algorithm to use (if any).
+   * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
+   * @return The encoded value to be sent in the HTTP POST body.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  String buildPostLogoutResponse(LogoutResponse logoutResponse, boolean sign, PrivateKey privateKey,
+                                 X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+      throws SAMLException;
+
+  /**
    * Builds a HTTP-Redirect binding to a AuthnRequest protocol.
    *
    * @param request    The AuthnRequest information.
@@ -122,6 +124,87 @@ public interface SAMLv2Service {
    */
   String buildRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign, PrivateKey key,
                                    Algorithm algorithm) throws SAMLException;
+
+  /**
+   * Build a Logout Request for HTTP Redirect bindings.
+   *
+   * @param request    the Logout request information.
+   * @param relayState The relay state parameter (required if signing).
+   * @param sign       Determines if the request should be signed or not.
+   * @param key        The key that is used to sign the request (private key, shared, secret, etc).
+   * @param algorithm  The signing algorithm to use (if any).
+   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  String buildRedirectLogoutRequest(LogoutRequest request, String relayState, boolean sign, PrivateKey key,
+                                    Algorithm algorithm)
+      throws SAMLException;
+
+  /**
+   * Build a Logout Response for HTTP Redirect bindings.
+   *
+   * @param response   the Logout response information.
+   * @param relayState The relay state parameter (required if signing).
+   * @param sign       Determines if the request should be signed or not.
+   * @param key        The key that is used to sign the request (private key, shared, secret, etc).
+   * @param algorithm  The signing algorithm to use (if any).
+   * @return The URL parameters that can be appended to a redirect URL. This does not include the question mark.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  String buildRedirectLogoutResponse(LogoutResponse response, String relayState, boolean sign, PrivateKey key,
+                                     Algorithm algorithm) throws SAMLException;
+
+  /**
+   * Parses the logout request from an HTTP POST binding and verifies that the signature is valid.
+   *
+   * @param encodedRequest  the encoded SAML request from an HTTP POST binding.
+   * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
+   *                        necessary details to complete signature verification.
+   * @return The parsed request.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  LogoutRequest parseLogoutRequestPostBinding(String encodedRequest,
+                                              Function<LogoutRequest, PostBindingSignatureHelper> signatureHelper)
+      throws SAMLException;
+
+  /**
+   * Parses a HTTP-Redirect binding to a Logout request.
+   *
+   * @param encodedRequest  the encoded SAML request, the request will be assumed to be encoded an deflated.
+   * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
+   *                        necessary details to complete signature verification.
+   * @return The parsed request.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  LogoutRequest parseLogoutRequestRedirectBinding(String encodedRequest, String relayState,
+                                                  Function<LogoutRequest, RedirectBindingSignatureHelper> signatureHelper)
+      throws SAMLException;
+
+  /**
+   * Parses the logout response from an HTTP POST binding and verifies that the signature is valid.
+   *
+   * @param encodedRequest  the encoded SAML request from an HTTP POST binding.
+   * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
+   *                        necessary details to complete signature verification.
+   * @return The parsed request.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  LogoutResponse parseLogoutResponsePostBinding(String encodedRequest,
+                                                Function<LogoutResponse, PostBindingSignatureHelper> signatureHelper)
+      throws SAMLException;
+
+  /**
+   * Parses a HTTP-Redirect binding to a Logout response.
+   *
+   * @param encodedRequest  the encoded SAML request, the request will be assumed to be encoded an deflated.
+   * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
+   *                        necessary details to complete signature verification.
+   * @return The parsed request.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  LogoutResponse parseLogoutResponseRedirectBinding(String encodedRequest, String relayState,
+                                                    Function<LogoutResponse, RedirectBindingSignatureHelper> signatureHelper)
+      throws SAMLException;
 
   /**
    * Parses a SAML 2.0 MetaData response and converts it to a simple to use object.
@@ -138,7 +221,7 @@ public interface SAMLv2Service {
    * @param encodedRequest  The encoded SAML request from an HTTP POST binding.
    * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
    *                        necessary details to complete signature verification.
-   * @return The request.
+   * @return The parsed request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
   AuthenticationRequest parseRequestPostBinding(String encodedRequest,
@@ -148,8 +231,7 @@ public interface SAMLv2Service {
   /**
    * Parses the authentication request from an HTTP redirect binding and verifies that it is valid.
    *
-   * @param encodedRequest  The encoded SAML request. When a request is accepted from an HTTP Redirect Binding, the
-   *                        request will be assumed to be encoded an deflated.
+   * @param encodedRequest  The encoded SAML request, the request will be assumed to be encoded an deflated.
    * @param relayState      The RelayState URL parameter (only needed if verifying signatures).
    * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
    *                        necessary details to complete signature verification.

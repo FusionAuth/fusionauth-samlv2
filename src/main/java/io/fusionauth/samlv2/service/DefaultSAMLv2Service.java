@@ -65,12 +65,15 @@ import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.Binding;
 import io.fusionauth.samlv2.domain.Conditions;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
+import io.fusionauth.samlv2.domain.LogoutRequest;
+import io.fusionauth.samlv2.domain.LogoutResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.MetaData.IDPMetaData;
 import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
+import io.fusionauth.samlv2.domain.SAMLRequest;
 import io.fusionauth.samlv2.domain.SignatureLocation;
 import io.fusionauth.samlv2.domain.SignatureNotFoundException;
 import io.fusionauth.samlv2.domain.Subject;
@@ -99,10 +102,12 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.RoleDescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.SPSSODescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.SSODescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.LogoutRequestType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.NameIDPolicyType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ObjectFactory;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ResponseType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusCodeType;
+import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusResponseType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.KeyInfoType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.X509DataType;
@@ -132,13 +137,13 @@ import static io.fusionauth.samlv2.util.SAMLTools.unmarshallFromDocument;
  * @author Brian Pontarelli
  */
 public class DefaultSAMLv2Service implements SAMLv2Service {
+  static final ObjectFactory PROTOCOL_OBJECT_FACTORY = new ObjectFactory();
+
   private static final io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ObjectFactory ASSERTION_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ObjectFactory();
 
   private static final io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.ObjectFactory DSIG_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.ObjectFactory();
 
   private static final io.fusionauth.samlv2.domain.jaxb.oasis.metadata.ObjectFactory METADATA_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.oasis.metadata.ObjectFactory();
-
-  private static final ObjectFactory PROTOCOL_OBJECT_FACTORY = new ObjectFactory();
 
   private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLv2Service.class);
 
@@ -258,6 +263,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createResponse(jaxbResponse), ResponseType.class);
+
+    // Bail now if we aren't signing the response.
+    if (!sign) {
+      try {
+        String xml = marshallToString(document);
+        return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
+      } catch (TransformerException e) {
+        throw new SAMLException("Unable to marshal the SAML response to XML.", e);
+      }
+    }
+
     try {
       // If successful, sign the assertion if requested, otherwise, sign the root
       Element toSign;
@@ -287,25 +303,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       }
 
       String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore);
-      return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));
+      return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
     } catch (Exception e) {
       throw new SAMLException("Unable to sign XML SAML response", e);
     }
-  }
-
-  @Override
-  public String buildInvalidTestingPostAuthnRequest(AuthenticationRequest request, boolean sign, PrivateKey privateKey,
-                                                    X509Certificate certificate, Algorithm algorithm,
-                                                    String xmlSignatureC14nMethod) throws SAMLException {
-    AuthnRequestType authnRequest = toAuthnRequest(request, "bad");
-    return buildPostAuthnRequest(authnRequest, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
-  }
-
-  @Override
-  public String buildInvalidTestingRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
-                                                        PrivateKey key, Algorithm algorithm) throws SAMLException {
-    AuthnRequestType authnRequest = toAuthnRequest(request, "bad");
-    return buildRedirectAuthnRequest(authnRequest, relayState, sign, key, algorithm);
   }
 
   @Override
@@ -385,16 +386,100 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                       X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
       throws SAMLException {
     AuthnRequestType authnRequest = toAuthnRequest(request, "2.0");
-    return buildPostAuthnRequest(authnRequest, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
+    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
+  }
+
+  @Override
+  public String buildPostLogoutRequest(LogoutRequest request, boolean sign, PrivateKey privateKey,
+                                       X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+      throws SAMLException {
+    LogoutRequestType logoutRequest = toLogoutRequest(request, "2.0");
+    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createLogoutRequest(logoutRequest), LogoutRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
+
+  }
+
+  @Override
+  public String buildPostLogoutResponse(LogoutResponse response, boolean sign, PrivateKey privateKey,
+                                        X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
+      throws SAMLException {
+    StatusResponseType logoutResponse = toLogoutResponse(response, "2.0");
+    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createLogoutResponse(logoutResponse), StatusResponseType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
   }
 
   @Override
   public String buildRedirectAuthnRequest(AuthenticationRequest request, String relayState, boolean sign,
-                                          PrivateKey key,
-                                          Algorithm algorithm)
-      throws SAMLException {
+                                          PrivateKey key, Algorithm algorithm) throws SAMLException {
     AuthnRequestType authnRequest = toAuthnRequest(request, "2.0");
-    return buildRedirectAuthnRequest(authnRequest, relayState, sign, key, algorithm);
+    return buildRedirectRequest(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class, relayState, sign, key, algorithm);
+  }
+
+  @Override
+  public String buildRedirectLogoutRequest(LogoutRequest request, String relayState, boolean sign, PrivateKey key,
+                                           Algorithm algorithm)
+      throws SAMLException {
+    LogoutRequestType logoutRequest = toLogoutRequest(request, "2.0");
+    return buildRedirectRequest(PROTOCOL_OBJECT_FACTORY.createLogoutRequest(logoutRequest), LogoutRequestType.class, relayState, sign, key, algorithm);
+  }
+
+  @Override
+  public String buildRedirectLogoutResponse(LogoutResponse response, String relayState, boolean sign, PrivateKey key,
+                                            Algorithm algorithm) throws SAMLException {
+    StatusResponseType logoutResponse = toLogoutResponse(response, "2.0");
+    return buildRedirectResponse(PROTOCOL_OBJECT_FACTORY.createLogoutResponse(logoutResponse), StatusResponseType.class, relayState, sign, key, algorithm);
+  }
+
+  @Override
+  public LogoutRequest parseLogoutRequestPostBinding(String encodedRequest,
+                                                     Function<LogoutRequest, PostBindingSignatureHelper> signatureHelperFunction)
+      throws SAMLException {
+    byte[] xml = Base64.getMimeDecoder().decode(encodedRequest);
+    LogoutRequestParseResult result = parseLogoutRequest(xml);
+    PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
+    if (signatureHelper.verifySignature()) {
+      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request);
+    }
+
+    return result.request;
+  }
+
+  @Override
+  public LogoutRequest parseLogoutRequestRedirectBinding(String encodedRequest, String relayState,
+                                                         Function<LogoutRequest, RedirectBindingSignatureHelper> signatureHelperFunction)
+      throws SAMLException {
+    LogoutRequestParseResult result = parseLogoutRequest(decodeAndInflate(encodedRequest));
+    RedirectBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
+    if (signatureHelper.verifySignature()) {
+      verifyRequestSignature(encodedRequest, relayState, signatureHelper, result.request);
+    }
+
+    return result.request;
+  }
+
+  @Override
+  public LogoutResponse parseLogoutResponsePostBinding(String encodedRequest,
+                                                       Function<LogoutResponse, PostBindingSignatureHelper> signatureHelperFunction)
+      throws SAMLException {
+    byte[] xml = Base64.getMimeDecoder().decode(encodedRequest);
+    LogoutResponseParseResult result = parseLogoutResponse(xml);
+    PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.response);
+    if (signatureHelper.verifySignature()) {
+      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.response);
+    }
+
+    return result.response;
+  }
+
+  @Override
+  public LogoutResponse parseLogoutResponseRedirectBinding(String encodedRequest, String relayState,
+                                                           Function<LogoutResponse, RedirectBindingSignatureHelper> signatureHelperFunction)
+      throws SAMLException {
+    LogoutResponseParseResult result = parseLogoutResponse(decodeAndInflate(encodedRequest));
+    RedirectBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.response);
+    if (signatureHelper.verifySignature()) {
+      verifyRequestSignature(encodedRequest, relayState, signatureHelper, result.response);
+    }
+
+    return result.response;
   }
 
   @Override
@@ -474,7 +559,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     AuthnRequestParseResult result = parseRequest(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      verifySignature(result.document, signatureHelper.keySelector());
+      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request);
     }
 
     return result.request;
@@ -487,26 +572,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     AuthnRequestParseResult result = parseRequest(decodeAndInflate(encodedRequest));
     RedirectBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      if (signatureHelper.signature() == null || signatureHelper.publicKey() == null || signatureHelper.algorithm() == null) {
-        throw new SignatureNotFoundException("You must specify a signature, key and algorithm if you want to verify the SAML request signature");
-      }
-
-      try {
-        String parameters = "SAMLRequest=" + URLEncoder.encode(encodedRequest, "UTF-8");
-        if (relayState != null) {
-          parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
-        }
-        parameters += "&SigAlg=" + URLEncoder.encode(signatureHelper.algorithm().uri, "UTF-8");
-
-        Signature sig = Signature.getInstance(signatureHelper.algorithm().name);
-        sig.initVerify(signatureHelper.publicKey());
-        sig.update(parameters.getBytes(StandardCharsets.UTF_8));
-        if (!sig.verify(Base64.getMimeDecoder().decode(signatureHelper.signature()))) {
-          throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.");
-        }
-      } catch (GeneralSecurityException | UnsupportedEncodingException e) {
-        throw new SAMLException("Unable to verify signature", e);
-      }
+      verifyRequestSignature(encodedRequest, relayState, signatureHelper, result.request);
     }
 
     return result.request;
@@ -522,7 +588,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     Document document = newDocumentFromBytes(decodedResponse);
     if (verifySignature) {
-      verifySignature(document, keySelector);
+      verifyEmbeddedSignature(document, keySelector, null);
     }
 
     ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
@@ -614,6 +680,110 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return response;
   }
 
+  <T> String buildPostRequest(JAXBElement<T> object, Class<T> type, boolean sign, PrivateKey privateKey,
+                              X509Certificate certificate,
+                              Algorithm algorithm, String xmlSignatureC14nMethod) throws SAMLException {
+    Document document = marshallToDocument(object, type);
+    try {
+      Element toSign = document.getDocumentElement();
+      String xml;
+      if (sign) {
+        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null);
+      } else {
+        xml = marshallToString(document);
+      }
+
+      return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
+    } catch (Exception e) {
+      throw new SAMLException("Unable to sign XML SAML response", e);
+    }
+  }
+
+  <T> String buildRedirect(JAXBElement<T> object, Class<T> type, String relayState, boolean sign,
+                           PrivateKey key, Algorithm algorithm, String parameterName) throws SAMLException {
+    try {
+      byte[] xml = marshallToBytes(object, type);
+      String encodedResult = SAMLTools.deflateAndEncode(xml);
+      String parameters = parameterName + "=" + URLEncoder.encode(encodedResult, "UTF-8");
+      if (relayState != null) {
+        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
+      }
+
+      if (sign && key != null && algorithm != null) {
+        Signature signature;
+        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, "UTF-8");
+        signature = Signature.getInstance(algorithm.name);
+        signature.initSign(key);
+        signature.update(parameters.getBytes(StandardCharsets.UTF_8));
+
+        String signatureParameter = new String(Base64.getEncoder().encode(signature.sign()), StandardCharsets.UTF_8);
+        parameters += "&Signature=" + URLEncoder.encode(signatureParameter, "UTF-8");
+      }
+
+      return parameters;
+    } catch (Exception e) {
+      // Not possible but freak out
+      throw new SAMLException(e);
+    }
+  }
+
+  <T> String buildRedirectRequest(JAXBElement<T> object, Class<T> type, String relayState, boolean sign,
+                                  PrivateKey key, Algorithm algorithm) throws SAMLException {
+    return buildRedirect(object, type, relayState, sign, key, algorithm, "SAMLRequest");
+  }
+
+  <T> String buildRedirectResponse(JAXBElement<T> object, Class<T> type, String relayState, boolean sign,
+                                   PrivateKey key, Algorithm algorithm) throws SAMLException {
+    return buildRedirect(object, type, relayState, sign, key, algorithm, "SAMLResponse");
+  }
+
+  AuthnRequestType toAuthnRequest(AuthenticationRequest request, String version) {
+    // SAML Web SSO profile requirements (section 4.1.4.1)
+    AuthnRequestType authnRequest = new AuthnRequestType();
+    authnRequest.setAssertionConsumerServiceURL(request.acsURL);
+    authnRequest.setDestination(request.destination);
+    authnRequest.setIssuer(new NameIDType());
+    authnRequest.getIssuer().setValue(request.issuer);
+    authnRequest.setNameIDPolicy(new NameIDPolicyType());
+    authnRequest.getNameIDPolicy().setFormat(NameIDFormat.EmailAddress.toSAMLFormat());
+    authnRequest.getNameIDPolicy().setAllowCreate(false);
+    authnRequest.setID(request.id);
+    authnRequest.setVersion(version);
+    authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+    return authnRequest;
+  }
+
+  LogoutRequestType toLogoutRequest(LogoutRequest request, String version) {
+    LogoutRequestType logoutRequest = new LogoutRequestType();
+    logoutRequest.setDestination(request.destination);
+    logoutRequest.setIssuer(new NameIDType());
+    logoutRequest.getIssuer().setValue(request.issuer);
+    logoutRequest.setNameID(new NameIDType());
+    logoutRequest.getNameID().setFormat(NameIDFormat.EmailAddress.toSAMLFormat());
+    logoutRequest.setID(request.id);
+    logoutRequest.getSessionIndex().add(request.sessionIndex);
+    logoutRequest.setVersion(version);
+    logoutRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+    return logoutRequest;
+  }
+
+  StatusResponseType toLogoutResponse(LogoutResponse response, String version) {
+    StatusResponseType logoutResponse = new StatusResponseType();
+    logoutResponse.setDestination(response.destination);
+    logoutResponse.setIssuer(new NameIDType());
+    logoutResponse.getIssuer().setValue(response.issuer);
+    logoutResponse.setID(response.id);
+    logoutResponse.setVersion(version);
+    logoutResponse.setInResponseTo(response.inResponseTo);
+    logoutResponse.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+    StatusType status = new StatusType();
+    status.setStatusCode(new StatusCodeType());
+    status.getStatusCode().setValue(response.status.code.toSAMLFormat());
+    status.setStatusMessage(response.status.message);
+    logoutResponse.setStatus(status);
+    return logoutResponse;
+  }
+
   private void addKeyDescriptors(SSODescriptorType descriptor, List<Certificate> certificates) {
     certificates.forEach(cert -> {
       KeyDescriptorType key = new KeyDescriptorType();
@@ -632,53 +802,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         throw new IllegalArgumentException(e);
       }
     });
-  }
-
-  private String buildPostAuthnRequest(AuthnRequestType authnRequest, boolean sign, PrivateKey privateKey,
-                                       X509Certificate certificate,
-                                       Algorithm algorithm, String xmlSignatureC14nMethod) throws SAMLException {
-    Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
-    try {
-      Element toSign = document.getDocumentElement();
-      String xml;
-      if (sign) {
-        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null);
-      } else {
-        xml = marshallToString(document);
-      }
-
-      return Base64.getEncoder().encodeToString(xml.getBytes(StandardCharsets.UTF_8));
-    } catch (Exception e) {
-      throw new SAMLException("Unable to sign XML SAML response", e);
-    }
-  }
-
-  private String buildRedirectAuthnRequest(AuthnRequestType authnRequest, String relayState, boolean sign,
-                                           PrivateKey key, Algorithm algorithm) throws SAMLException {
-    try {
-      byte[] xml = marshallToBytes(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class);
-      String encodedResult = SAMLTools.deflateAndEncode(xml);
-      String parameters = "SAMLRequest=" + URLEncoder.encode(encodedResult, "UTF-8");
-      if (relayState != null) {
-        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
-      }
-
-      if (sign && key != null && algorithm != null) {
-        Signature signature;
-        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, "UTF-8");
-        signature = Signature.getInstance(algorithm.name);
-        signature.initSign(key);
-        signature.update(parameters.getBytes(StandardCharsets.UTF_8));
-
-        String signatureParameter = Base64.getEncoder().encodeToString(signature.sign());
-        parameters += "&Signature=" + URLEncoder.encode(signatureParameter, "UTF-8");
-      }
-
-      return parameters;
-    } catch (Exception e) {
-      // Not possible but freak out
-      throw new SAMLException(e);
-    }
   }
 
   private void fixIDs(Element element) {
@@ -713,6 +836,51 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     subjectConfirmation.method = ConfirmationMethod.fromSAMLFormat(subjectConfirmationType.getMethod());
 
     return subjectConfirmation;
+  }
+
+  private LogoutRequestParseResult parseLogoutRequest(byte[] xmlBytes) throws SAMLException {
+    String xml = new String(xmlBytes, StandardCharsets.UTF_8);
+    if (logger.isDebugEnabled()) {
+      logger.debug("SAMLRequest XML is\n{}", xml);
+    }
+
+    LogoutRequestParseResult result = new LogoutRequestParseResult();
+    result.document = newDocumentFromBytes(xmlBytes);
+    result.logoutRequest = unmarshallFromDocument(result.document, LogoutRequestType.class);
+    result.request = new LogoutRequest();
+    result.request.xml = xml;
+    result.request.id = result.logoutRequest.getID();
+    result.request.issuer = result.logoutRequest.getIssuer().getValue();
+    result.request.issueInstant = result.logoutRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
+    NameIDType nameId = result.logoutRequest.getNameID();
+    if (nameId == null) {
+      result.request.nameIdFormat = NameIDFormat.EmailAddress;
+    } else {
+      result.request.nameIdFormat = NameIDFormat.fromSAMLFormat(nameId.getFormat());
+    }
+    List<String> sessionIndex = result.logoutRequest.getSessionIndex();
+    result.request.sessionIndex = sessionIndex.isEmpty() ? null : sessionIndex.get(0);
+    result.request.version = result.logoutRequest.getVersion();
+    return result;
+  }
+
+
+  private LogoutResponseParseResult parseLogoutResponse(byte[] xmlBytes) throws SAMLException {
+    String xml = new String(xmlBytes, StandardCharsets.UTF_8);
+    if (logger.isDebugEnabled()) {
+      logger.debug("SAMLRequest XML is\n{}", xml);
+    }
+
+    LogoutResponseParseResult result = new LogoutResponseParseResult();
+    result.document = newDocumentFromBytes(xmlBytes);
+    result.logoutResponse = unmarshallFromDocument(result.document, StatusResponseType.class);
+    result.response = new LogoutResponse();
+    result.response.xml = xml;
+    result.response.id = result.logoutResponse.getID();
+    result.response.issuer = result.logoutResponse.getIssuer().getValue();
+    result.response.issueInstant = result.logoutResponse.getIssueInstant().toGregorianCalendar().toZonedDateTime();
+    result.response.version = result.logoutResponse.getVersion();
+    return result;
   }
 
   private AuthnRequestParseResult parseRequest(byte[] xmlBytes) throws SAMLException {
@@ -770,29 +938,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return marshallToString(document);
   }
 
-  private AuthnRequestType toAuthnRequest(AuthenticationRequest request, String version) {
-    // SAML Web SSO profile requirements (section 4.1.4.1)
-    AuthnRequestType authnRequest = new AuthnRequestType();
-    authnRequest.setAssertionConsumerServiceURL(request.acsURL);
-    authnRequest.setDestination(request.destination);
-    authnRequest.setIssuer(new NameIDType());
-    authnRequest.getIssuer().setValue(request.issuer);
-    authnRequest.setNameIDPolicy(new NameIDPolicyType());
-    authnRequest.getNameIDPolicy().setFormat(NameIDFormat.EmailAddress.toSAMLFormat());
-    authnRequest.getNameIDPolicy().setAllowCreate(false);
-    authnRequest.setID(request.id);
-    authnRequest.setVersion(version);
-    authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
-    return authnRequest;
-  }
-
-  private void verifySignature(Document document, KeySelector keySelector) throws SAMLException {
+  private void verifyEmbeddedSignature(Document document, KeySelector keySelector, SAMLRequest request)
+      throws SAMLException {
     // Fix the IDs in the entire document per the suggestions at http://stackoverflow.com/questions/17331187/xml-dig-sig-error-after-upgrade-to-java7u25
     fixIDs(document.getDocumentElement());
 
     NodeList nl = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
     if (nl.getLength() == 0) {
-      throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
+      throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.", request);
     }
 
     for (int i = 0; i < nl.getLength(); i++) {
@@ -802,13 +955,38 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         XMLSignature signature = factory.unmarshalXMLSignature(validateContext);
         boolean valid = signature.validate(validateContext);
         if (!valid) {
-          throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.");
+          throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
         }
       } catch (MarshalException e) {
-        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. We couldn't unmarshall the XML Signature element.", e);
+        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. We couldn't unmarshall the XML Signature element.", request, e);
       } catch (XMLSignatureException e) {
-        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. The signature was unmarshalled but we couldn't validate it. Possible reasons include a key was not provided that was eligible to verify the signature, or an un-expected exception occurred.", e);
+        throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. The signature was unmarshalled but we couldn't validate it. Possible reasons include a key was not provided that was eligible to verify the signature, or an un-expected exception occurred.", request, e);
       }
+    }
+  }
+
+  private void verifyRequestSignature(String encodedRequest, String relayState,
+                                      RedirectBindingSignatureHelper signatureHelper, SAMLRequest request)
+      throws SAMLException {
+    if (signatureHelper.signature() == null || signatureHelper.publicKey() == null || signatureHelper.algorithm() == null) {
+      throw new SignatureNotFoundException("You must specify a signature, key and algorithm if you want to verify the SAML request signature", request);
+    }
+
+    try {
+      String parameters = "SAMLRequest=" + URLEncoder.encode(encodedRequest, "UTF-8");
+      if (relayState != null) {
+        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
+      }
+      parameters += "&SigAlg=" + URLEncoder.encode(signatureHelper.algorithm().uri, "UTF-8");
+
+      Signature sig = Signature.getInstance(signatureHelper.algorithm().name);
+      sig.initVerify(signatureHelper.publicKey());
+      sig.update(parameters.getBytes(StandardCharsets.UTF_8));
+      if (!sig.verify(Base64.getMimeDecoder().decode(signatureHelper.signature().getBytes(StandardCharsets.UTF_8)))) {
+        throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
+      }
+    } catch (GeneralSecurityException | UnsupportedEncodingException e) {
+      throw new SAMLException("Unable to verify signature", request, e);
     }
   }
 
@@ -818,5 +996,21 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     public Document document;
 
     public AuthenticationRequest request;
+  }
+
+  private static class LogoutRequestParseResult {
+    public Document document;
+
+    public LogoutRequestType logoutRequest;
+
+    public LogoutRequest request;
+  }
+
+  private static class LogoutResponseParseResult {
+    public Document document;
+
+    public StatusResponseType logoutResponse;
+
+    public LogoutResponse response;
   }
 }

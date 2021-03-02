@@ -21,6 +21,8 @@ package io.fusionauth.samlv2.domain;
  * @author Brian Pontarelli
  */
 public class SAMLException extends Exception {
+  public SAMLRequest request;
+
   public SAMLException() {
     super();
   }
@@ -31,6 +33,16 @@ public class SAMLException extends Exception {
 
   public SAMLException(String message, Throwable cause) {
     super(message, cause);
+  }
+
+  public SAMLException(String message, SAMLRequest request) {
+    super(message);
+    this.request = request;
+  }
+
+  public SAMLException(String message, SAMLRequest request, Throwable cause) {
+    super(message, cause);
+    this.request = request;
   }
 
   public SAMLException(Throwable cause) {

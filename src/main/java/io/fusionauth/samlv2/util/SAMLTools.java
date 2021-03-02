@@ -39,6 +39,7 @@ import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.net.URL;
+import java.nio.charset.StandardCharsets;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateException;
 import java.security.cert.CertificateFactory;
@@ -124,6 +125,16 @@ public class SAMLTools {
   }
 
   /**
+   * Decode the encoded request.
+   *
+   * @param encodedRequest the encoded request
+   * @return a decoded and request as bytes
+   */
+  public static byte[] decode(String encodedRequest) {
+    return Base64.getMimeDecoder().decode(encodedRequest);
+  }
+
+  /**
    * Decode and inflate the encoded request.
    *
    * @param encodedRequest the encoded request
@@ -166,7 +177,17 @@ public class SAMLTools {
     int length = deflater.deflate(deflatedResult);
     deflater.end();
     byte[] src = Arrays.copyOf(deflatedResult, length);
-    return Base64.getEncoder().encodeToString(src);
+    return new String(Base64.getEncoder().encode(src), StandardCharsets.UTF_8);
+  }
+
+  /**
+   * Encode the provided byte array.
+   *
+   * @param bytes the byte array to encode.
+   * @return an encoded string
+   */
+  public static String encode(byte[] bytes) {
+    return new String(Base64.getEncoder().encode(bytes), StandardCharsets.UTF_8);
   }
 
   /**
@@ -275,7 +296,7 @@ public class SAMLTools {
     try {
       return newDocumentBuilder().parse(new ByteArrayInputStream(bytes));
     } catch (SAXException | IOException e) {
-      throw new SAMLException("Unable to parse SAML v2.0 authentication response", e);
+      throw new SAMLException("Unable to parse SAML v2.0 document.", e);
     }
   }
 

@@ -55,6 +55,8 @@ import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.Binding;
+import io.fusionauth.samlv2.domain.LogoutRequest;
+import io.fusionauth.samlv2.domain.LogoutResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.MetaData.IDPMetaData;
 import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
@@ -82,6 +84,7 @@ import sun.security.x509.X509CertImpl;
 import sun.security.x509.X509CertInfo;
 import static org.testng.Assert.assertEquals;
 import static org.testng.Assert.assertFalse;
+import static org.testng.Assert.assertNotNull;
 import static org.testng.Assert.assertNull;
 import static org.testng.Assert.assertTrue;
 import static org.testng.Assert.fail;
@@ -232,6 +235,46 @@ public class DefaultSAMLv2ServiceTest {
     };
   }
 
+  @Test(dataProvider = "bindings")
+  public void parseLogout_Request_raw(Binding binding) throws Exception {
+    byte[] bytes = binding == Binding.HTTP_Redirect
+        ? Files.readAllBytes(Paths.get("src/test/xml/encoded/logout-request.txt"))
+        : Files.readAllBytes(Paths.get("src/test/xml/encoded/logout-request-embedded-signature.txt"));
+
+    String encodedXML = new String(bytes, StandardCharsets.UTF_8);
+
+    X509Certificate certificate;
+    String redirectSignature = new String(Files.readAllBytes(Paths.get("src/test/xml/signature/logout-request.txt")), StandardCharsets.UTF_8);
+    String x509encoded = "MIICajCCAdOgAwIBAgIBADANBgkqhkiG9w0BAQ0FADBSMQswCQYDVQQGEwJ1czETMBEGA1UECAwKQ2FsaWZvcm5pYTEVMBMGA1UECgwMT25lbG9naW4gSW5jMRcwFQYDVQQDDA5zcC5leGFtcGxlLmNvbTAeFw0xNDA3MTcxNDEyNTZaFw0xNTA3MTcxNDEyNTZaMFIxCzAJBgNVBAYTAnVzMRMwEQYDVQQIDApDYWxpZm9ybmlhMRUwEwYDVQQKDAxPbmVsb2dpbiBJbmMxFzAVBgNVBAMMDnNwLmV4YW1wbGUuY29tMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDZx+ON4IUoIWxgukTb1tOiX3bMYzYQiwWPUNMp+Fq82xoNogso2bykZG0yiJm5o8zv/sd6pGouayMgkx/2FSOdc36T0jGbCHuRSbtia0PEzNIRtmViMrt3AeoWBidRXmZsxCNLwgIV6dn2WpuE5Az0bHgpZnQxTKFek0BMKU/d8wIDAQABo1AwTjAdBgNVHQ4EFgQUGHxYqZYyX7cTxKVODVgZwSTdCnwwHwYDVR0jBBgwFoAUGHxYqZYyX7cTxKVODVgZwSTdCnwwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQ0FAAOBgQByFOl+hMFICbd3DJfnp2Rgd/dqttsZG/tyhILWvErbio/DEe98mXpowhTkC04ENprOyXi7ZbUqiicF89uAGyt1oqgTUCD1VsLahqIcmrzgumNyTwLGWo17WDAa1/usDhetWAMhgzF/Cnf5ek0nK00m0YZGyc4LzgD0CROMASTWNg==";
+    try (InputStream is = new ByteArrayInputStream(Base64.getMimeDecoder().decode(x509encoded))) {
+      CertificateFactory factor = CertificateFactory.getInstance("X.509");
+      certificate = (X509Certificate) factor.generateCertificate(is);
+    }
+
+    assertNotNull(certificate);
+    PublicKey publicKey = certificate.getPublicKey();
+
+    // Testing purposes, signatures can't be verified currently, TBD if this is a bug or just invalid signatures.
+    // - Disable signature verification for now.
+    boolean verifySignature = false;
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    LogoutRequest request = binding == Binding.HTTP_Redirect
+        ? service.parseLogoutRequestRedirectBinding(encodedXML, "http://sp.example.com/relaystate", logoutRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS1, publicKey, redirectSignature, verifySignature))
+        : service.parseLogoutRequestPostBinding(encodedXML, logoutRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), verifySignature));
+
+    assertEquals(request.id, binding == Binding.HTTP_Redirect
+        ? "ONELOGIN_21df91a89767879fc0f7df6a1490c6000c81644d"
+        : "pfxd4d369e8-9ea1-780c-aff8-a1d11a9862a1");
+    assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
+    assertEquals(request.nameIdFormat, NameIDFormat.Transient);
+    assertEquals(request.version, "2.0");
+
+    String expectedXML = binding == Binding.HTTP_Redirect
+        ? new String(Files.readAllBytes(Paths.get("src/test/xml/logout-request.xml")))
+        : new String(Files.readAllBytes(Paths.get("src/test/xml/logout-request-embedded-signature.xml")));
+    assertEquals(request.xml.replace("\r\n", "\n"), expectedXML.replace("\r\n", "\n"));
+  }
+
   @Test
   public void parseMetaData() throws Exception {
     byte[] buf = Files.readAllBytes(Paths.get("src/test/xml/metadata.xml"));
@@ -270,7 +313,7 @@ public class DefaultSAMLv2ServiceTest {
       AuthenticationRequest request = service.parseRequestRedirectBinding(deflated, null, authRequest -> new TestRedirectBindingSignatureHelper());
       fail("Expected an exception because we are declaring a DOCTYPE and expanding an entity. The issuer is now set to [" + request.issuer + "] which is not good.");
     } catch (SAMLException e) {
-      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 authentication response");
+      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 document.");
       assertEquals(e.getCause().getClass().getCanonicalName(), "org.xml.sax.SAXParseException");
       assertEquals(e.getCause().getMessage(), "DOCTYPE is disallowed when the feature \"http://apache.org/xml/features/disallow-doctype-decl\" set to true.");
     }
@@ -298,7 +341,7 @@ public class DefaultSAMLv2ServiceTest {
       AuthenticationRequest request = service.parseRequestRedirectBinding(deflated, null, authRequest -> new TestRedirectBindingSignatureHelper());
       fail("Expected an exception because we are declaring a DOCTYPE. The issuer is now set to [" + request.issuer + "] which is not good.");
     } catch (SAMLException e) {
-      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 authentication response");
+      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 document.");
       assertEquals(e.getCause().getClass().getCanonicalName(), "org.xml.sax.SAXParseException");
       assertEquals(e.getCause().getMessage(), "DOCTYPE is disallowed when the feature \"http://apache.org/xml/features/disallow-doctype-decl\" set to true.");
     } finally {
@@ -318,7 +361,7 @@ public class DefaultSAMLv2ServiceTest {
       service.parseRequestRedirectBinding(deflated, null, authRequest -> new TestRedirectBindingSignatureHelper());
       fail("expected an exception because we are declaring a DOCTYPE");
     } catch (SAMLException e) {
-      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 authentication response");
+      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 document.");
       assertEquals(e.getCause().getClass().getCanonicalName(), "org.xml.sax.SAXParseException");
       assertEquals(e.getCause().getMessage(), "DOCTYPE is disallowed when the feature \"http://apache.org/xml/features/disallow-doctype-decl\" set to true.");
     }
@@ -385,7 +428,7 @@ public class DefaultSAMLv2ServiceTest {
     PublicKey publicKey = KeyFactory.getInstance("RSA")
                                     .generatePublic(
                                         new X509EncodedKeySpec(
-                                            Base64.getDecoder()
+                                            Base64.getMimeDecoder()
                                                   .decode(
                                                       Files.readAllBytes(binding == Binding.HTTP_Redirect
                                                           ? Paths.get("src/test/xml/public-key/authn-request-redirect.txt")
@@ -417,7 +460,7 @@ public class DefaultSAMLv2ServiceTest {
     PublicKey publicKey = KeyFactory.getInstance("RSA")
                                     .generatePublic(
                                         new X509EncodedKeySpec(
-                                            Base64.getDecoder()
+                                            Base64.getMimeDecoder()
                                                   .decode(
                                                       Files.readAllBytes(binding == Binding.HTTP_Redirect
                                                           ? Paths.get("src/test/xml/public-key/authn-request-redirect.txt")
@@ -589,6 +632,85 @@ public class DefaultSAMLv2ServiceTest {
       // Should throw
       assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
     }
+  }
+
+  @Test(dataProvider = "bindings")
+  public void parse_LogoutRequest(Binding binding) throws Exception {
+    byte[] bytes = binding == Binding.HTTP_Redirect
+        ? Files.readAllBytes(Paths.get("src/test/xml/logout-request.xml"))
+        : Files.readAllBytes(Paths.get("src/test/xml/logout-request-embedded-signature.xml"));
+
+    String encodedXML = binding == Binding.HTTP_Redirect
+        ? SAMLTools.deflateAndEncode(bytes)
+        : SAMLTools.encode(bytes);
+
+    X509Certificate certificate;
+    String redirectSignature = new String(Files.readAllBytes(Paths.get("src/test/xml/signature/logout-request.txt")), StandardCharsets.UTF_8);
+    String x509encoded = "MIICajCCAdOgAwIBAgIBADANBgkqhkiG9w0BAQ0FADBSMQswCQYDVQQGEwJ1czETMBEGA1UECAwKQ2FsaWZvcm5pYTEVMBMGA1UECgwMT25lbG9naW4gSW5jMRcwFQYDVQQDDA5zcC5leGFtcGxlLmNvbTAeFw0xNDA3MTcxNDEyNTZaFw0xNTA3MTcxNDEyNTZaMFIxCzAJBgNVBAYTAnVzMRMwEQYDVQQIDApDYWxpZm9ybmlhMRUwEwYDVQQKDAxPbmVsb2dpbiBJbmMxFzAVBgNVBAMMDnNwLmV4YW1wbGUuY29tMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDZx+ON4IUoIWxgukTb1tOiX3bMYzYQiwWPUNMp+Fq82xoNogso2bykZG0yiJm5o8zv/sd6pGouayMgkx/2FSOdc36T0jGbCHuRSbtia0PEzNIRtmViMrt3AeoWBidRXmZsxCNLwgIV6dn2WpuE5Az0bHgpZnQxTKFek0BMKU/d8wIDAQABo1AwTjAdBgNVHQ4EFgQUGHxYqZYyX7cTxKVODVgZwSTdCnwwHwYDVR0jBBgwFoAUGHxYqZYyX7cTxKVODVgZwSTdCnwwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQ0FAAOBgQByFOl+hMFICbd3DJfnp2Rgd/dqttsZG/tyhILWvErbio/DEe98mXpowhTkC04ENprOyXi7ZbUqiicF89uAGyt1oqgTUCD1VsLahqIcmrzgumNyTwLGWo17WDAa1/usDhetWAMhgzF/Cnf5ek0nK00m0YZGyc4LzgD0CROMASTWNg==";
+    try (InputStream is = new ByteArrayInputStream(Base64.getMimeDecoder().decode(x509encoded))) {
+      CertificateFactory factor = CertificateFactory.getInstance("X.509");
+      certificate = (X509Certificate) factor.generateCertificate(is);
+    }
+
+    assertNotNull(certificate);
+    PublicKey publicKey = certificate.getPublicKey();
+
+    // Testing purposes, signatures can't be verified currently, TBD if this is a bug or just invalid signatures.
+    // - Disable signature verification for now.
+    boolean verifySignature = false;
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    LogoutRequest request = binding == Binding.HTTP_Redirect
+        ? service.parseLogoutRequestRedirectBinding(encodedXML, "http://sp.example.com/relaystate", logoutRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS1, publicKey, redirectSignature, verifySignature))
+        : service.parseLogoutRequestPostBinding(encodedXML, logoutRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), verifySignature));
+
+    assertEquals(request.id, binding == Binding.HTTP_Redirect
+        ? "ONELOGIN_21df91a89767879fc0f7df6a1490c6000c81644d"
+        : "pfxd4d369e8-9ea1-780c-aff8-a1d11a9862a1");
+    assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
+    assertEquals(request.nameIdFormat, NameIDFormat.Transient);
+    assertEquals(request.version, "2.0");
+    String expectedXML = new String(bytes, StandardCharsets.UTF_8);
+    assertEquals(request.xml.replace("\r\n", "\n"), expectedXML.replace("\r\n", "\n"));
+  }
+
+  @Test(dataProvider = "bindings")
+  public void parse_LogoutResponse(Binding binding) throws Exception {
+    byte[] bytes = binding == Binding.HTTP_Redirect
+        ? Files.readAllBytes(Paths.get("src/test/xml/logout-response.xml"))
+        : Files.readAllBytes(Paths.get("src/test/xml/logout-response-embedded-signature.xml"));
+
+    String encodedXML = binding == Binding.HTTP_Redirect
+        ? SAMLTools.deflateAndEncode(bytes)
+        : SAMLTools.encode(bytes);
+
+    X509Certificate certificate;
+    String redirectSignature = new String(Files.readAllBytes(Paths.get("src/test/xml/signature/logout-response.txt")), StandardCharsets.UTF_8);
+    String x509encoded = "MIICajCCAdOgAwIBAgIBADANBgkqhkiG9w0BAQ0FADBSMQswCQYDVQQGEwJ1czETMBEGA1UECAwKQ2FsaWZvcm5pYTEVMBMGA1UECgwMT25lbG9naW4gSW5jMRcwFQYDVQQDDA5zcC5leGFtcGxlLmNvbTAeFw0xNDA3MTcxNDEyNTZaFw0xNTA3MTcxNDEyNTZaMFIxCzAJBgNVBAYTAnVzMRMwEQYDVQQIDApDYWxpZm9ybmlhMRUwEwYDVQQKDAxPbmVsb2dpbiBJbmMxFzAVBgNVBAMMDnNwLmV4YW1wbGUuY29tMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDZx+ON4IUoIWxgukTb1tOiX3bMYzYQiwWPUNMp+Fq82xoNogso2bykZG0yiJm5o8zv/sd6pGouayMgkx/2FSOdc36T0jGbCHuRSbtia0PEzNIRtmViMrt3AeoWBidRXmZsxCNLwgIV6dn2WpuE5Az0bHgpZnQxTKFek0BMKU/d8wIDAQABo1AwTjAdBgNVHQ4EFgQUGHxYqZYyX7cTxKVODVgZwSTdCnwwHwYDVR0jBBgwFoAUGHxYqZYyX7cTxKVODVgZwSTdCnwwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQ0FAAOBgQByFOl+hMFICbd3DJfnp2Rgd/dqttsZG/tyhILWvErbio/DEe98mXpowhTkC04ENprOyXi7ZbUqiicF89uAGyt1oqgTUCD1VsLahqIcmrzgumNyTwLGWo17WDAa1/usDhetWAMhgzF/Cnf5ek0nK00m0YZGyc4LzgD0CROMASTWNg==";
+    try (InputStream is = new ByteArrayInputStream(Base64.getMimeDecoder().decode(x509encoded))) {
+      CertificateFactory factor = CertificateFactory.getInstance("X.509");
+      certificate = (X509Certificate) factor.generateCertificate(is);
+    }
+
+    assertNotNull(certificate);
+    PublicKey publicKey = certificate.getPublicKey();
+
+    // Testing purposes, signatures can't be verified currently, TBD if this is a bug or just invalid signatures.
+    // - Disable signature verification for now.
+    boolean verifySignature = false;
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    LogoutResponse response = binding == Binding.HTTP_Redirect
+        ? service.parseLogoutResponseRedirectBinding(encodedXML, "http://sp.example.com/relaystate", logoutRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS1, publicKey, redirectSignature, verifySignature))
+        : service.parseLogoutResponsePostBinding(encodedXML, logoutRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), verifySignature));
+
+    assertEquals(response.id, binding == Binding.HTTP_Redirect
+        ? "_6c3737282f007720e736f0f4028feed8cb9b40291c"
+        : "pfxe335499f-e73b-80bd-60c4-1628984aed4f");
+    assertEquals(response.issuer, "http://idp.example.com/metadata.php");
+    assertEquals(response.version, "2.0");
+    assertNull(response.inResponseTo);
+    assertNull(response.sessionIndex);
+    String expectedXML = new String(bytes, StandardCharsets.UTF_8);
+    assertEquals(response.xml.replace("\r\n", "\n"), expectedXML.replace("\r\n", "\n"));
   }
 
   @Test(dataProvider = "bindings")

@@ -30,6 +30,11 @@ public class SignatureNotFoundException extends SAMLException {
     super(message);
   }
 
+  public SignatureNotFoundException(String message, SAMLRequest request) {
+    super(message);
+    this.request = request;
+  }
+
   public SignatureNotFoundException(String message, Throwable cause) {
     super(message, cause);
   }
