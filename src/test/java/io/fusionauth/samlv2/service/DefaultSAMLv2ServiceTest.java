@@ -119,6 +119,7 @@ public class DefaultSAMLv2ServiceTest {
     metaData.id = UUID.randomUUID().toString();
     metaData.entityId = "https://fusionauth.io/samlv2/" + metaData.id;
     metaData.idp = new IDPMetaData();
+    metaData.idp.wantAuthnRequestsSigned = true;
     metaData.idp.postBindingSignInEndpoints.add("https://fusionauth.io/samlv2/login/POST");
     metaData.idp.redirectBindingSignInEndpoints.add("https://fusionauth.io/samlv2/login/REDIRECT");
 
@@ -140,7 +141,7 @@ public class DefaultSAMLv2ServiceTest {
     assertTrue(xml.contains(metaData.idp.postBindingLogoutEndpoints.get(0)));
     assertTrue(xml.contains(metaData.idp.redirectBindingLogoutEndpoints.get(0)));
     assertTrue(xml.contains(metaData.idp.redirectBindingLogoutEndpoints.get(0)));
-    assertTrue(xml.contains("<ns2:IDPSSODescriptor protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
+    assertTrue(xml.contains("<ns2:IDPSSODescriptor WantAuthnRequestsSigned=\"true\" protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
 
     // Now parse it
     MetaData parsed = service.parseMetaData(xml);

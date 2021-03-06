@@ -318,6 +318,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     if (metaData.idp != null) {
       IDPSSODescriptorType idp = new IDPSSODescriptorType();
       idp.getProtocolSupportEnumeration().add("urn:oasis:names:tc:SAML:2.0:protocol");
+      idp.setWantAuthnRequestsSigned(metaData.idp.wantAuthnRequestsSigned);
 
       metaData.idp.redirectBindingSignInEndpoints.forEach(endpoint -> {
         EndpointType signIn = new EndpointType();

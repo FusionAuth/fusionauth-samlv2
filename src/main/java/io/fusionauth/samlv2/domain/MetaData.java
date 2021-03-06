@@ -38,6 +38,8 @@ public class MetaData {
     public List<String> redirectBindingLogoutEndpoints = new ArrayList<>();
 
     public List<String> redirectBindingSignInEndpoints = new ArrayList<>();
+
+    public boolean wantAuthnRequestsSigned;
   }
 
   public static class SPMetaData {
