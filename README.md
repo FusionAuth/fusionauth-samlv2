@@ -11,6 +11,11 @@ We are very interested in compensating anyone that can identify a security relat
 
 ### Disclosures
 
+- CSNC-2021-004 XML External Entity
+  - Thanks to [Compass Security](https://compass-security.com/) for responsibly disclosing this issue.
+  - See [CVE-2021-27736](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2021-27736)
+  - See [CSNC-2021-004](https://www.compass-security.com/fileadmin/Research/Advisories/2021-03_CSNC-2021-004_FusionAuth_SAML_Library_XML_External_Entity.txt)
+  - Affects versions prior to `0.5.4`, ensure you are using version `0.5.4` or later. 
 - CNSC-2020-002 Signature Exclusion Attack
   - Thanks to [Compass Security](https://compass-security.com/) for responsibly disclosing this issue.
   - See [CVE-2020-12676](https://cve.mitre.org/cgi-bin/cvename.cgi?name=CVE-2020-12676)
