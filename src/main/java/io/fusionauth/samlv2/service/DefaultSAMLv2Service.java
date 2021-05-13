@@ -209,7 +209,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         if (response.assertion.subject.subjectConfirmation != null) {
           SubjectConfirmationDataType dataType = new SubjectConfirmationDataType();
           dataType.setInResponseTo(response.assertion.subject.subjectConfirmation.inResponseTo);
-          dataType.setNotBefore(toXMLGregorianCalendar(response.assertion.subject.subjectConfirmation.notBefore));
+          // SAML Profiles 4.1.4.2 <Response> Usage
+          // - Subject Confirmation MUST NOT contain NotBefore.
           dataType.setNotOnOrAfter(toXMLGregorianCalendar(response.assertion.subject.subjectConfirmation.notOnOrAfter));
           dataType.setRecipient(response.assertion.subject.subjectConfirmation.recipient);
           SubjectConfirmationType subjectConfirmationType = new SubjectConfirmationType();
@@ -829,7 +830,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     if (data != null) {
       subjectConfirmation.address = data.getAddress();
       subjectConfirmation.inResponseTo = data.getInResponseTo();
-      subjectConfirmation.notBefore = toZonedDateTime(data.getNotBefore());
       subjectConfirmation.notOnOrAfter = toZonedDateTime(data.getNotOnOrAfter());
       subjectConfirmation.recipient = data.getRecipient();
     }

@@ -27,8 +27,6 @@ public class SubjectConfirmation {
 
   public ConfirmationMethod method;
 
-  public ZonedDateTime notBefore;
-
   public ZonedDateTime notOnOrAfter;
 
   public String recipient;
