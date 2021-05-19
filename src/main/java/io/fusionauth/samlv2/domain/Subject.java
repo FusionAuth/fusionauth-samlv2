@@ -15,8 +15,10 @@
  */
 package io.fusionauth.samlv2.domain;
 
+import java.util.List;
+
 public class Subject {
-  public NameID nameID;
+  public List<NameID> nameIDs;
 
   public SubjectConfirmation subjectConfirmation;
 }

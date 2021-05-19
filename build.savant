@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2014-2021, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,7 @@
  */
 savantVersion = "1.0.0"
 
-project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.5.7", licenses: ["ApacheV2_0"]) {
+project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.6.0", licenses: ["ApacheV2_0"]) {
   workflow {
     standard()
   }
@@ -26,14 +26,14 @@ project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.5.7", lic
 
   dependencies {
     group(name: "compile", export: false) {
-      dependency(id: "org.slf4j:slf4j-api:1.7.21")
+      dependency(id: "org.slf4j:slf4j-api:1.7.30")
       dependency(id: "jakarta.xml.bind:jakarta.xml.bind-api:2.3.2")
     }
     group(name: "runtime") {
       dependency(id: "org.glassfish.jaxb:jaxb-runtime:2.3.2")
     }
     group(name: "test-compile", export: false) {
-      dependency(id: "org.testng:testng:6.14.3")
+      dependency(id: "org.testng:testng:7.3.0")
     }
   }
 
@@ -44,8 +44,8 @@ project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.5.7", lic
 
 // Plugins
 dependency = loadPlugin(id: "org.savantbuild.plugin:dependency:1.0.2")
-java = loadPlugin(id: "org.savantbuild.plugin:java:1.0.2")
-javaTestNG = loadPlugin(id: "org.savantbuild.plugin:java-testng:1.0.5")
+java = loadPlugin(id: "org.savantbuild.plugin:java:1.2.0")
+javaTestNG = loadPlugin(id: "org.savantbuild.plugin:java-testng:1.0.8")
 idea = loadPlugin(id: "org.savantbuild.plugin:idea:1.0.1")
 release = loadPlugin(id: "org.savantbuild.plugin:release-git:${savantVersion}")
 

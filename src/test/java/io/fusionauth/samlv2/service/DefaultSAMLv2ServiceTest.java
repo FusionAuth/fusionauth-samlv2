@@ -44,6 +44,7 @@ import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.security.spec.X509EncodedKeySpec;
+import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
@@ -309,7 +310,6 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(fromEncoded.getValue().getID(), "foobarbaz");
     assertEquals(fromEncoded.getValue().getIssuer().getValue(), "https://local.fusionauth.io");
     assertEquals(fromEncoded.getValue().getVersion(), "2.0");
-    assertFalse(fromEncoded.getValue().getNameIDPolicy().isAllowCreate());
     assertFalse(fromEncoded.getValue().getNameIDPolicy().isAllowCreate());
 
     // For HTTP Redirect, pull out the RelayState and SigAlg values from the request parameter.
@@ -647,16 +647,18 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, true, KeySelector.singletonKeySelector(key));
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
-    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
-    assertTrue(ZonedDateTime.now().isAfter(response.assertion.conditions.notOnOrAfter));
-    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now()));
+    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(response.assertion.conditions.notOnOrAfter));
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
     assertEquals(response.status.code, ResponseStatus.Success);
     assertEquals(response.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
-    assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
+    assertNotNull(response.assertion.subject.nameIDs);
+    assertEquals(response.assertion.subject.nameIDs.size(), 1);
+    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress);
   }
 
   @Test
@@ -667,7 +669,7 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
     assertEquals(response.destination, "http://sp.example.com/demo1/index.php?acs");
-    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
+    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "http://idp.example.com/metadata.php");
     assertEquals(response.status.code, ResponseStatus.Success);
     assertEquals(response.assertion.attributes.get("uid").size(), 1);
@@ -683,7 +685,9 @@ public class DefaultSAMLv2ServiceTest {
     //  <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true" xsi:type="xs:string"/>
     assertEquals(response.assertion.attributes.get("PersonImmutableID").size(), 1);
     assertNull(response.assertion.attributes.get("PersonImmutableID").get(0));
-    assertEquals(response.assertion.subject.nameID.format, NameIDFormat.Transient);
+    assertNotNull(response.assertion.subject.nameIDs);
+    assertEquals(response.assertion.subject.nameIDs.size(), 1);
+    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.Transient);
   }
 
   @Test(dataProvider = "maxLineLength")
@@ -710,16 +714,18 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(withLineReturns, true, KeySelector.singletonKeySelector(key));
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
-    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
-    assertTrue(ZonedDateTime.now().isAfter(response.assertion.conditions.notOnOrAfter));
-    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now()));
+    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(response.assertion.conditions.notOnOrAfter));
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
     assertEquals(response.status.code, ResponseStatus.Success);
     assertEquals(response.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
-    assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
+    assertNotNull(response.assertion.subject.nameIDs);
+    assertEquals(response.assertion.subject.nameIDs.size(), 1);
+    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress);
   }
 
   @Test
@@ -926,16 +932,18 @@ public class DefaultSAMLv2ServiceTest {
     }
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
-    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now()));
-    assertTrue(ZonedDateTime.now().isAfter(response.assertion.conditions.notOnOrAfter));
-    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now()));
+    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(response.assertion.conditions.notOnOrAfter));
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
     assertEquals(response.status.code, ResponseStatus.Success);
     assertEquals(response.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
-    assertEquals(response.assertion.subject.nameID.format, NameIDFormat.EmailAddress);
+    assertNotNull(response.assertion.subject.nameIDs);
+    assertEquals(response.assertion.subject.nameIDs.size(), 1);
+    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress);
   }
 
   @DataProvider(name = "signatureLocation")
@@ -948,7 +956,7 @@ public class DefaultSAMLv2ServiceTest {
 
   private X509Certificate generateX509Certificate(KeyPair keyPair) throws IllegalArgumentException {
     try {
-      ZonedDateTime now = ZonedDateTime.now();
+      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       X509CertInfo certInfo = new X509CertInfo();
       CertificateX509Key certKey = new CertificateX509Key(keyPair.getPublic());
       certInfo.set(X509CertInfo.KEY, certKey);

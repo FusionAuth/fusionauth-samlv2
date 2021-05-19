@@ -70,6 +70,7 @@ import io.fusionauth.samlv2.domain.LogoutResponse;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.MetaData.IDPMetaData;
 import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
+import io.fusionauth.samlv2.domain.NameID;
 import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
@@ -198,11 +199,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         SubjectType subjectType = new SubjectType();
 
         // NameId (element)
-        if (response.assertion.subject.nameID != null) {
-          NameIDType nameIdType = new NameIDType();
-          nameIdType.setValue(response.assertion.subject.nameID.id);
-          nameIdType.setFormat(response.assertion.subject.nameID.format.toSAMLFormat());
-          subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createNameID(nameIdType));
+        if (response.assertion.subject.nameIDs != null) {
+          for (NameID nameId : response.assertion.subject.nameIDs) {
+            NameIDType nameIdType = new NameIDType();
+            nameIdType.setValue(nameId.id);
+            nameIdType.setFormat(nameId.format.toSAMLFormat());
+            subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createNameID(nameIdType));
+          }
         }
 
         // Subject confirmation (element)
@@ -620,13 +623,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         for (JAXBElement<?> element : elements) {
           Class<?> type = element.getDeclaredType();
           if (type == NameIDType.class) {
-            if (response.assertion.subject.nameID != null) {
-              logger.warn("SAML response contained multiple NameID elements. Only the first one was used.");
-              continue;
+            if (response.assertion.subject.nameIDs == null) {
+              response.assertion.subject.nameIDs = new ArrayList<>();
             }
 
             // Extract the name
-            response.assertion.subject.nameID = parseNameId((NameIDType) element.getValue());
+            response.assertion.subject.nameIDs.add(parseNameId((NameIDType) element.getValue()));
           } else if (type == SubjectConfirmationType.class) {
             // Extract the confirmation
             response.assertion.subject.subjectConfirmation = parseConfirmation((SubjectConfirmationType) element.getValue());
@@ -747,11 +749,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     authnRequest.setIssuer(new NameIDType());
     authnRequest.getIssuer().setValue(request.issuer);
     authnRequest.setNameIDPolicy(new NameIDPolicyType());
-    authnRequest.getNameIDPolicy().setFormat(NameIDFormat.EmailAddress.toSAMLFormat());
-    authnRequest.getNameIDPolicy().setAllowCreate(false);
+    // Default to EmailAddress for backwards compatibility
+    authnRequest.getNameIDPolicy().setFormat(request.nameIdFormat != null ? request.nameIdFormat.toSAMLFormat() : NameIDFormat.EmailAddress.toSAMLFormat());
+    if (request.allowCreate != null) {
+      authnRequest.getNameIDPolicy().setAllowCreate(request.allowCreate);
+    }
     authnRequest.setID(request.id);
     authnRequest.setVersion(version);
-    authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+    authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now(ZoneOffset.UTC))));
     return authnRequest;
   }
 
@@ -765,7 +770,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     logoutRequest.setID(request.id);
     logoutRequest.getSessionIndex().add(request.sessionIndex);
     logoutRequest.setVersion(version);
-    logoutRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+    logoutRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now(ZoneOffset.UTC))));
     return logoutRequest;
   }
 
@@ -777,7 +782,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     logoutResponse.setID(response.id);
     logoutResponse.setVersion(version);
     logoutResponse.setInResponseTo(response.inResponseTo);
-    logoutResponse.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now())));
+    logoutResponse.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now(ZoneOffset.UTC))));
     StatusType status = new StatusType();
     status.setStatusCode(new StatusCodeType());
     status.getStatusCode().setValue(response.status.code.toSAMLFormat());

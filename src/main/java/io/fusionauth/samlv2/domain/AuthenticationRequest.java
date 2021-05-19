@@ -23,5 +23,7 @@ package io.fusionauth.samlv2.domain;
 public class AuthenticationRequest extends SAMLRequest {
   public String acsURL;
 
+  public Boolean allowCreate = false;
+
   public NameIDFormat nameIdFormat;
 }
