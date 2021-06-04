@@ -57,7 +57,6 @@ import java.util.zip.Inflater;
 
 import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
 import io.fusionauth.samlv2.domain.NameID;
-import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.NameIDType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.KeyDescriptorType;
@@ -308,7 +307,7 @@ public class SAMLTools {
    */
   public static NameID parseNameId(NameIDType element) {
     NameID nameId = new NameID();
-    nameId.format = NameIDFormat.fromSAMLFormat(element.getFormat());
+    nameId.format = element.getFormat();
     nameId.id = element.getValue();
     return nameId;
   }

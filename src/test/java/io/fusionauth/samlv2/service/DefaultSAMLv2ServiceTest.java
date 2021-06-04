@@ -658,7 +658,7 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
     assertNotNull(response.assertion.subject.nameIDs);
     assertEquals(response.assertion.subject.nameIDs.size(), 1);
-    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress);
+    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
   }
 
   @Test
@@ -687,7 +687,7 @@ public class DefaultSAMLv2ServiceTest {
     assertNull(response.assertion.attributes.get("PersonImmutableID").get(0));
     assertNotNull(response.assertion.subject.nameIDs);
     assertEquals(response.assertion.subject.nameIDs.size(), 1);
-    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.Transient);
+    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.Transient.toSAMLFormat());
   }
 
   @Test(dataProvider = "maxLineLength")
@@ -725,7 +725,7 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
     assertNotNull(response.assertion.subject.nameIDs);
     assertEquals(response.assertion.subject.nameIDs.size(), 1);
-    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress);
+    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
   }
 
   @Test
@@ -943,7 +943,7 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
     assertNotNull(response.assertion.subject.nameIDs);
     assertEquals(response.assertion.subject.nameIDs.size(), 1);
-    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress);
+    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
   }
 
   @DataProvider(name = "signatureLocation")

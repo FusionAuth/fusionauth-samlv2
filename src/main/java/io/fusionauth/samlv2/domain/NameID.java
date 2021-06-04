@@ -16,7 +16,7 @@
 package io.fusionauth.samlv2.domain;
 
 public class NameID {
-  public NameIDFormat format;
+  public String format;
 
   public String id;
 }

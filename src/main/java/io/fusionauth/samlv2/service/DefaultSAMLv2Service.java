@@ -203,7 +203,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           for (NameID nameId : response.assertion.subject.nameIDs) {
             NameIDType nameIdType = new NameIDType();
             nameIdType.setValue(nameId.id);
-            nameIdType.setFormat(nameId.format.toSAMLFormat());
+            nameIdType.setFormat(nameId.format);
             subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createNameID(nameIdType));
           }
         }
