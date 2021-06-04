@@ -21,7 +21,7 @@ package io.fusionauth.samlv2.domain;
  * @author Daniel DeGroff
  */
 public class LogoutRequest extends SAMLRequest {
-  public NameIDFormat nameIdFormat;
+  public String nameIdFormat;
 
   public String sessionIndex;
 }

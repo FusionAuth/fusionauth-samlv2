@@ -860,9 +860,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     result.request.issueInstant = result.logoutRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
     NameIDType nameId = result.logoutRequest.getNameID();
     if (nameId == null) {
-      result.request.nameIdFormat = NameIDFormat.EmailAddress;
+      result.request.nameIdFormat = NameIDFormat.EmailAddress.toSAMLFormat();
     } else {
-      result.request.nameIdFormat = NameIDFormat.fromSAMLFormat(nameId.getFormat());
+      result.request.nameIdFormat = nameId.getFormat();
     }
     List<String> sessionIndex = result.logoutRequest.getSessionIndex();
     result.request.sessionIndex = sessionIndex.isEmpty() ? null : sessionIndex.get(0);

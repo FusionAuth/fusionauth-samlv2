@@ -396,7 +396,7 @@ public class DefaultSAMLv2ServiceTest {
         ? "ONELOGIN_21df91a89767879fc0f7df6a1490c6000c81644d"
         : "pfxd4d369e8-9ea1-780c-aff8-a1d11a9862a1");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
-    assertEquals(request.nameIdFormat, NameIDFormat.Transient);
+    assertEquals(request.nameIdFormat, NameIDFormat.Transient.toSAMLFormat());
     assertEquals(request.version, "2.0");
 
     String expectedXML = binding == Binding.HTTP_Redirect
@@ -803,7 +803,7 @@ public class DefaultSAMLv2ServiceTest {
         ? "ONELOGIN_21df91a89767879fc0f7df6a1490c6000c81644d"
         : "pfxd4d369e8-9ea1-780c-aff8-a1d11a9862a1");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
-    assertEquals(request.nameIdFormat, NameIDFormat.Transient);
+    assertEquals(request.nameIdFormat, NameIDFormat.Transient.toSAMLFormat());
     assertEquals(request.version, "2.0");
     String expectedXML = new String(bytes, StandardCharsets.UTF_8);
     assertEquals(request.xml.replace("\r\n", "\n"), expectedXML.replace("\r\n", "\n"));
