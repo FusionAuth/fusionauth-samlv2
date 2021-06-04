@@ -25,5 +25,5 @@ public class AuthenticationRequest extends SAMLRequest {
 
   public Boolean allowCreate = false;
 
-  public NameIDFormat nameIdFormat;
+  public String nameIdFormat;
 }

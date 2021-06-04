@@ -516,7 +516,7 @@ public class DefaultSAMLv2ServiceTest {
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
     assertEquals(request.version, "2.0");
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
@@ -536,7 +536,7 @@ public class DefaultSAMLv2ServiceTest {
     // No Name Policy present in the request, we will default to Email
     assertEquals(request.id, "id_4c6e5aa3");
     assertEquals(request.issuer, "https://medallia.com/sso/mlg");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
     assertEquals(request.version, "2.0");
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
@@ -573,7 +573,7 @@ public class DefaultSAMLv2ServiceTest {
 
     assertEquals(request.id, binding == Binding.HTTP_Redirect ? "ID_025417c8-50c8-4916-bfe0-e05694f8cea7" : "ID_26d69170-fc73-4b62-8bb6-c72769216134");
     assertEquals(request.issuer, "http://localhost:8080/auth/realms/master");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
     assertEquals(request.version, "2.0");
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
@@ -627,7 +627,7 @@ public class DefaultSAMLv2ServiceTest {
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
     assertEquals(request.version, "2.0");
     assertEquals(request.xml.replace("\r\n", "\n"), xml.replace("\r\n", "\n"));
   }
@@ -897,7 +897,7 @@ public class DefaultSAMLv2ServiceTest {
     // Parse the request
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
     assertEquals(request.version, "2.0");
   }
 

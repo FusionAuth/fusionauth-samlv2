@@ -750,7 +750,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     authnRequest.getIssuer().setValue(request.issuer);
     authnRequest.setNameIDPolicy(new NameIDPolicyType());
     // Default to EmailAddress for backwards compatibility
-    authnRequest.getNameIDPolicy().setFormat(request.nameIdFormat != null ? request.nameIdFormat.toSAMLFormat() : NameIDFormat.EmailAddress.toSAMLFormat());
+    authnRequest.getNameIDPolicy().setFormat(request.nameIdFormat != null ? request.nameIdFormat : NameIDFormat.EmailAddress.toSAMLFormat());
     if (request.allowCreate != null) {
       authnRequest.getNameIDPolicy().setAllowCreate(request.allowCreate);
     }
@@ -905,9 +905,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     result.request.issueInstant = result.authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
     NameIDPolicyType nameIdPolicyType = result.authnRequest.getNameIDPolicy();
     if (nameIdPolicyType == null) {
-      result.request.nameIdFormat = NameIDFormat.EmailAddress;
+      result.request.nameIdFormat = NameIDFormat.EmailAddress.toSAMLFormat();
     } else {
-      result.request.nameIdFormat = NameIDFormat.fromSAMLFormat(nameIdPolicyType.getFormat());
+      result.request.nameIdFormat = nameIdPolicyType.getFormat();
     }
     result.request.version = result.authnRequest.getVersion();
     return result;
