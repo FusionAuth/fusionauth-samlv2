@@ -135,7 +135,7 @@ public class DefaultSAMLv2ServiceTest {
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     String xml = service.buildMetadataResponse(metaData);
-    System.out.println(xml);
+    // System.out.println(xml);
     assertTrue(xml.contains("_" + metaData.id));
     assertTrue(xml.contains(metaData.entityId));
     assertTrue(xml.contains(metaData.idp.postBindingSignInEndpoints.get(0)));
@@ -339,7 +339,7 @@ public class DefaultSAMLv2ServiceTest {
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     String xml = service.buildMetadataResponse(metaData);
-    System.out.println(xml);
+    // System.out.println(xml);
     assertTrue(xml.contains("_" + metaData.id));
     assertTrue(xml.contains(metaData.entityId));
     assertTrue(xml.contains(metaData.sp.acsEndpoint));
