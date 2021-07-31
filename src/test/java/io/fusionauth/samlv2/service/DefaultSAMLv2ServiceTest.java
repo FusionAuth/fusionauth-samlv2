@@ -902,7 +902,7 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test(dataProvider = "signatureLocation")
-  public void roundTripResponseSignedAssertion(SignatureLocation signatureLocation) throws Exception {
+  public void roundTripResponseSignedAssertion(SignatureLocation signatureLocation, boolean includeKeyInfoInResponse) throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
@@ -912,9 +912,9 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
-    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureLocation);
-    System.out.println(new String(Base64.getMimeDecoder().decode(encodedXML)));
-    response = service.parseResponse(encodedXML, true, KeySelector.singletonKeySelector(kp.getPublic()));
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureLocation, includeKeyInfoInResponse);
+    // System.out.println(new String(Base64.getMimeDecoder().decode(encodedXML)));
+    response = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
 
     // Assert the signature is in the correct location based upon the signature option provided.
     Document document = parseDocument(encodedXML);
@@ -949,8 +949,10 @@ public class DefaultSAMLv2ServiceTest {
   @DataProvider(name = "signatureLocation")
   public Object[][] signatureLocation() {
     return new Object[][]{
-        {SignatureLocation.Assertion},
-        {SignatureLocation.Response}
+        {SignatureLocation.Assertion, true},
+        {SignatureLocation.Assertion, false},
+        {SignatureLocation.Response, true},
+        {SignatureLocation.Response, false}
     };
   }
 

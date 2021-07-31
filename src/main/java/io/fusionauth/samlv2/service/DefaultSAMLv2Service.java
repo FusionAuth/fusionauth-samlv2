@@ -159,7 +159,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   @Override
   public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
                                    X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
-                                   SignatureLocation signatureOption) throws SAMLException {
+                                   SignatureLocation signatureOption, boolean includeKeyInfo) throws SAMLException {
     ResponseType jaxbResponse = new ResponseType();
 
     // Status (element)
@@ -306,7 +306,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         }
       }
 
-      String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore);
+      String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore, includeKeyInfo);
       return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
     } catch (Exception e) {
       throw new SAMLException("Unable to sign XML SAML response", e);
@@ -391,7 +391,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                       X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
       throws SAMLException {
     AuthnRequestType authnRequest = toAuthnRequest(request, "2.0");
-    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
+    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod, true);
   }
 
   @Override
@@ -399,7 +399,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                        X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
       throws SAMLException {
     LogoutRequestType logoutRequest = toLogoutRequest(request, "2.0");
-    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createLogoutRequest(logoutRequest), LogoutRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
+    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createLogoutRequest(logoutRequest), LogoutRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod, true);
 
   }
 
@@ -408,7 +408,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                         X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod)
       throws SAMLException {
     StatusResponseType logoutResponse = toLogoutResponse(response, "2.0");
-    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createLogoutResponse(logoutResponse), StatusResponseType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
+    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createLogoutResponse(logoutResponse), StatusResponseType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod, true);
   }
 
   @Override
@@ -686,13 +686,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
   <T> String buildPostRequest(JAXBElement<T> object, Class<T> type, boolean sign, PrivateKey privateKey,
                               X509Certificate certificate,
-                              Algorithm algorithm, String xmlSignatureC14nMethod) throws SAMLException {
+                              Algorithm algorithm, String xmlSignatureC14nMethod, boolean includeKeyInfo) throws SAMLException {
     Document document = marshallToDocument(object, type);
     try {
       Element toSign = document.getDocumentElement();
       String xml;
       if (sign) {
-        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null);
+        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null, includeKeyInfo);
       } else {
         xml = marshallToString(document);
       }
@@ -914,7 +914,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   private String signXML(PrivateKey privateKey, X509Certificate certificate, Algorithm algorithm,
-                         String xmlSignatureC14nMethod, Document document, Element toSign, Node insertBefore)
+                         String xmlSignatureC14nMethod, Document document, Element toSign, Node insertBefore,
+                         boolean includeKeyInfo)
       throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, MarshalException, XMLSignatureException, TransformerException {
     // Set the id attribute node. Yucky! Yuck!
     toSign.setIdAttributeNode(toSign.getAttributeNode("ID"), true);
@@ -937,7 +938,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         Collections.singletonList(ref));
     KeyInfoFactory kif = factory.getKeyInfoFactory();
     X509Data data = kif.newX509Data(Collections.singletonList(certificate));
-    KeyInfo ki = kif.newKeyInfo(Collections.singletonList(data));
+    // KeyInfo is optional. Using the provided boolean so we can test w/ and w/out
+    KeyInfo ki = includeKeyInfo ? kif.newKeyInfo(Collections.singletonList(data)) : null;
     XMLSignature signature = factory.newXMLSignature(si, ki);
 
     signature.sign(dsc);

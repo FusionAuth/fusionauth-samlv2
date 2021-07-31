@@ -35,7 +35,7 @@ public class DefaultSAMLv2TestService extends DefaultSAMLv2Service implements SA
                                                     X509Certificate certificate, Algorithm algorithm,
                                                     String xmlSignatureC14nMethod) throws SAMLException {
     AuthnRequestType authnRequest = toAuthnRequest(request, SamlTestVersion);
-    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
+    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createAuthnRequest(authnRequest), AuthnRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod, true);
   }
 
   @Override
@@ -43,7 +43,7 @@ public class DefaultSAMLv2TestService extends DefaultSAMLv2Service implements SA
                                                      X509Certificate certificate, Algorithm algorithm,
                                                      String xmlSignatureC14nMethod) throws SAMLException {
     LogoutRequestType logoutRequest = toLogoutRequest(request, SamlTestVersion);
-    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createLogoutRequest(logoutRequest), LogoutRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod);
+    return buildPostRequest(PROTOCOL_OBJECT_FACTORY.createLogoutRequest(logoutRequest), LogoutRequestType.class, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod, true);
   }
 
   @Override

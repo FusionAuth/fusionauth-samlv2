@@ -46,12 +46,13 @@ public interface SAMLv2Service {
    * @param algorithm              The signing algorithm to use (if any).
    * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
    * @param signatureLocation      The signature location that instructs where to place the signature in the response.
+   * @param includeKeyInfo         When true the KeyInfo element will be added to the response
    * @return The response base-64 encoded.
    * @throws SAMLException If any unrecoverable errors occur.
    */
   String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
                             X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
-                            SignatureLocation signatureLocation)
+                            SignatureLocation signatureLocation, boolean includeKeyInfo)
       throws SAMLException;
 
   /**
