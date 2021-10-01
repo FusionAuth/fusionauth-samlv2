@@ -124,13 +124,13 @@ public class SAMLTools {
   }
 
   /**
-   * Decode the encoded request.
+   * Decode the encoded request or response.
    *
-   * @param encodedRequest the encoded request
+   * @param base64Encoded the encoded request or response
    * @return a decoded and request as bytes
    */
-  public static byte[] decode(String encodedRequest) {
-    return Base64.getMimeDecoder().decode(encodedRequest);
+  public static byte[] decode(String base64Encoded) {
+    return Base64.getMimeDecoder().decode(base64Encoded);
   }
 
   /**
@@ -160,6 +160,16 @@ public class SAMLTools {
     } catch (DataFormatException e) {
       throw new SAMLException("Invalid AuthnRequest. Inflating the bytes failed.", e);
     }
+  }
+
+  /**
+   * Decode the encoded request or response to a String.
+   *
+   * @param base64Encoded the encoded request or response
+   * @return a decoded and request as a string
+   */
+  public static String decodeToString(String base64Encoded) {
+    return new String(Base64.getMimeDecoder().decode(base64Encoded), StandardCharsets.UTF_8);
   }
 
   /**
