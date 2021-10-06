@@ -28,6 +28,6 @@ public class SAMLToolsTest {
     // Ensure we can handle a truncated deflated AuthN request.
     // - As long as this test doesn't hang we are good.
     String truncated = "fVPBjpswEL1X6j8g7gHDJqFYSSqaqGqkbRcF2kMvlWsPjSVsU3vYTf++hk22qbSEC5L95s2b9zwrx1Tb0aLHoz7A7x4cBifVakfHi3XYW00Nc9JRzRQ4ipxWxed7mkaEdtag4aYN374JXvn+8dymYc6BRWn0BM9+tw5/vCN5RrKGkDvCFoKQZUp4LnLR5FmzTDPWQC44T+cTHN/AOt9hHfqGE5DSmkcpwH7xAtdhVQbozZiS5FwPe+2QafScJJnPSDZLlnV6RxcpnS++TxTuPKfUDEctR8SOxrEUXQQnproWIm5UXFUPFdhHySHqjt202tH7D1ILqX/ddvjnM8jRT3VdzsqHqp5gLS5RbI12vQJ7FvL1cP8i1/2vVoAySewbwGmQ+55xF24G9tWQPB2dsptbtQqQCYZsKF/F11UvNB0dUtnvStNK/if4aKxiOD1zEiXjiRSzZoRSUEy2hRAWnAuDom3N09YCQ5802h7C+LrXeRFAjGvhrUA4YbA1qmNWuiE5PwTH5zEvg15jt61/";
-    byte[] bytes = SAMLTools.decodeAndInflate(truncated);
+    SAMLTools.decodeAndInflate(truncated);
   }
 }

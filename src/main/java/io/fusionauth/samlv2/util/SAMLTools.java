@@ -146,14 +146,11 @@ public class SAMLTools {
 
     try {
       ByteArrayOutputStream os = new ByteArrayOutputStream();
-      byte[] result = new byte[bytes.length];
-      while (!inflater.finished()) {
-        int length = inflater.inflate(result);
+      byte[] buf = new byte[1024];
+      while (inflater.getRemaining() > 0) {
+        int length = inflater.inflate(buf);
         if (length > 0) {
-          os.write(result, 0, length);
-        } else {
-          // 0 bytes inflated, fail-safe in case we have a truncated request that is never 'finished'.
-          break;
+          os.write(buf, 0, length);
         }
       }
 
