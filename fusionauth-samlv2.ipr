@@ -49,6 +49,67 @@
           </value>
         </option>
       </inspection_tool>
+      <inspection_tool class="scwbasic-protection-set_CryptoCipherInsecureAsymmetricCryptographicAlgorithm" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_CryptoKeyAgreementGuideonApprovedCryptographicAlgorithm" enabled="true" level="SENSEI MARKED INFO" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_CryptoKeyAgreementInsecureCryptographicAlgorithm" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_CryptoKeyPairGenerationApprovedStandardCryptographicAlgorithm" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_CryptoKeyPairGenerationInsecureCryptographicAlgorithm" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_CryptoKeyPairGenerationNonStandardCryptographicAlgorithm" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_CryptoSignatureApprovedHashingAlgorithm" enabled="true" level="SENSEI MARKED INFO" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_CryptoSignatureInsecureHashingAlgorithm" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_CryptoSignatureNonStandardHashingAlgorithm" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidbruteforcingUsesufficientlylongkeysizeskeyGenerator" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUseappropriatekeypairgenerationalgorithminsecure" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUseappropriatekeypairgenerationalgorithmnotrecommended" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUseappropriatesecretkeygenerationalgorithmDESfamily" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUseappropriatesecretkeygenerationalgorithmHmacfamily" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUseappropriatesecretkeygenerationalgorithmOtheralgorithms" enabled="true" level="SENSEI MARKED INFO" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUseappropriatesecretkeygenerationalgorithminsecureSecretKeyFactory" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUseappropriatesecretkeygenerationalgorithmotherSecretKeyFactory" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUsestrongsymmetriccryptographicalgorithm" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUsestrongsymmetriccryptographicalgorithmUntrusted" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUsesufficientlylongkeysizeskeyGeneratorbadvalue" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUsesufficientlylongkeysizeskeyPairGenerator" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-CryptographyAvoidcryptographicweaknessUsesufficientlylongkeysizeskeyPairGeneratorbadvalue" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_DataProtection-SecureDataStorageAvoiddataexposureUseCipherinsteadofNullCipher" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_InjectionAvoidCodeInjectionUseSafeConstructor1stargumentoftypeConstructor" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_InjectionAvoidCodeInjectionUseSafeConstructorargumentsbutnoConstructorargument" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_InjectionAvoidCodeInjectionUseSafeConstructornoarguments" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_InjectionAvoidSQLInjectionUseParameterizedQueriesPreparedStatement" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_InjectionAvoidSQLInjectionUseParameterizedQueriesStatement" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XMLInjectionSetmissingsecureprocessingfeature" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XMLInjectionSetsecureprocessingfeaturetotrue" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEDocumentBuilderFactoryAddmissingfeaturedissallow-doctype-decl" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEDocumentBuilderFactoryAddmissingfeatureexternal-parameter-entities" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEDocumentBuilderFactoryAddmissingfeatureload-external-dtd" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEDocumentBuilderFactoryAddmissingfeaturesetExpandEntityReferences" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEDocumentBuilderFactoryAddmissingfeaturesetXIncludeAware" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEDocumentBuilderFactorySetfeaturestofalse" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEDocumentBuilderFactorySetfeaturestotrue" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEDocumentBuilderFactorySetterstofalse" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEXMLInputFactoryAddIS_SUPPORTING_EXTERNAL_ENTITIESfeature" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEXMLInputFactoryAddSUPPORT_DTDfeature" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwbasic-protection-set_XXEXMLInputFactorySetfeaturestofalse" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwjava_CollectionsDonotexposeinternalLists" enabled="true" level="SENSEI MARKED INFO" enabled_by_default="true" />
+      <inspection_tool class="scwjava_CollectionsDonotexposeinternalSets" enabled="true" level="SENSEI MARKED INFO" enabled_by_default="true" />
+      <inspection_tool class="scwjava_Createprivateconstructorforutilityclassallfieldsmethodsarestatic" enabled="true" level="SENSEI INFO" enabled_by_default="true" />
+      <inspection_tool class="scwjava_Donotcompareclassestypesbytheirname" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_Donotcompareclassestypesbytheirnameliteral" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_Donotcompareclassestypesbytheirnameliteralinverted" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_Donotexposeinternalarray" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_ExceptionCreatedbutnotthrown" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_Incorrectequalitycheckofwrappervaluesequals" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwjava_Incorrectequalitycheckofwrappervaluesnotequals" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwjava_IncorrectuseofObjects.equals" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_InefficientuseofString.indexOf" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_InvalidcomparisonofStringtonumberprimitive" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwjava_InvalidcomparisonofStringtonumberwrapper" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwjava_PortabilityFlawAvoidlocaledependentcomparisonsequalsaftercaseconversion" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_RegexInjection" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwjava_String.formatreturnvaluebeingignored" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_StringsRegexUseEscapeRegexSpecialCharacterforAnyCharMatching" enabled="true" level="SENSEI ERROR" enabled_by_default="true" />
+      <inspection_tool class="scwjava_URLClassloaderCallsuperwhenoverridinggetPermissions" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
+      <inspection_tool class="scwjava_ValidateZipEntries" enabled="true" level="SENSEI WARNING" enabled_by_default="true" />
     </profile>
     <version value="1.0" />
   </component>
@@ -283,10 +344,12 @@
         </value>
       </option>
       <option name="WRAP_COMMENTS" value="true" />
-      <DB2CodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <DB2CodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -318,10 +381,12 @@
         <option name="EXPR_CASE_THEN_WRAP" value="true" />
         <option name="PRIMARY_KEY_NAME_TEMPLATE" value="{table}_{columns}_pk" />
       </DB2CodeStyleSettings>
-      <DerbyCodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <DerbyCodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -357,10 +422,12 @@
         <option name="CLASS_COUNT_TO_USE_IMPORT_ON_DEMAND" value="9999" />
         <option name="NAMES_COUNT_TO_USE_IMPORT_ON_DEMAND" value="9999" />
       </GroovyCodeStyleSettings>
-      <H2CodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <H2CodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -392,10 +459,12 @@
         <option name="EXPR_CASE_THEN_WRAP" value="true" />
         <option name="PRIMARY_KEY_NAME_TEMPLATE" value="{table}_{columns}_pk" />
       </H2CodeStyleSettings>
-      <HSQLCodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <HSQLCodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -443,10 +512,12 @@
           </value>
         </option>
       </JavaCodeStyleSettings>
-      <MSSQLCodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <MSSQLCodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -481,10 +552,12 @@
       <MarkdownNavigatorCodeStyleSettings>
         <option name="RIGHT_MARGIN" value="72" />
       </MarkdownNavigatorCodeStyleSettings>
-      <MySQLCodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <MySQLCodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -516,10 +589,12 @@
         <option name="EXPR_CASE_THEN_WRAP" value="true" />
         <option name="PRIMARY_KEY_NAME_TEMPLATE" value="{table}_{columns}_pk" />
       </MySQLCodeStyleSettings>
-      <OracleCodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <OracleCodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -551,10 +626,12 @@
         <option name="EXPR_CASE_THEN_WRAP" value="true" />
         <option name="PRIMARY_KEY_NAME_TEMPLATE" value="{table}_{columns}_pk" />
       </OracleCodeStyleSettings>
-      <PostgresCodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <PostgresCodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -586,10 +663,12 @@
         <option name="EXPR_CASE_THEN_WRAP" value="true" />
         <option name="PRIMARY_KEY_NAME_TEMPLATE" value="{table}_{columns}_pk" />
       </PostgresCodeStyleSettings>
-      <SQLiteCodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <SQLiteCodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -624,10 +703,11 @@
       <ScalaCodeStyleSettings>
         <option name="MULTILINE_STRING_CLOSING_QUOTES_ON_NEW_LINE" value="true" />
       </ScalaCodeStyleSettings>
-      <SqlCodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <SqlCodeStyleSettings version="5">
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -664,10 +744,12 @@
         <option name="WRAP_INSIDE_WHERE" value="5" />
         <option name="WRAP_INSIDE_SET" value="5" />
       </SqlCodeStyleSettings>
-      <SybaseCodeStyleSettings version="0">
-        <option name="myVersion" value="0" />
-        <option name="ALIAS_CASE" value="4" />
+      <SybaseCodeStyleSettings version="5">
+        <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
+        <option name="CUSTOM_TYPE_CASE" value="3" />
+        <option name="ALIAS_CASE" value="4" />
+        <option name="BUILT_IN_CASE" value="0" />
         <option name="QUERY_TRUE_INDENT" value="false" />
         <option name="QUERY_ALIGN_ELEMENTS" value="false" />
         <option name="QUERY_ALIGN_LINE_COMMENTS" value="false" />
@@ -702,13 +784,6 @@
       <XML>
         <option name="XML_LEGACY_SETTINGS_IMPORTED" value="true" />
       </XML>
-      <codeStyleSettings language="CSS">
-        <indentOptions>
-          <option name="INDENT_SIZE" value="2" />
-          <option name="CONTINUATION_INDENT_SIZE" value="4" />
-          <option name="TAB_SIZE" value="2" />
-        </indentOptions>
-      </codeStyleSettings>
       <codeStyleSettings language="ECMA Script Level 4">
         <indentOptions>
           <option name="INDENT_SIZE" value="2" />
@@ -1478,7 +1553,7 @@
     <resource url="urn:oasis:names:tc:SAML:2.0:assertion" location="$PROJECT_DIR$/src/main/xsd/saml-schema-assertion-2.0.xsd" />
     <default-html-doctype>http://www.w3.org/1999/xhtml</default-html-doctype>
   </component>
-  <component name="ProjectRootManager" version="2" languageLevel="JDK_1_8" default="false" project-jdk-name="Java 1.8" project-jdk-type="JavaSDK">
+  <component name="ProjectRootManager" version="2" languageLevel="JDK_1_8" project-jdk-name="Java 1.8" project-jdk-type="JavaSDK">
     <output url="file://$PROJECT_DIR$/out" />
   </component>
   <component name="SvnBranchConfigurationManager">
