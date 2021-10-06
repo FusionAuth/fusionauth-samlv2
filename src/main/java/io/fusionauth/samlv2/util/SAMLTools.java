@@ -76,17 +76,16 @@ import static javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING;
  * @author Daniel DeGroff
  */
 public class SAMLTools {
-  private static final Map<String, Boolean> FactoryAttributes = new HashMap<>();
+  private static final Map<String, Boolean> FactoryFeatures = new HashMap<>();
 
   private static final Logger logger = LoggerFactory.getLogger(SAMLTools.class);
 
   static {
-    FactoryAttributes.put("http://xml.org/sax/features/external-general-entities", false);
-    FactoryAttributes.put("http://xml.org/sax/features/external-parameter-entities", false);
-    FactoryAttributes.put("http://apache.org/xml/features/disallow-doctype-decl", true);
-    FactoryAttributes.put("http://javax.xml.XMLConstants/feature/secure-processing", true);
-    FactoryAttributes.put("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
-    FactoryAttributes.put("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
+    FactoryFeatures.put("http://apache.org/xml/features/disallow-doctype-decl", true);
+    FactoryFeatures.put("http://apache.org/xml/features/nonvalidating/load-external-dtd", false);
+    FactoryFeatures.put("http://apache.org/xml/features/nonvalidating/load-dtd-grammar", false);
+    FactoryFeatures.put("http://xml.org/sax/features/external-general-entities", false);
+    FactoryFeatures.put("http://xml.org/sax/features/external-parameter-entities", false);
   }
 
   /**
@@ -144,7 +143,6 @@ public class SAMLTools {
     byte[] bytes = Base64.getMimeDecoder().decode(encodedRequest);
     Inflater inflater = new Inflater(true);
     inflater.setInput(bytes);
-    inflater.finished();
 
     try {
       ByteArrayOutputStream os = new ByteArrayOutputStream();
@@ -153,6 +151,9 @@ public class SAMLTools {
         int length = inflater.inflate(result);
         if (length > 0) {
           os.write(result, 0, length);
+        } else {
+          // 0 bytes inflated, fail-safe in case we have a truncated request that is never 'finished'.
+          break;
         }
       }
 
@@ -251,6 +252,7 @@ public class SAMLTools {
   public static String marshallToString(Document document) throws TransformerException {
     StringWriter sw = new StringWriter();
     TransformerFactory tf = TransformerFactory.newInstance();
+    tf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     Transformer transformer = tf.newTransformer();
     transformer.transform(new DOMSource(document), new StreamResult(sw));
     return sw.toString();
@@ -274,13 +276,13 @@ public class SAMLTools {
       // Do not expand entity references
       dbf.setExpandEntityReferences(false);
 
-      // Set default attributes
-      for (String key : FactoryAttributes.keySet()) {
+      // Set default features
+      for (String key : FactoryFeatures.keySet()) {
         try {
-          dbf.setAttribute(key, FactoryAttributes.get(key));
+          dbf.setFeature(key, FactoryFeatures.get(key));
         } catch (IllegalArgumentException e) {
           // The parser may not recognize this attribute.
-          logger.debug("Failed to set attribute [" + key + "=" + FactoryAttributes.get(key) + "]. This may be expected if the parser does not recognize this attribute.", e);
+          logger.debug("Failed to set feature [" + key + "=" + FactoryFeatures.get(key) + "]. This may be expected if the parser does not recognize this feature.", e);
         }
       }
 
@@ -415,7 +417,9 @@ public class SAMLTools {
   public static boolean validate(Document document, URL schemaURI, SchemaValidationErrors errors) throws SAMLException {
     Schema schema;
     try {
-      schema = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI).newSchema(schemaURI);
+      SchemaFactory schemaFactory = SchemaFactory.newInstance(XMLConstants.W3C_XML_SCHEMA_NS_URI);
+      schemaFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+      schema = schemaFactory.newSchema(schemaURI);
     } catch (SAXException e) {
       throw new SAMLException("An invalid schema was requested. Schema [" + schemaURI + "].", e);
     }
