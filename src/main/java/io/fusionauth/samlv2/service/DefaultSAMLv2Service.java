@@ -50,7 +50,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
-import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -58,7 +57,6 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
-import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
@@ -741,7 +739,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return buildRedirect(object, type, relayState, sign, key, algorithm, "SAMLResponse");
   }
 
-  AuthnRequestType toAuthnRequest(AuthenticationRequest request, String version) {
+  AuthnRequestType toAuthnRequest(AuthenticationRequest request, String version) throws SAMLException {
     // SAML Web SSO profile requirements (section 4.1.4.1)
     AuthnRequestType authnRequest = new AuthnRequestType();
     authnRequest.setAssertionConsumerServiceURL(request.acsURL);
@@ -756,11 +754,11 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
     authnRequest.setID(request.id);
     authnRequest.setVersion(version);
-    authnRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now(ZoneOffset.UTC))));
+    authnRequest.setIssueInstant(SAMLTools.toXMLGregorianCalendar(ZonedDateTime.now(ZoneOffset.UTC)));
     return authnRequest;
   }
 
-  LogoutRequestType toLogoutRequest(LogoutRequest request, String version) {
+  LogoutRequestType toLogoutRequest(LogoutRequest request, String version) throws SAMLException {
     LogoutRequestType logoutRequest = new LogoutRequestType();
     logoutRequest.setDestination(request.destination);
     logoutRequest.setIssuer(new NameIDType());
@@ -770,11 +768,11 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     logoutRequest.setID(request.id);
     logoutRequest.getSessionIndex().add(request.sessionIndex);
     logoutRequest.setVersion(version);
-    logoutRequest.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now(ZoneOffset.UTC))));
+    logoutRequest.setIssueInstant(SAMLTools.toXMLGregorianCalendar(ZonedDateTime.now(ZoneOffset.UTC)));
     return logoutRequest;
   }
 
-  StatusResponseType toLogoutResponse(LogoutResponse response, String version) {
+  StatusResponseType toLogoutResponse(LogoutResponse response, String version) throws SAMLException {
     StatusResponseType logoutResponse = new StatusResponseType();
     logoutResponse.setDestination(response.destination);
     logoutResponse.setIssuer(new NameIDType());
@@ -782,7 +780,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     logoutResponse.setID(response.id);
     logoutResponse.setVersion(version);
     logoutResponse.setInResponseTo(response.inResponseTo);
-    logoutResponse.setIssueInstant(new XMLGregorianCalendarImpl(GregorianCalendar.from(ZonedDateTime.now(ZoneOffset.UTC))));
+    logoutResponse.setIssueInstant(SAMLTools.toXMLGregorianCalendar(ZonedDateTime.now(ZoneOffset.UTC)));
     StatusType status = new StatusType();
     status.setStatusCode(new StatusCodeType());
     status.getStatusCode().setValue(response.status.code.toSAMLFormat());

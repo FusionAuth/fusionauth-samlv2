@@ -21,6 +21,8 @@ import javax.xml.bind.JAXBElement;
 import javax.xml.bind.JAXBException;
 import javax.xml.bind.Marshaller;
 import javax.xml.bind.Unmarshaller;
+import javax.xml.datatype.DatatypeConfigurationException;
+import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -55,7 +57,6 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
-import com.sun.org.apache.xerces.internal.jaxp.datatype.XMLGregorianCalendarImpl;
 import io.fusionauth.samlv2.domain.NameID;
 import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.NameIDType;
@@ -360,12 +361,16 @@ public class SAMLTools {
    * @param instant the instant
    * @return a calendar object.
    */
-  public static XMLGregorianCalendar toXMLGregorianCalendar(ZonedDateTime instant) {
+  public static XMLGregorianCalendar toXMLGregorianCalendar(ZonedDateTime instant) throws SAMLException {
     if (instant == null) {
       return null;
     }
 
-    return new XMLGregorianCalendarImpl(GregorianCalendar.from(instant));
+    try {
+      return DatatypeFactory.newInstance().newXMLGregorianCalendar(GregorianCalendar.from(instant));
+    } catch (DatatypeConfigurationException e) {
+      throw new SAMLException("Unable to initiate DataTypeFactor.", e);
+    }
   }
 
   /**
