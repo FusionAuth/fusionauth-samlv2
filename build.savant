@@ -15,7 +15,10 @@
  */
 savantVersion = "1.0.0"
 
-project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.6.6", licenses: ["ApacheV2_0"]) {
+glassFishVersion = "3.0.2"
+jakartaXMLBindVersion = "3.0.1"
+
+project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.7.0", licenses: ["ApacheV2_0"]) {
   workflow {
     standard()
   }
@@ -25,15 +28,15 @@ project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.6.6", lic
   }
 
   dependencies {
-    group(name: "compile", export: false) {
+    group(name: "compile") {
+      dependency(id: "jakarta.xml.bind:jakarta.xml.bind-api:${jakartaXMLBindVersion}")
       dependency(id: "org.slf4j:slf4j-api:1.7.30")
-      dependency(id: "jakarta.xml.bind:jakarta.xml.bind-api:2.3.2")
-    }
-    group(name: "runtime") {
-      dependency(id: "org.glassfish.jaxb:jaxb-runtime:2.3.2")
     }
     group(name: "test-compile", export: false) {
       dependency(id: "org.testng:testng:7.3.0")
+    }
+    group(name: "test-runtime", export: false) {
+      dependency(id: "org.glassfish.jaxb:jaxb-runtime:${glassFishVersion}")
     }
   }
 
@@ -45,21 +48,24 @@ project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.6.6", lic
 // Plugins
 dependency = loadPlugin(id: "org.savantbuild.plugin:dependency:1.0.2")
 java = loadPlugin(id: "org.savantbuild.plugin:java:1.2.0")
-javaTestNG = loadPlugin(id: "org.savantbuild.plugin:java-testng:1.0.8")
+javaTestNG = loadPlugin(id: "org.savantbuild.plugin:java-testng:1.0.9")
 idea = loadPlugin(id: "org.savantbuild.plugin:idea:1.0.1")
 release = loadPlugin(id: "org.savantbuild.plugin:release-git:${savantVersion}")
 
-java.settings.javaVersion = "1.8"
-javaTestNG.settings.javaVersion = "1.8"
+java.settings.javaVersion = "17"
+javaTestNG.settings.javaVersion = "17"
 
 target(name: "clean", description: "Cleans the project") {
   java.clean()
 }
 
 target(name: "compile", description: "Compiles the project") {
+  java.settings.compilerArguments = ""
+  java.compileMain()
+
   // Once we remove the use of the sun.security.x509 and other private classes, we can remove the ignore.symbols.file
-  java.settings.compilerArguments = "-XDignore.symbol.file"
-  java.compile()
+  java.settings.compilerArguments = "-XDignore.symbol.file --add-exports java.base/sun.security.x509=ALL-UNNAMED --add-exports java.base/sun.security.util=ALL-UNNAMED"
+  java.compileTest()
 }
 
 target(name: "jar", description: "JARs the project", dependsOn: ["compile"]) {
@@ -67,7 +73,7 @@ target(name: "jar", description: "JARs the project", dependsOn: ["compile"]) {
 }
 
 target(name: "test", description: "Runs the project's tests", dependsOn: ["jar"]) {
-  javaTestNG.settings.jvmArguments = "-Dcom.sun.org.apache.xml.internal.security.ignoreLineBreaks=true"
+  javaTestNG.settings.jvmArguments = "-Dcom.sun.org.apache.xml.internal.security.ignoreLineBreaks=true --add-exports java.base/sun.security.x509=ALL-UNNAMED --add-exports java.base/sun.security.util=ALL-UNNAMED"
   javaTestNG.test()
 }
 

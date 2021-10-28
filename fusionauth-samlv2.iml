@@ -28,11 +28,11 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/.savant/cache/jakarta/xml/bind/jakarta.xml.bind-api/2.3.2/jakarta.xml.bind-api-2.3.2.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/jakarta/xml/bind/jakarta.xml.bind-api/3.0.1/jakarta.xml.bind-api-3.0.1.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$USER_HOME$/.savant/cache/jakarta/xml/bind/jakarta.xml.bind-api/2.3.2/jakarta.xml.bind-api-2.3.2-src.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/jakarta/xml/bind/jakarta.xml.bind-api/3.0.1/jakarta.xml.bind-api-3.0.1-src.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
@@ -213,66 +213,55 @@
     <orderEntry type="module-library" scope="RUNTIME">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/jaxb-runtime/2.3.2/jaxb-runtime-2.3.2.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/jaxb-runtime/3.0.2/jaxb-runtime-3.0.2.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/jaxb-runtime/2.3.2/jaxb-runtime-2.3.2-src.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/jaxb-runtime/3.0.2/jaxb-runtime-3.0.2-src.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="RUNTIME">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/.savant/cache/com/sun/xml/fastinfoset/FastInfoset/1.2.16/FastInfoset-1.2.16.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/jaxb-core/3.0.2/jaxb-core-3.0.2.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$USER_HOME$/.savant/cache/com/sun/xml/fastinfoset/FastInfoset/1.2.16/FastInfoset-1.2.16-src.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/jaxb-core/3.0.2/jaxb-core-3.0.2-src.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="RUNTIME">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/.savant/cache/com/sun/istack/istack-commons-runtime/3.0.8/istack-commons-runtime-3.0.8.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/com/sun/activation/jakarta.activation/2.0.1/jakarta.activation-2.0.1.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$USER_HOME$/.savant/cache/com/sun/istack/istack-commons-runtime/3.0.8/istack-commons-runtime-3.0.8-src.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/com/sun/activation/jakarta.activation/2.0.1/jakarta.activation-2.0.1-src.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="RUNTIME">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/.savant/cache/jakarta/activation/jakarta.activation-api/1.2.1/jakarta.activation-api-1.2.1.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/txw2/3.0.2/txw2-3.0.2.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$USER_HOME$/.savant/cache/jakarta/activation/jakarta.activation-api/1.2.1/jakarta.activation-api-1.2.1-src.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/txw2/3.0.2/txw2-3.0.2-src.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
     <orderEntry type="module-library" scope="RUNTIME">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/txw2/2.3.2/txw2-2.3.2.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/com/sun/istack/istack-commons-runtime/4.0.1/istack-commons-runtime-4.0.1.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/txw2/2.3.2/txw2-2.3.2-src.jar!/" />
-        </SOURCES>
-      </library>
-    </orderEntry>
-    <orderEntry type="module-library" scope="RUNTIME">
-      <library>
-        <CLASSES>
-          <root url="jar://$USER_HOME$/.savant/cache/org/jvnet/staxex/stax-ex/1.8.1/stax-ex-1.8.1.jar!/" />
-        </CLASSES>
-        <JAVADOC />
-        <SOURCES>
-          <root url="jar://$USER_HOME$/.savant/cache/org/jvnet/staxex/stax-ex/1.8.1/stax-ex-1.8.1-src.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/com/sun/istack/istack-commons-runtime/4.0.1/istack-commons-runtime-4.0.1-src.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
