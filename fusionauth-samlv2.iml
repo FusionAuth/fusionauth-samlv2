@@ -17,11 +17,11 @@
     <orderEntry type="module-library">
       <library>
         <CLASSES>
-          <root url="jar://$USER_HOME$/.savant/cache/org/slf4j/slf4j-api/1.7.30/slf4j-api-1.7.30.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/org/slf4j/slf4j-api/2.0.0-alpha5/slf4j-api-2.0.0-alpha5.jar!/" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
-          <root url="jar://$USER_HOME$/.savant/cache/org/slf4j/slf4j-api/1.7.30/slf4j-api-1.7.30-src.jar!/" />
+          <root url="jar://$USER_HOME$/.savant/cache/org/slf4j/slf4j-api/2.0.0-alpha5/slf4j-api-2.0.0-alpha5-src.jar!/" />
         </SOURCES>
       </library>
     </orderEntry>
@@ -210,7 +210,7 @@
         </SOURCES>
       </library>
     </orderEntry>
-    <orderEntry type="module-library" scope="RUNTIME">
+    <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
           <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/jaxb-runtime/3.0.2/jaxb-runtime-3.0.2.jar!/" />
@@ -221,7 +221,7 @@
         </SOURCES>
       </library>
     </orderEntry>
-    <orderEntry type="module-library" scope="RUNTIME">
+    <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
           <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/jaxb-core/3.0.2/jaxb-core-3.0.2.jar!/" />
@@ -232,7 +232,7 @@
         </SOURCES>
       </library>
     </orderEntry>
-    <orderEntry type="module-library" scope="RUNTIME">
+    <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
           <root url="jar://$USER_HOME$/.savant/cache/com/sun/activation/jakarta.activation/2.0.1/jakarta.activation-2.0.1.jar!/" />
@@ -243,7 +243,7 @@
         </SOURCES>
       </library>
     </orderEntry>
-    <orderEntry type="module-library" scope="RUNTIME">
+    <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
           <root url="jar://$USER_HOME$/.savant/cache/org/glassfish/jaxb/txw2/3.0.2/txw2-3.0.2.jar!/" />
@@ -254,7 +254,7 @@
         </SOURCES>
       </library>
     </orderEntry>
-    <orderEntry type="module-library" scope="RUNTIME">
+    <orderEntry type="module-library" scope="TEST">
       <library>
         <CLASSES>
           <root url="jar://$USER_HOME$/.savant/cache/com/sun/istack/istack-commons-runtime/4.0.1/istack-commons-runtime-4.0.1.jar!/" />
