@@ -8,22 +8,22 @@
 
 package io.fusionauth.samlv2.domain.jaxb.oasis.protocol;
 
-import javax.xml.bind.annotation.XmlAccessType;
-import javax.xml.bind.annotation.XmlAccessorType;
-import javax.xml.bind.annotation.XmlAttribute;
-import javax.xml.bind.annotation.XmlElement;
-import javax.xml.bind.annotation.XmlRootElement;
-import javax.xml.bind.annotation.XmlSchemaType;
-import javax.xml.bind.annotation.XmlType;
+import jakarta.xml.bind.annotation.XmlAccessType;
+import jakarta.xml.bind.annotation.XmlAccessorType;
+import jakarta.xml.bind.annotation.XmlAttribute;
+import jakarta.xml.bind.annotation.XmlElement;
+import jakarta.xml.bind.annotation.XmlRootElement;
+import jakarta.xml.bind.annotation.XmlSchemaType;
+import jakarta.xml.bind.annotation.XmlType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.ConditionsType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectType;
 
 
 /**
  * <p>Java class for AuthnRequestType complex type.
- * 
+ *
  * <p>The following schema fragment specifies the expected content contained within this class.
- * 
+ *
  * <pre>
  * &lt;complexType name="AuthnRequestType">
  *   &lt;complexContent>
@@ -46,8 +46,8 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.SubjectType;
  *   &lt;/complexContent>
  * &lt;/complexType>
  * </pre>
- * 
- * 
+ *
+ *
  */
 @XmlAccessorType(XmlAccessType.FIELD)
 @XmlType(name = "AuthnRequestType", propOrder = {
@@ -93,11 +93,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the subject property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link SubjectType }
-     *     
+     *
      */
     public SubjectType getSubject() {
         return subject;
@@ -105,11 +105,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the subject property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link SubjectType }
-     *     
+     *
      */
     public void setSubject(SubjectType value) {
         this.subject = value;
@@ -117,11 +117,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the nameIDPolicy property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link NameIDPolicyType }
-     *     
+     *
      */
     public NameIDPolicyType getNameIDPolicy() {
         return nameIDPolicy;
@@ -129,11 +129,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the nameIDPolicy property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link NameIDPolicyType }
-     *     
+     *
      */
     public void setNameIDPolicy(NameIDPolicyType value) {
         this.nameIDPolicy = value;
@@ -141,11 +141,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the conditions property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link ConditionsType }
-     *     
+     *
      */
     public ConditionsType getConditions() {
         return conditions;
@@ -153,11 +153,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the conditions property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link ConditionsType }
-     *     
+     *
      */
     public void setConditions(ConditionsType value) {
         this.conditions = value;
@@ -165,11 +165,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the requestedAuthnContext property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link RequestedAuthnContextType }
-     *     
+     *
      */
     public RequestedAuthnContextType getRequestedAuthnContext() {
         return requestedAuthnContext;
@@ -177,11 +177,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the requestedAuthnContext property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link RequestedAuthnContextType }
-     *     
+     *
      */
     public void setRequestedAuthnContext(RequestedAuthnContextType value) {
         this.requestedAuthnContext = value;
@@ -189,11 +189,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the scoping property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link ScopingType }
-     *     
+     *
      */
     public ScopingType getScoping() {
         return scoping;
@@ -201,11 +201,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the scoping property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link ScopingType }
-     *     
+     *
      */
     public void setScoping(ScopingType value) {
         this.scoping = value;
@@ -213,11 +213,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the forceAuthn property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link Boolean }
-     *     
+     *
      */
     public Boolean isForceAuthn() {
         return forceAuthn;
@@ -225,11 +225,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the forceAuthn property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link Boolean }
-     *     
+     *
      */
     public void setForceAuthn(Boolean value) {
         this.forceAuthn = value;
@@ -237,11 +237,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the isPassive property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link Boolean }
-     *     
+     *
      */
     public Boolean isIsPassive() {
         return isPassive;
@@ -249,11 +249,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the isPassive property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link Boolean }
-     *     
+     *
      */
     public void setIsPassive(Boolean value) {
         this.isPassive = value;
@@ -261,11 +261,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the protocolBinding property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link String }
-     *     
+     *
      */
     public String getProtocolBinding() {
         return protocolBinding;
@@ -273,11 +273,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the protocolBinding property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link String }
-     *     
+     *
      */
     public void setProtocolBinding(String value) {
         this.protocolBinding = value;
@@ -285,11 +285,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the assertionConsumerServiceIndex property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link Integer }
-     *     
+     *
      */
     public Integer getAssertionConsumerServiceIndex() {
         return assertionConsumerServiceIndex;
@@ -297,11 +297,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the assertionConsumerServiceIndex property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link Integer }
-     *     
+     *
      */
     public void setAssertionConsumerServiceIndex(Integer value) {
         this.assertionConsumerServiceIndex = value;
@@ -309,11 +309,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the assertionConsumerServiceURL property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link String }
-     *     
+     *
      */
     public String getAssertionConsumerServiceURL() {
         return assertionConsumerServiceURL;
@@ -321,11 +321,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the assertionConsumerServiceURL property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link String }
-     *     
+     *
      */
     public void setAssertionConsumerServiceURL(String value) {
         this.assertionConsumerServiceURL = value;
@@ -333,11 +333,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the attributeConsumingServiceIndex property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link Integer }
-     *     
+     *
      */
     public Integer getAttributeConsumingServiceIndex() {
         return attributeConsumingServiceIndex;
@@ -345,11 +345,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the attributeConsumingServiceIndex property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link Integer }
-     *     
+     *
      */
     public void setAttributeConsumingServiceIndex(Integer value) {
         this.attributeConsumingServiceIndex = value;
@@ -357,11 +357,11 @@ public class AuthnRequestType
 
     /**
      * Gets the value of the providerName property.
-     * 
+     *
      * @return
      *     possible object is
      *     {@link String }
-     *     
+     *
      */
     public String getProviderName() {
         return providerName;
@@ -369,11 +369,11 @@ public class AuthnRequestType
 
     /**
      * Sets the value of the providerName property.
-     * 
+     *
      * @param value
      *     allowed object is
      *     {@link String }
-     *     
+     *
      */
     public void setProviderName(String value) {
         this.providerName = value;

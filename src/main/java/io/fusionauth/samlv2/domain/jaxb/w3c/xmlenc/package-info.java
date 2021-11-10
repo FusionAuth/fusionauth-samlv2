@@ -5,5 +5,5 @@
 // Generated on: 2013.06.27 at 01:49:11 PM MDT 
 //
 
-@javax.xml.bind.annotation.XmlSchema(namespace = "http://www.w3.org/2001/04/xmlenc#", elementFormDefault = javax.xml.bind.annotation.XmlNsForm.QUALIFIED)
+@jakarta.xml.bind.annotation.XmlSchema(namespace = "http://www.w3.org/2001/04/xmlenc#", elementFormDefault = jakarta.xml.bind.annotation.XmlNsForm.QUALIFIED)
 package io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc;

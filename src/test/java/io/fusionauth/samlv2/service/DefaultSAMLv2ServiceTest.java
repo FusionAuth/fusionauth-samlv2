@@ -15,9 +15,7 @@
  */
 package io.fusionauth.samlv2.service;
 
-import javax.xml.bind.JAXBContext;
-import javax.xml.bind.JAXBElement;
-import javax.xml.bind.Unmarshaller;
+import javax.xml.XMLConstants;
 import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
 import javax.xml.crypto.dsig.XMLSignature;
@@ -43,6 +41,7 @@ import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -70,13 +69,17 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.LogoutRequestType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusResponseType;
 import io.fusionauth.samlv2.util.SAMLTools;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBElement;
+import jakarta.xml.bind.Unmarshaller;
 import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.w3c.dom.Document;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
-import sun.security.rsa.RSAPublicKeyImpl;
+import sun.security.util.KnownOIDs;
+import sun.security.util.ObjectIdentifier;
 import sun.security.x509.AlgorithmId;
 import sun.security.x509.CertificateAlgorithmId;
 import sun.security.x509.CertificateSerialNumber;
@@ -177,10 +180,10 @@ public class DefaultSAMLv2ServiceTest {
 
     String samlRequest = rawRequest;
     if (binding == Binding.HTTP_Redirect) {
-      int start = samlRequest.indexOf("=");
-      int end = samlRequest.indexOf("&");
+      int start = samlRequest.indexOf('=');
+      int end = samlRequest.indexOf('&');
       samlRequest = samlRequest.substring(start + 1, end);
-      samlRequest = URLDecoder.decode(samlRequest, "UTF-8");
+      samlRequest = URLDecoder.decode(samlRequest, StandardCharsets.UTF_8);
     }
 
     byte[] bytes = binding == Binding.HTTP_Redirect
@@ -201,14 +204,14 @@ public class DefaultSAMLv2ServiceTest {
     if (binding == Binding.HTTP_Redirect) {
       // Unwind the RelayState
       int start = rawRequest.indexOf("RelayState=");
-      int end = rawRequest.indexOf("&", start);
-      String relayState = URLDecoder.decode(rawRequest.substring(start + "RelayState=".length(), end), "UTF-8");
+      int end = rawRequest.indexOf('&', start);
+      String relayState = URLDecoder.decode(rawRequest.substring(start + "RelayState=".length(), end), StandardCharsets.UTF_8);
       assertEquals(relayState, "Relay-State-String");
 
       // Unwind the SigAlg
       start = rawRequest.indexOf("SigAlg=");
-      end = rawRequest.indexOf("&", start);
-      String sigAlg = URLDecoder.decode(rawRequest.substring(start + "SigAlg=".length(), end), "UTF-8");
+      end = rawRequest.indexOf('&', start);
+      String sigAlg = URLDecoder.decode(rawRequest.substring(start + "SigAlg=".length(), end), StandardCharsets.UTF_8);
       assertEquals(sigAlg, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256");
     }
   }
@@ -238,10 +241,10 @@ public class DefaultSAMLv2ServiceTest {
 
     String samlResponse = rawResponse;
     if (binding == Binding.HTTP_Redirect) {
-      int start = samlResponse.indexOf("=");
-      int end = samlResponse.indexOf("&");
+      int start = samlResponse.indexOf('=');
+      int end = samlResponse.indexOf('&');
       samlResponse = samlResponse.substring(start + 1, end);
-      samlResponse = URLDecoder.decode(samlResponse, "UTF-8");
+      samlResponse = URLDecoder.decode(samlResponse, StandardCharsets.UTF_8);
     }
 
     byte[] bytes = binding == Binding.HTTP_Redirect
@@ -260,14 +263,14 @@ public class DefaultSAMLv2ServiceTest {
     if (binding == Binding.HTTP_Redirect) {
       // Unwind the RelayState
       int start = rawResponse.indexOf("RelayState=");
-      int end = rawResponse.indexOf("&", start);
-      String relayState = URLDecoder.decode(rawResponse.substring(start + "RelayState=".length(), end), "UTF-8");
+      int end = rawResponse.indexOf('&', start);
+      String relayState = URLDecoder.decode(rawResponse.substring(start + "RelayState=".length(), end), StandardCharsets.UTF_8);
       assertEquals(relayState, "Relay-State-String");
 
       // Unwind the SigAlg
       start = rawResponse.indexOf("SigAlg=");
-      end = rawResponse.indexOf("&", start);
-      String sigAlg = URLDecoder.decode(rawResponse.substring(start + "SigAlg=".length(), end), "UTF-8");
+      end = rawResponse.indexOf('&', start);
+      String sigAlg = URLDecoder.decode(rawResponse.substring(start + "SigAlg=".length(), end), StandardCharsets.UTF_8);
       assertEquals(sigAlg, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256");
     }
   }
@@ -293,10 +296,10 @@ public class DefaultSAMLv2ServiceTest {
 
     String samlRequest = rawRequest;
     if (binding == Binding.HTTP_Redirect) {
-      int start = samlRequest.indexOf("=");
-      int end = samlRequest.indexOf("&");
+      int start = samlRequest.indexOf('=');
+      int end = samlRequest.indexOf('&');
       samlRequest = samlRequest.substring(start + 1, end);
-      samlRequest = URLDecoder.decode(samlRequest, "UTF-8");
+      samlRequest = URLDecoder.decode(samlRequest, StandardCharsets.UTF_8);
     }
 
     byte[] bytes = binding == Binding.HTTP_Redirect
@@ -316,14 +319,14 @@ public class DefaultSAMLv2ServiceTest {
     if (binding == Binding.HTTP_Redirect) {
       // Unwind the RelayState
       int start = rawRequest.indexOf("RelayState=");
-      int end = rawRequest.indexOf("&", start);
-      String relayState = URLDecoder.decode(rawRequest.substring(start + "RelayState=".length(), end), "UTF-8");
+      int end = rawRequest.indexOf('&', start);
+      String relayState = URLDecoder.decode(rawRequest.substring(start + "RelayState=".length(), end), StandardCharsets.UTF_8);
       assertEquals(relayState, "Relay-State-String");
 
       // Unwind the SigAlg
       start = rawRequest.indexOf("SigAlg=");
-      end = rawRequest.indexOf("&", start);
-      String sigAlg = URLDecoder.decode(rawRequest.substring(start + "SigAlg=".length(), end), "UTF-8");
+      end = rawRequest.indexOf('&', start);
+      String sigAlg = URLDecoder.decode(rawRequest.substring(start + "SigAlg=".length(), end), StandardCharsets.UTF_8);
       assertEquals(sigAlg, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256");
     }
   }
@@ -374,7 +377,7 @@ public class DefaultSAMLv2ServiceTest {
     String encodedXML = new String(bytes, StandardCharsets.UTF_8);
 
     X509Certificate certificate;
-    String redirectSignature = new String(Files.readAllBytes(Paths.get("src/test/xml/signature/logout-request.txt")), StandardCharsets.UTF_8);
+    String redirectSignature = Files.readString(Paths.get("src/test/xml/signature/logout-request.txt"));
     String x509encoded = "MIICajCCAdOgAwIBAgIBADANBgkqhkiG9w0BAQ0FADBSMQswCQYDVQQGEwJ1czETMBEGA1UECAwKQ2FsaWZvcm5pYTEVMBMGA1UECgwMT25lbG9naW4gSW5jMRcwFQYDVQQDDA5zcC5leGFtcGxlLmNvbTAeFw0xNDA3MTcxNDEyNTZaFw0xNTA3MTcxNDEyNTZaMFIxCzAJBgNVBAYTAnVzMRMwEQYDVQQIDApDYWxpZm9ybmlhMRUwEwYDVQQKDAxPbmVsb2dpbiBJbmMxFzAVBgNVBAMMDnNwLmV4YW1wbGUuY29tMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDZx+ON4IUoIWxgukTb1tOiX3bMYzYQiwWPUNMp+Fq82xoNogso2bykZG0yiJm5o8zv/sd6pGouayMgkx/2FSOdc36T0jGbCHuRSbtia0PEzNIRtmViMrt3AeoWBidRXmZsxCNLwgIV6dn2WpuE5Az0bHgpZnQxTKFek0BMKU/d8wIDAQABo1AwTjAdBgNVHQ4EFgQUGHxYqZYyX7cTxKVODVgZwSTdCnwwHwYDVR0jBBgwFoAUGHxYqZYyX7cTxKVODVgZwSTdCnwwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQ0FAAOBgQByFOl+hMFICbd3DJfnp2Rgd/dqttsZG/tyhILWvErbio/DEe98mXpowhTkC04ENprOyXi7ZbUqiicF89uAGyt1oqgTUCD1VsLahqIcmrzgumNyTwLGWo17WDAa1/usDhetWAMhgzF/Cnf5ek0nK00m0YZGyc4LzgD0CROMASTWNg==";
     try (InputStream is = new ByteArrayInputStream(Base64.getMimeDecoder().decode(x509encoded))) {
       CertificateFactory factor = CertificateFactory.getInstance("X.509");
@@ -388,7 +391,7 @@ public class DefaultSAMLv2ServiceTest {
     // - Disable signature verification for now.
     boolean verifySignature = false;
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    LogoutRequest request = binding == Binding.HTTP_Redirect
+    @SuppressWarnings("ConstantConditions") LogoutRequest request = binding == Binding.HTTP_Redirect
         ? service.parseLogoutRequestRedirectBinding(encodedXML, "http://sp.example.com/relaystate", logoutRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS1, publicKey, redirectSignature, verifySignature))
         : service.parseLogoutRequestPostBinding(encodedXML, logoutRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), verifySignature));
 
@@ -421,15 +424,16 @@ public class DefaultSAMLv2ServiceTest {
   public void parseRequest_compassSecurity() throws Exception {
     String encodedXML = "PHNhbWxwOkF1dGhuUmVxdWVzdCB4bWxuczpzYW1scD0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOnByb3RvY29sIg0KICAgICAgICAgICAgICAgICAgICB4bWxuczpzYW1sPSJ1cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6YXNzZXJ0aW9uIiBJRD0iXzdmZTUxMGNjOGU1MWFhNDE1NThhIg0KICAgICAgICAgICAgICAgICAgICBJc3N1ZUluc3RhbnQ9IjIwMjEtMDEtMjFUMTY6NDY6MDVaIiBQcm92aWRlck5hbWU9IlNpbXBsZSBTQU1MIFNlcnZpY2UgUHJvdmlkZXIiDQogICAgICAgICAgICAgICAgICAgIEFzc2VydGlvbkNvbnN1bWVyU2VydmljZVVSTD0iaHR0cDovL2xvY2FsaG9zdDo3MDcwL3NhbWwvc3NvIg0KICAgICAgICAgICAgICAgICAgICBEZXN0aW5hdGlvbj0iaHR0cDovL2xvY2FsaG9zdDo5MDExL3NhbWx2Mi9sb2dpbi81YjJlNDgzZi03NTcyLTQ4NzktODE3ZS0xYTkwYWM0NGU3NTciDQogICAgICAgICAgICAgICAgICAgIFByb3RvY29sQmluZGluZz0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6Mi4wOmJpbmRpbmdzOkhUVFAtUE9TVCIgVmVyc2lvbj0iMi4wIj4NCiAgPHNhbWw6SXNzdWVyPnVybjpleGFtcGxlOnNwPC9zYW1sOklzc3Vlcj4NCiAgPFNpZ25hdHVyZSB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC8wOS94bWxkc2lnIyI+DQogICAgPFNpZ25lZEluZm8+DQogICAgICA8Q2Fub25pY2FsaXphdGlvbk1ldGhvZCBBbGdvcml0aG09Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvMTAveG1sLWV4Yy1jMTRuIyIvPg0KICAgICAgPFNpZ25hdHVyZU1ldGhvZCBBbGdvcml0aG09Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvMDQveG1sZHNpZy1tb3JlI3JzYS1zaGEyNTYiLz4NCiAgICAgIDxSZWZlcmVuY2UgVVJJPSIjXzdmZTUxMGNjOGU1MWFhNDE1NThhIj4NCiAgICAgICAgPFRyYW5zZm9ybXM+DQogICAgICAgICAgPFRyYW5zZm9ybSBBbGdvcml0aG09Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvMDkveG1sZHNpZyNlbnZlbG9wZWQtc2lnbmF0dXJlIi8+DQogICAgICAgICAgPFRyYW5zZm9ybSBBbGdvcml0aG09Imh0dHA6Ly93d3cudzMub3JnLzIwMDEvMTAveG1sLWV4Yy1jMTRuIyIvPg0KICAgICAgICA8L1RyYW5zZm9ybXM+DQogICAgICAgIDxEaWdlc3RNZXRob2QgQWxnb3JpdGhtPSJodHRwOi8vd3d3LnczLm9yZy8yMDAxLzA0L3htbGVuYyNzaGEyNTYiLz4NCiAgICAgICAgPERpZ2VzdFZhbHVlPjV4V2cvaWRqOGpNV2Z3ZWRmaksyQkVZa2QveUxXY2pNa2ZKK1ZmOHQrRkE9PC9EaWdlc3RWYWx1ZT4NCiAgICAgIDwvUmVmZXJlbmNlPg0KICAgIDwvU2lnbmVkSW5mbz4NCiAgICA8U2lnbmF0dXJlVmFsdWU+DQogICAgICBsZ05CSEZ4UHFueHVKRmVRa0cwN3dNY0JwZll3TkVBc2pMeWpQTTBsQit5Nm8rNEtDSzN0U2padXVSUVlNWTRJb3J6Uk95b3piZGtsRitCT2UxL0tKNFhxRGhFaXFlbUEyTGszcEliakJQbit6NDdGcER0NWdsQUVxY3NmMlI2RDhKTndkNWJxSmgxYnVITXNUQ3dIOFhPVHZpdHlxQXZrZmp4WVhNU290SDFWSWxrRWxjZFF6aXA5ZlhsZW1ZdExCdXoybG5sTHYyS01DSkRpYTlQTzZrSHQySTRBL2s0WXBNRmx2NlF0aGlPcjdlVjROOWIxVk43VUxYRHJlUS9OUDhtZWdtWGVBcWxaMC81VnlXdGRYQ1E0QUlSUVlUeW5mTlZ3TDA1VG5JOXNYZDl5WTdPbXk5WVJwdEYzaHZBWVFqd0t1ak90bjNGUnJNSldKMzRha3c9PQ0KICAgIDwvU2lnbmF0dXJlVmFsdWU+DQogICAgPEtleUluZm8+DQogICAgICA8WDUwOURhdGE+DQogICAgICAgIDxYNTA5Q2VydGlmaWNhdGU+DQogICAgICAgICAgTUlJRFV6Q0NBanVnQXdJQkFnSUpBUEowbUE2V3pPcHZNQTBHQ1NxR1NJYjNEUUVCQ3dVQU1HQXhDekFKQmdOVkJBWVRBbFZUTVJNd0VRWURWUVFJRXdwRFlXeHBabTl5Ym1saE1SWXdGQVlEVlFRSEV3MVRZVzRnUm5KaGJtTnBjMk52TVJBd0RnWURWUVFLRXdkS1lXNXJlVU52TVJJd0VBWURWUVFERXdsc2IyTmhiR2h2YzNRd0hoY05NVFF3TXpFeU1UazBOak16V2hjTk1qY3hNVEU1TVRrME5qTXpXakJnTVFzd0NRWURWUVFHRXdKVlV6RVRNQkVHQTFVRUNCTUtRMkZzYVdadmNtNXBZVEVXTUJRR0ExVUVCeE1OVTJGdUlFWnlZVzVqYVhOamJ6RVFNQTRHQTFVRUNoTUhTbUZ1YTNsRGJ6RVNNQkFHQTFVRUF4TUpiRzlqWVd4b2IzTjBNSUlCSWpBTkJna3Foa2lHOXcwQkFRRUZBQU9DQVE4QU1JSUJDZ0tDQVFFQXRsTkR5NERSMnRoWjJERGNpSVRvZlVwd1laY25Yay85cHFEdDhWMTZqQkQwMnVPZC9UZHlzZ2lLTGpyWlpiQy9YME9YMUVGZTVkTjY1VXJMT0RRQkJ6WjMvOFBZejY4MTlNS2M5aXJWOCs3MzJINWRHd3pnbVlCWUQrcXFmNEJjUjM2TDdUam1Pd2prZSsxY01jR2crV1hWU1hRTS9kalN4aFFIaldOamtSdDFUL21MZmxxTXFwb3B6Y21BUFFETEVIRXJ0dWFtOVh0dWRqaUZNOHI1anp2bXUvVXBJUGliYndBWThxM3NUUHBFN0pCTHI2SXk0cEJBY2lMbFhhNE5yRFE4YUw4akZwaWhqdm0rdUhWTUhNR215bkdpY0dRTGdyRktPV3M2NTVtVlZXWGZET2U2SjVwaUJYcjFteW5uQnN0ZGRTYWxaNWFMQVdGOGc2c3pmUUlEQVFBQm94QXdEakFNQmdOVkhSTUJBZjhFQWpBQU1BMEdDU3FHU0liM0RRRUJDd1VBQTRJQkFRQ2xaeStnTVlrTmZvK2RRakV1dmJ2eDYyTU1SM1dka3BmZXk0M1pnUHF4MTh2cEcwUDdhSXFUeWJreFRraGkvQXc4cExEY0l2QVBaSHFsTWZMQ05Cci80K3NucXJMbzNPaUdaSTFobDlRT0czaFFta3JqVDEwaGx5WFJTM29UbmpENWJoRGoraW5iRzFpOVFSSzdQTzBQUXFXaElLZ3J0THlZcDNXdlM2WjljWVh3UXQ1RmNZYmhLcCtDK2t2Q3pxK1RmYlFhbWx2ZWhXakJVTlIyN0NFMTFNLy9XVEYwbmZiT0Z1MzJFQzZrQjBFR2Q2UFRJd2h0eTJ6SHhnKyt1WU1qQVVMK1pOdU5pYU1jMzU1b1h2THRoMXE1cmszR2EzdW5wQmptUTdvYlUyLzQvV2RKblBmdmxEMmt0QVYvUzVkVlNLU0RObWthZzhJWDBuSGIvMUZODQogICAgICAgIDwvWDUwOUNlcnRpZmljYXRlPg0KICAgICAgPC9YNTA5RGF0YT4NCiAgICA8L0tleUluZm8+DQogIDwvU2lnbmF0dXJlPg0KICA8c2FtbHA6TmFtZUlEUG9saWN5IEZvcm1hdD0idXJuOm9hc2lzOm5hbWVzOnRjOlNBTUw6MS4xOm5hbWVpZC1mb3JtYXQ6ZW1haWxBZGRyZXNzIiBBbGxvd0NyZWF0ZT0idHJ1ZSIvPg0KICA8c2FtbHA6UmVxdWVzdGVkQXV0aG5Db250ZXh0IENvbXBhcmlzb249ImV4YWN0Ij4NCiAgICA8c2FtbDpBdXRobkNvbnRleHRDbGFzc1JlZj51cm46b2FzaXM6bmFtZXM6dGM6U0FNTDoyLjA6YWM6Y2xhc3NlczpQYXNzd29yZFByb3RlY3RlZFRyYW5zcG9ydA0KICAgIDwvc2FtbDpBdXRobkNvbnRleHRDbGFzc1JlZj4NCiAgPC9zYW1scDpSZXF1ZXN0ZWRBdXRobkNvbnRleHQ+DQo8L3NhbWxwOkF1dGhuUmVxdWVzdD4=";
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    PublicKey publicKey = new RSAPublicKeyImpl
-        (new BigInteger("23016430918823899869174537266594866915196701755262955756947374683306171050449785978041642070945082562110926617344211216571596575890159654912559343561454566120924390651417182396241104494630512996615232908509829811443784313485862019497373006302688901954848508137355590138442254765794572625586049567608157223736747587462558785268970406066201827350377828581492579969240135441642716939367190425379788145244337250560138881783025442595121210838086638484878363941229167629103738547784336822433469701246494321129732432091196962736034404069520496182669787723781485938596516343326251546340541402004104537790138422441873446220669"),
-            new BigInteger("65537"));
+    PublicKey publicKey = KeyFactory.getInstance("RSA")
+                                    .generatePublic(new RSAPublicKeySpec(
+                                        new BigInteger("23016430918823899869174537266594866915196701755262955756947374683306171050449785978041642070945082562110926617344211216571596575890159654912559343561454566120924390651417182396241104494630512996615232908509829811443784313485862019497373006302688901954848508137355590138442254765794572625586049567608157223736747587462558785268970406066201827350377828581492579969240135441642716939367190425379788145244337250560138881783025442595121210838086638484878363941229167629103738547784336822433469701246494321129732432091196962736034404069520496182669787723781485938596516343326251546340541402004104537790138422441873446220669"),
+                                        new BigInteger("65537")));
     TestPostBindingSignatureHelper signatureHelper = new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), true);
     AuthenticationRequest request = service.parseRequestPostBinding(encodedXML, authRequest -> signatureHelper);
 
     assertEquals(request.id, "_7fe510cc8e51aa41558a");
     assertEquals(request.issuer, "urn:example:sp");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress);
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
     assertEquals(request.version, "2.0");
   }
 
@@ -781,7 +785,7 @@ public class DefaultSAMLv2ServiceTest {
         : SAMLTools.encode(bytes);
 
     X509Certificate certificate;
-    String redirectSignature = new String(Files.readAllBytes(Paths.get("src/test/xml/signature/logout-request.txt")), StandardCharsets.UTF_8);
+    String redirectSignature = Files.readString(Paths.get("src/test/xml/signature/logout-request.txt"));
     String x509encoded = "MIICajCCAdOgAwIBAgIBADANBgkqhkiG9w0BAQ0FADBSMQswCQYDVQQGEwJ1czETMBEGA1UECAwKQ2FsaWZvcm5pYTEVMBMGA1UECgwMT25lbG9naW4gSW5jMRcwFQYDVQQDDA5zcC5leGFtcGxlLmNvbTAeFw0xNDA3MTcxNDEyNTZaFw0xNTA3MTcxNDEyNTZaMFIxCzAJBgNVBAYTAnVzMRMwEQYDVQQIDApDYWxpZm9ybmlhMRUwEwYDVQQKDAxPbmVsb2dpbiBJbmMxFzAVBgNVBAMMDnNwLmV4YW1wbGUuY29tMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDZx+ON4IUoIWxgukTb1tOiX3bMYzYQiwWPUNMp+Fq82xoNogso2bykZG0yiJm5o8zv/sd6pGouayMgkx/2FSOdc36T0jGbCHuRSbtia0PEzNIRtmViMrt3AeoWBidRXmZsxCNLwgIV6dn2WpuE5Az0bHgpZnQxTKFek0BMKU/d8wIDAQABo1AwTjAdBgNVHQ4EFgQUGHxYqZYyX7cTxKVODVgZwSTdCnwwHwYDVR0jBBgwFoAUGHxYqZYyX7cTxKVODVgZwSTdCnwwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQ0FAAOBgQByFOl+hMFICbd3DJfnp2Rgd/dqttsZG/tyhILWvErbio/DEe98mXpowhTkC04ENprOyXi7ZbUqiicF89uAGyt1oqgTUCD1VsLahqIcmrzgumNyTwLGWo17WDAa1/usDhetWAMhgzF/Cnf5ek0nK00m0YZGyc4LzgD0CROMASTWNg==";
     try (InputStream is = new ByteArrayInputStream(Base64.getMimeDecoder().decode(x509encoded))) {
       CertificateFactory factor = CertificateFactory.getInstance("X.509");
@@ -795,7 +799,7 @@ public class DefaultSAMLv2ServiceTest {
     // - Disable signature verification for now.
     boolean verifySignature = false;
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    LogoutRequest request = binding == Binding.HTTP_Redirect
+    @SuppressWarnings("ConstantConditions") LogoutRequest request = binding == Binding.HTTP_Redirect
         ? service.parseLogoutRequestRedirectBinding(encodedXML, "http://sp.example.com/relaystate", logoutRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS1, publicKey, redirectSignature, verifySignature))
         : service.parseLogoutRequestPostBinding(encodedXML, logoutRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), verifySignature));
 
@@ -820,7 +824,7 @@ public class DefaultSAMLv2ServiceTest {
         : SAMLTools.encode(bytes);
 
     X509Certificate certificate;
-    String redirectSignature = new String(Files.readAllBytes(Paths.get("src/test/xml/signature/logout-response.txt")), StandardCharsets.UTF_8);
+    String redirectSignature = Files.readString(Paths.get("src/test/xml/signature/logout-response.txt"));
     String x509encoded = "MIICajCCAdOgAwIBAgIBADANBgkqhkiG9w0BAQ0FADBSMQswCQYDVQQGEwJ1czETMBEGA1UECAwKQ2FsaWZvcm5pYTEVMBMGA1UECgwMT25lbG9naW4gSW5jMRcwFQYDVQQDDA5zcC5leGFtcGxlLmNvbTAeFw0xNDA3MTcxNDEyNTZaFw0xNTA3MTcxNDEyNTZaMFIxCzAJBgNVBAYTAnVzMRMwEQYDVQQIDApDYWxpZm9ybmlhMRUwEwYDVQQKDAxPbmVsb2dpbiBJbmMxFzAVBgNVBAMMDnNwLmV4YW1wbGUuY29tMIGfMA0GCSqGSIb3DQEBAQUAA4GNADCBiQKBgQDZx+ON4IUoIWxgukTb1tOiX3bMYzYQiwWPUNMp+Fq82xoNogso2bykZG0yiJm5o8zv/sd6pGouayMgkx/2FSOdc36T0jGbCHuRSbtia0PEzNIRtmViMrt3AeoWBidRXmZsxCNLwgIV6dn2WpuE5Az0bHgpZnQxTKFek0BMKU/d8wIDAQABo1AwTjAdBgNVHQ4EFgQUGHxYqZYyX7cTxKVODVgZwSTdCnwwHwYDVR0jBBgwFoAUGHxYqZYyX7cTxKVODVgZwSTdCnwwDAYDVR0TBAUwAwEB/zANBgkqhkiG9w0BAQ0FAAOBgQByFOl+hMFICbd3DJfnp2Rgd/dqttsZG/tyhILWvErbio/DEe98mXpowhTkC04ENprOyXi7ZbUqiicF89uAGyt1oqgTUCD1VsLahqIcmrzgumNyTwLGWo17WDAa1/usDhetWAMhgzF/Cnf5ek0nK00m0YZGyc4LzgD0CROMASTWNg==";
     try (InputStream is = new ByteArrayInputStream(Base64.getMimeDecoder().decode(x509encoded))) {
       CertificateFactory factor = CertificateFactory.getInstance("X.509");
@@ -834,7 +838,7 @@ public class DefaultSAMLv2ServiceTest {
     // - Disable signature verification for now.
     boolean verifySignature = false;
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    LogoutResponse response = binding == Binding.HTTP_Redirect
+    @SuppressWarnings("ConstantConditions") LogoutResponse response = binding == Binding.HTTP_Redirect
         ? service.parseLogoutResponseRedirectBinding(encodedXML, "http://sp.example.com/relaystate", logoutRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS1, publicKey, redirectSignature, verifySignature))
         : service.parseLogoutResponsePostBinding(encodedXML, logoutRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), verifySignature));
 
@@ -870,25 +874,25 @@ public class DefaultSAMLv2ServiceTest {
 
     if (binding == Binding.HTTP_Redirect) {
       // Unwind the request
-      int start = encoded.indexOf("=");
-      int end = encoded.indexOf("&");
-      String encodedRequest = URLDecoder.decode(encoded.substring(start + 1, end), "UTF-8");
+      int start = encoded.indexOf('=');
+      int end = encoded.indexOf('&');
+      String encodedRequest = URLDecoder.decode(encoded.substring(start + 1, end), StandardCharsets.UTF_8);
 
       // Unwind the RelayState
       start = encoded.indexOf("RelayState=");
-      end = encoded.indexOf("&", start);
+      end = encoded.indexOf('&', start);
       String relayState = encoded.substring(start + "RelayState=".length(), end);
       assertEquals(relayState, "Relay-State-String");
 
       // Unwind the SigAlg
       start = encoded.indexOf("SigAlg=");
-      end = encoded.indexOf("&", start);
-      String sigAlg = URLDecoder.decode(encoded.substring(start + "SigAlg=".length(), end), "UTF-8");
+      end = encoded.indexOf('&', start);
+      String sigAlg = URLDecoder.decode(encoded.substring(start + "SigAlg=".length(), end), StandardCharsets.UTF_8);
 
       // Unwind the Signature
       start = encoded.indexOf("Signature=");
       end = encoded.length();
-      String signature = URLDecoder.decode(encoded.substring(start + "Signature=".length(), end), "UTF-8");
+      String signature = URLDecoder.decode(encoded.substring(start + "Signature=".length(), end), StandardCharsets.UTF_8);
       request = service.parseRequestRedirectBinding(encodedRequest, relayState, authRequest -> new TestRedirectBindingSignatureHelper(Algorithm.fromURI(sigAlg), kp.getPublic(), signature, true));
     } else {
       request = service.parseRequestPostBinding(encoded, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
@@ -902,7 +906,8 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test(dataProvider = "signatureLocation")
-  public void roundTripResponseSignedAssertion(SignatureLocation signatureLocation, boolean includeKeyInfoInResponse) throws Exception {
+  public void roundTripResponseSignedAssertion(SignatureLocation signatureLocation, boolean includeKeyInfoInResponse)
+      throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
@@ -963,7 +968,7 @@ public class DefaultSAMLv2ServiceTest {
       CertificateX509Key certKey = new CertificateX509Key(keyPair.getPublic());
       certInfo.set(X509CertInfo.KEY, certKey);
       certInfo.set(X509CertInfo.VERSION, new CertificateVersion(1));
-      certInfo.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(AlgorithmId.sha256WithRSAEncryption_oid)));
+      certInfo.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(ObjectIdentifier.of(KnownOIDs.SHA256withRSA))));
       certInfo.set(X509CertInfo.ISSUER, new X500Name("CN=FusionAuth"));
       certInfo.set(X509CertInfo.SUBJECT, new X500Name("CN=FusionAuth"));
       certInfo.set(X509CertInfo.VALIDITY, new CertificateValidity(Date.from(now.toInstant()), Date.from(now.plusYears(10).toInstant())));
@@ -977,9 +982,11 @@ public class DefaultSAMLv2ServiceTest {
     }
   }
 
-  private Document parseDocument(String encoded) {
+  private Document parseDocument(String encoded) throws ParserConfigurationException {
     byte[] bytes = Base64.getMimeDecoder().decode(encoded);
     DocumentBuilderFactory documentBuilderFactory = DocumentBuilderFactory.newInstance();
+    documentBuilderFactory.setExpandEntityReferences(false);
+    documentBuilderFactory.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     documentBuilderFactory.setNamespaceAware(true);
     try {
       DocumentBuilder builder = documentBuilderFactory.newDocumentBuilder();

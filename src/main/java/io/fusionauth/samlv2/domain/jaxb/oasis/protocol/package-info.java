@@ -5,5 +5,5 @@
 // Generated on: 2013.06.27 at 01:49:11 PM MDT 
 //
 
-@javax.xml.bind.annotation.XmlSchema(namespace = "urn:oasis:names:tc:SAML:2.0:protocol", elementFormDefault = javax.xml.bind.annotation.XmlNsForm.QUALIFIED)
+@jakarta.xml.bind.annotation.XmlSchema(namespace = "urn:oasis:names:tc:SAML:2.0:protocol", elementFormDefault = jakarta.xml.bind.annotation.XmlNsForm.QUALIFIED)
 package io.fusionauth.samlv2.domain.jaxb.oasis.protocol;

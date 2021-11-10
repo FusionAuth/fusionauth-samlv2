@@ -22,6 +22,8 @@ import java.time.ZonedDateTime;
 import java.util.Date;
 
 import io.fusionauth.samlv2.domain.Algorithm;
+import sun.security.util.KnownOIDs;
+import sun.security.util.ObjectIdentifier;
 import sun.security.x509.AlgorithmId;
 import sun.security.x509.CertificateAlgorithmId;
 import sun.security.x509.CertificateSerialNumber;
@@ -50,7 +52,7 @@ public class CertificateTools {
       CertificateX509Key certKey = new CertificateX509Key(keyPair.getPublic());
       certInfo.set(X509CertInfo.KEY, certKey);
       certInfo.set(X509CertInfo.VERSION, new CertificateVersion(1));
-      certInfo.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(AlgorithmId.sha256WithRSAEncryption_oid)));
+      certInfo.set(X509CertInfo.ALGORITHM_ID, new CertificateAlgorithmId(new AlgorithmId(ObjectIdentifier.of(KnownOIDs.SHA256withRSA))));
       certInfo.set(X509CertInfo.ISSUER, new X500Name("cn=" + issuer));
       certInfo.set(X509CertInfo.SUBJECT, new X500Name("cn=" + issuer));
       certInfo.set(X509CertInfo.VALIDITY, new CertificateValidity(new Date(0), new Date(ZonedDateTime.now().plusYears(99).toInstant().toEpochMilli())));
