@@ -351,7 +351,10 @@
       <option name="WRAP_COMMENTS" value="true" />
       <option name="DO_NOT_FORMAT">
         <list>
-          <fileSet type="globPattern" pattern="*.ftl, *.css, *.sql" />
+          <fileSet type="globPattern" pattern="*.css" />
+          <fileSet type="globPattern" pattern="*.ftl" />
+          <fileSet type="globPattern" pattern="*.sql" />
+          <fileSet type="globPattern" pattern="build.savant" />
         </list>
       </option>
       <DB2CodeStyleSettings version="6">
