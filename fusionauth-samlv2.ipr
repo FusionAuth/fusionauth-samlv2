@@ -349,6 +349,11 @@
         </value>
       </option>
       <option name="WRAP_COMMENTS" value="true" />
+      <option name="DO_NOT_FORMAT">
+        <list>
+          <fileSet type="globPattern" pattern="*.ftl, *.css, *.sql" />
+        </list>
+      </option>
       <DB2CodeStyleSettings version="6">
         <option name="USE_GENERAL_STYLE" value="false" />
         <option name="TYPE_CASE" value="3" />
