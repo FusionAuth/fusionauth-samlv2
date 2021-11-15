@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2021, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 package io.fusionauth.samlv2.service;
 
-import jakarta.xml.bind.JAXBElement;
 import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.MarshalException;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
@@ -34,7 +33,6 @@ import javax.xml.crypto.dsig.keyinfo.X509Data;
 import javax.xml.crypto.dsig.spec.C14NMethodParameterSpec;
 import javax.xml.crypto.dsig.spec.TransformParameterSpec;
 import javax.xml.transform.TransformerException;
-import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
@@ -111,6 +109,7 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.KeyInfoType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.X509DataType;
 import io.fusionauth.samlv2.util.SAMLTools;
+import jakarta.xml.bind.JAXBElement;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Attr;
@@ -135,6 +134,7 @@ import static io.fusionauth.samlv2.util.SAMLTools.unmarshallFromDocument;
  *
  * @author Brian Pontarelli
  */
+@SuppressWarnings("scwbasic-protection-set_CryptoSignatureApprovedHashingAlgorithm")
 public class DefaultSAMLv2Service implements SAMLv2Service {
   static final ObjectFactory PROTOCOL_OBJECT_FACTORY = new ObjectFactory();
 
@@ -186,7 +186,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     AssertionType assertionType = new AssertionType();
     if (response.assertion != null && response.status.code == ResponseStatus.Success) {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      String id = "_" + UUID.randomUUID().toString();
+      String id = "_" + UUID.randomUUID();
       assertionType.setID(id);
       assertionType.setIssuer(jaxbResponse.getIssuer());
       assertionType.setIssueInstant(toXMLGregorianCalendar(now));
@@ -530,7 +530,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                        .filter(Objects::nonNull)
                                        .collect(Collectors.toList());
       } catch (IllegalArgumentException e) {
-        // toPublicKey might throw this and we want to translate it back to a known exception
+        // toPublicKey might throw an exception, we want to translate it back to a known exception
         throw new SAMLException(e.getCause());
       }
     }
@@ -651,8 +651,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         //   - ProxyRestriction specifics are in section 2.6.1.6
         //   http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
         for (ConditionAbstractType conditionAbstractType : conditionAbstractTypes) {
-          if (conditionAbstractType instanceof AudienceRestrictionType) {
-            AudienceRestrictionType restrictionType = (AudienceRestrictionType) conditionAbstractType;
+          if (conditionAbstractType instanceof AudienceRestrictionType restrictionType) {
             response.assertion.conditions.audiences.addAll(restrictionType.getAudience());
           }
         }
@@ -661,12 +660,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       // Handle the attributes
       List<StatementAbstractType> statements = assertionType.getStatementOrAuthnStatementOrAuthzDecisionStatement();
       for (StatementAbstractType statement : statements) {
-        if (statement instanceof AttributeStatementType) {
-          AttributeStatementType attributeStatementType = (AttributeStatementType) statement;
+        if (statement instanceof AttributeStatementType attributeStatementType) {
           List<Object> attributeObjects = attributeStatementType.getAttributeOrEncryptedAttribute();
           for (Object attributeObject : attributeObjects) {
-            if (attributeObject instanceof AttributeType) {
-              AttributeType attributeType = (AttributeType) attributeObject;
+            if (attributeObject instanceof AttributeType attributeType) {
               String name = attributeType.getName();
               List<Object> attributeValues = attributeType.getAttributeValue();
               List<String> values = attributeValues.stream().map(SAMLTools::attributeToString).collect(Collectors.toList());
@@ -682,9 +679,11 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return response;
   }
 
+  @SuppressWarnings("SameParameterValue")
   <T> String buildPostRequest(JAXBElement<T> object, Class<T> type, boolean sign, PrivateKey privateKey,
                               X509Certificate certificate,
-                              Algorithm algorithm, String xmlSignatureC14nMethod, boolean includeKeyInfo) throws SAMLException {
+                              Algorithm algorithm, String xmlSignatureC14nMethod, boolean includeKeyInfo)
+      throws SAMLException {
     Document document = marshallToDocument(object, type);
     try {
       Element toSign = document.getDocumentElement();
@@ -706,20 +705,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     try {
       byte[] xml = marshallToBytes(object, type);
       String encodedResult = SAMLTools.deflateAndEncode(xml);
-      String parameters = parameterName + "=" + URLEncoder.encode(encodedResult, "UTF-8");
+      String parameters = parameterName + "=" + URLEncoder.encode(encodedResult, StandardCharsets.UTF_8);
       if (relayState != null) {
-        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
+        parameters += "&RelayState=" + URLEncoder.encode(relayState, StandardCharsets.UTF_8);
       }
 
       if (sign && key != null && algorithm != null) {
         Signature signature;
-        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, "UTF-8");
+        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, StandardCharsets.UTF_8);
         signature = Signature.getInstance(algorithm.name);
         signature.initSign(key);
         signature.update(parameters.getBytes(StandardCharsets.UTF_8));
 
         String signatureParameter = new String(Base64.getEncoder().encode(signature.sign()), StandardCharsets.UTF_8);
-        parameters += "&Signature=" + URLEncoder.encode(signatureParameter, "UTF-8");
+        parameters += "&Signature=" + URLEncoder.encode(signatureParameter, StandardCharsets.UTF_8);
       }
 
       return parameters;
@@ -734,6 +733,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return buildRedirect(object, type, relayState, sign, key, algorithm, "SAMLRequest");
   }
 
+  @SuppressWarnings("SameParameterValue")
   <T> String buildRedirectResponse(JAXBElement<T> object, Class<T> type, String relayState, boolean sign,
                                    PrivateKey key, Algorithm algorithm) throws SAMLException {
     return buildRedirect(object, type, relayState, sign, key, algorithm, "SAMLResponse");
@@ -772,6 +772,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return logoutRequest;
   }
 
+  @SuppressWarnings("SameParameterValue")
   StatusResponseType toLogoutResponse(LogoutResponse response, String version) throws SAMLException {
     StatusResponseType logoutResponse = new StatusResponseType();
     logoutResponse.setDestination(response.destination);
@@ -936,7 +937,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         Collections.singletonList(ref));
     KeyInfoFactory kif = factory.getKeyInfoFactory();
     X509Data data = kif.newX509Data(Collections.singletonList(certificate));
-    // KeyInfo is optional. Using the provided boolean so we can test w/ and w/out
+    // KeyInfo is optional. Using the provided boolean, so we can test w/ and w/out
     KeyInfo ki = includeKeyInfo ? kif.newKeyInfo(Collections.singletonList(data)) : null;
     XMLSignature signature = factory.newXMLSignature(si, ki);
 
@@ -979,11 +980,11 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     try {
-      String parameters = "SAMLRequest=" + URLEncoder.encode(encodedRequest, "UTF-8");
+      String parameters = "SAMLRequest=" + URLEncoder.encode(encodedRequest, StandardCharsets.UTF_8);
       if (relayState != null) {
-        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
+        parameters += "&RelayState=" + URLEncoder.encode(relayState, StandardCharsets.UTF_8);
       }
-      parameters += "&SigAlg=" + URLEncoder.encode(signatureHelper.algorithm().uri, "UTF-8");
+      parameters += "&SigAlg=" + URLEncoder.encode(signatureHelper.algorithm().uri, StandardCharsets.UTF_8);
 
       Signature sig = Signature.getInstance(signatureHelper.algorithm().name);
       sig.initVerify(signatureHelper.publicKey());
@@ -991,7 +992,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       if (!sig.verify(Base64.getMimeDecoder().decode(signatureHelper.signature().getBytes(StandardCharsets.UTF_8)))) {
         throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
       }
-    } catch (GeneralSecurityException | UnsupportedEncodingException e) {
+    } catch (GeneralSecurityException e) {
       throw new SAMLException("Unable to verify signature", request, e);
     }
   }
