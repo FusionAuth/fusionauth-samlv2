@@ -17,46 +17,30 @@ package io.fusionauth.samlv2.service;
 
 import java.security.PublicKey;
 
-import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.service.SAMLv2Service.RedirectBindingSignatureHelper;
 
 /**
  * @author Daniel DeGroff
  */
 public class TestRedirectBindingSignatureHelper implements RedirectBindingSignatureHelper {
-  public Algorithm algorithm;
-
   public PublicKey publicKey;
-
-  public String signature;
 
   public boolean verifySignature;
 
   public TestRedirectBindingSignatureHelper() {
   }
 
-  public TestRedirectBindingSignatureHelper(Algorithm algorithm, PublicKey publicKey, String signature,
-                                            boolean verifySignature) {
-    this.algorithm = algorithm;
+  public TestRedirectBindingSignatureHelper(PublicKey publicKey, boolean verifySignature) {
     this.publicKey = publicKey;
-    this.signature = signature;
     this.verifySignature = verifySignature;
   }
 
-  @Override
-  public Algorithm algorithm() {
-    return algorithm;
-  }
 
   @Override
   public PublicKey publicKey() {
     return publicKey;
   }
 
-  @Override
-  public String signature() {
-    return signature;
-  }
 
   @Override
   public boolean verifySignature() {

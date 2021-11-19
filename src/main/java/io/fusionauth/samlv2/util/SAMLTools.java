@@ -16,11 +16,6 @@
 package io.fusionauth.samlv2.util;
 
 import javax.xml.XMLConstants;
-import jakarta.xml.bind.JAXBContext;
-import jakarta.xml.bind.JAXBElement;
-import jakarta.xml.bind.JAXBException;
-import jakarta.xml.bind.Marshaller;
-import jakarta.xml.bind.Unmarshaller;
 import javax.xml.datatype.DatatypeConfigurationException;
 import javax.xml.datatype.DatatypeFactory;
 import javax.xml.datatype.XMLGregorianCalendar;
@@ -62,6 +57,11 @@ import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.jaxb.oasis.assertion.NameIDType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.metadata.KeyDescriptorType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.X509DataType;
+import jakarta.xml.bind.JAXBContext;
+import jakarta.xml.bind.JAXBElement;
+import jakarta.xml.bind.JAXBException;
+import jakarta.xml.bind.Marshaller;
+import jakarta.xml.bind.Unmarshaller;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
@@ -76,6 +76,7 @@ import static javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING;
 /**
  * @author Daniel DeGroff
  */
+@SuppressWarnings("unused")
 public class SAMLTools {
   private static final Map<String, Boolean> FactoryFeatures = new HashMap<>();
 
@@ -323,6 +324,31 @@ public class SAMLTools {
   }
 
   /**
+   * Separate query parameters, do not URL decode anything.
+   *
+   * @param queryString the query string to parse
+   * @return a POJO containing non-URL decoded SAML query parameters.
+   */
+  public static SAMLRequestParameters parseQueryString(String queryString) {
+    SAMLRequestParameters result = new SAMLRequestParameters();
+
+    String[] parts = queryString.split("&");
+    for (String part : parts) {
+      String[] param = part.split("=");
+      if (param.length == 2) {
+        switch (param[0]) {
+          case "RelayState" -> result.RelayState = param[1];
+          case "SAMLRequest" -> result.SAMLRequest = param[1];
+          case "SigAlg" -> result.SigAlg = param[1];
+          case "Signature" -> result.Signature = param[1];
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
    * Convert a key descriptor type to a certificate
    *
    * @param keyDescriptorType the key descriptor type
@@ -332,8 +358,7 @@ public class SAMLTools {
     try {
       List<Object> keyData = keyDescriptorType.getKeyInfo().getContent();
       for (Object keyDatum : keyData) {
-        if (keyDatum instanceof JAXBElement<?>) {
-          JAXBElement<?> element = (JAXBElement<?>) keyDatum;
+        if (keyDatum instanceof JAXBElement<?> element) {
           if (element.getDeclaredType() == X509DataType.class) {
             X509DataType cert = (X509DataType) element.getValue();
             List<Object> certData = cert.getX509IssuerSerialOrX509SKIOrX509SubjectName();
