@@ -29,8 +29,10 @@ import java.io.ByteArrayInputStream;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.UnsupportedEncodingException;
 import java.math.BigInteger;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -384,12 +386,18 @@ public class DefaultSAMLv2ServiceTest {
     assertNotNull(certificate);
     PublicKey publicKey = certificate.getPublicKey();
 
+    // For HTTP Redirect binding
+    String queryString = "SAMLRequest=" + URLEncoder.encode(encodedXML, "UTF-8") +
+        "&RelayState=" + URLEncoder.encode("http://sp.example.com/relaystate", "UTF-8") +
+        "&SigAlg=" + URLEncoder.encode(Algorithm.RS1.uri, "UTF-8") +
+        "&Signature=" + URLEncoder.encode(redirectSignature, "UTF-8");
+
     // Testing purposes, signatures can't be verified currently, TBD if this is a bug or just invalid signatures.
     // - Disable signature verification for now.
     boolean verifySignature = false;
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     LogoutRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseLogoutRequestRedirectBinding(encodedXML, "http://sp.example.com/relaystate", logoutRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS1, publicKey, redirectSignature, verifySignature))
+        ? service.parseLogoutRequestRedirectBinding(queryString, logoutRequest -> new TestRedirectBindingSignatureHelper(publicKey, verifySignature))
         : service.parseLogoutRequestPostBinding(encodedXML, logoutRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), verifySignature));
 
     assertEquals(request.id, binding == Binding.HTTP_Redirect
@@ -440,7 +448,8 @@ public class DefaultSAMLv2ServiceTest {
       DefaultSAMLv2Service service = new DefaultSAMLv2Service();
       byte[] xml = Files.readAllBytes(Paths.get("src/test/xml/authn-request-expanded-entity.xml"));
       String deflated = SAMLTools.deflateAndEncode(xml);
-      AuthenticationRequest request = service.parseRequestRedirectBinding(deflated, null, authRequest -> new TestRedirectBindingSignatureHelper());
+      String queryString = "SAMLRequest=" + URLEncoder.encode(deflated, "UTF-8");
+      AuthenticationRequest request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper());
       fail("Expected an exception because we are declaring a DOCTYPE and expanding an entity. The issuer is now set to [" + request.issuer + "] which is not good.");
     } catch (SAMLException e) {
       assertEquals(e.getMessage(), "Unable to parse SAML v2.0 document.");
@@ -468,7 +477,8 @@ public class DefaultSAMLv2ServiceTest {
       xml = xmlString.getBytes(StandardCharsets.UTF_8);
 
       String deflated = SAMLTools.deflateAndEncode(xml);
-      AuthenticationRequest request = service.parseRequestRedirectBinding(deflated, null, authRequest -> new TestRedirectBindingSignatureHelper());
+      String queryString = "SAMLRequest=" + URLEncoder.encode(deflated, "UTF-8");
+      AuthenticationRequest request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper());
       fail("Expected an exception because we are declaring a DOCTYPE. The issuer is now set to [" + request.issuer + "] which is not good.");
     } catch (SAMLException e) {
       assertEquals(e.getMessage(), "Unable to parse SAML v2.0 document.");
@@ -488,7 +498,8 @@ public class DefaultSAMLv2ServiceTest {
       DefaultSAMLv2Service service = new DefaultSAMLv2Service();
       byte[] xml = Files.readAllBytes(Paths.get("src/test/xml/authn-request-has-doctype.xml"));
       String deflated = SAMLTools.deflateAndEncode(xml);
-      service.parseRequestRedirectBinding(deflated, null, authRequest -> new TestRedirectBindingSignatureHelper());
+      String queryString = "SAMLRequest=" + URLEncoder.encode(deflated, "UTF-8");
+      service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper());
       fail("expected an exception because we are declaring a DOCTYPE");
     } catch (SAMLException e) {
       assertEquals(e.getMessage(), "Unable to parse SAML v2.0 document.");
@@ -509,10 +520,11 @@ public class DefaultSAMLv2ServiceTest {
       i = i + maxLineLength;
     }
 
-    String withLineReturns = String.join("\n", lines);
-
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationRequest request = service.parseRequestRedirectBinding(withLineReturns, null, authRequest -> new TestRedirectBindingSignatureHelper());
+
+    String withLineReturns = String.join("\n", lines);
+    String queryString = "SAMLRequest=" + URLEncoder.encode(withLineReturns, "UTF-8");
+    AuthenticationRequest request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper());
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
@@ -530,7 +542,7 @@ public class DefaultSAMLv2ServiceTest {
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseRequestRedirectBinding(encodedXML, null, authRequest -> new TestRedirectBindingSignatureHelper())
+        ? service.parseRequestRedirectBinding("SAMLRequest=" + URLEncoder.encode(encodedXML, "UTF-8"), authRequest -> new TestRedirectBindingSignatureHelper())
         : service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper());
 
     // No Name Policy present in the request, we will default to Email
@@ -566,9 +578,15 @@ public class DefaultSAMLv2ServiceTest {
 
                                                   )));
 
+    // For HTTP Redirect bindings
+    String queryString = "SAMLRequest=" + URLEncoder.encode(encodedXML, "UTF-8") +
+        "&RelayState=" + URLEncoder.encode(relayState, "UTF-8") +
+        "&SigAlg=" + URLEncoder.encode(Algorithm.RS256.uri, "UTF-8") +
+        "&Signature=" + URLEncoder.encode(signature, "UTF-8");
+
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseRequestRedirectBinding(encodedXML, relayState, authRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS256, publicKey, signature, true))
+        ? service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper(publicKey, true))
         : service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), true));
 
     assertEquals(request.id, binding == Binding.HTTP_Redirect ? "ID_025417c8-50c8-4916-bfe0-e05694f8cea7" : "ID_26d69170-fc73-4b62-8bb6-c72769216134");
@@ -586,7 +604,6 @@ public class DefaultSAMLv2ServiceTest {
     String encodedXML = new String(Files.readAllBytes(binding == Binding.HTTP_Redirect
         ? Paths.get("src/test/xml/deflated/authn-request-signed.txt")
         : Paths.get("src/test/xml/encoded/authn-request-signed-badSignature.txt")));
-    String signature = new String(Files.readAllBytes(Paths.get("src/test/xml/signature/authn-request-redirect-bad.txt"))); // Not used for POST binding
     PublicKey publicKey = KeyFactory.getInstance("RSA")
                                     .generatePublic(
                                         new X509EncodedKeySpec(
@@ -601,7 +618,12 @@ public class DefaultSAMLv2ServiceTest {
     try {
       DefaultSAMLv2Service service = new DefaultSAMLv2Service();
       if (binding == Binding.HTTP_Redirect) {
-        service.parseRequestRedirectBinding(encodedXML, relayState, request -> new TestRedirectBindingSignatureHelper(Algorithm.RS256, publicKey, signature, true));
+        String signature = new String(Files.readAllBytes(Paths.get("src/test/xml/signature/authn-request-redirect-bad.txt"))); // Not used for POST binding
+        String queryString = "SAMLRequest=" + URLEncoder.encode(encodedXML, "UTF-8") +
+            "&RelayState=" + URLEncoder.encode(relayState, "UTF-8") +
+            "&SigAlg=" + URLEncoder.encode("http://www.w3.org/2001/04/xmldsig-more#rsa-sha256", "UTF-8") +
+            "&Signature=" + URLEncoder.encode(signature, "UTF-8");
+        service.parseRequestRedirectBinding(queryString, request -> new TestRedirectBindingSignatureHelper(publicKey, true));
       } else {
         service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), true));
       }
@@ -620,9 +642,12 @@ public class DefaultSAMLv2ServiceTest {
         ? Paths.get("src/test/xml/deflated/authn-request-control.txt")
         : Paths.get("src/test/xml/encoded/authn-request-control.txt")));
 
+    // For Redirect Binding
+    String queryString = "SAMLRequest=" + URLEncoder.encode(encodedXML, "UTF-8");
+
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseRequestRedirectBinding(encodedXML, null, authRequest -> new TestRedirectBindingSignatureHelper())
+        ? service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper())
         : service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper());
 
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
@@ -791,12 +816,17 @@ public class DefaultSAMLv2ServiceTest {
     assertNotNull(certificate);
     PublicKey publicKey = certificate.getPublicKey();
 
+    String queryString = "SAMLRequest=" + URLEncoder.encode(encodedXML, "UTF-8") +
+        "&RelayState=" + URLEncoder.encode("http://sp.example.com/relaystate", "UTF-8") +
+        "&SigAlg=" + URLEncoder.encode(Algorithm.RS1.uri, "UTF-8") +
+        "&Signature=" + URLEncoder.encode(redirectSignature, "UTF-8");
+
     // Testing purposes, signatures can't be verified currently, TBD if this is a bug or just invalid signatures.
     // - Disable signature verification for now.
     boolean verifySignature = false;
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     LogoutRequest request = binding == Binding.HTTP_Redirect
-        ? service.parseLogoutRequestRedirectBinding(encodedXML, "http://sp.example.com/relaystate", logoutRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS1, publicKey, redirectSignature, verifySignature))
+        ? service.parseLogoutRequestRedirectBinding(queryString, logoutRequest -> new TestRedirectBindingSignatureHelper(publicKey, verifySignature))
         : service.parseLogoutRequestPostBinding(encodedXML, logoutRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), verifySignature));
 
     assertEquals(request.id, binding == Binding.HTTP_Redirect
@@ -830,12 +860,18 @@ public class DefaultSAMLv2ServiceTest {
     assertNotNull(certificate);
     PublicKey publicKey = certificate.getPublicKey();
 
+    // For Redirect Binding
+    String queryString = "SAMLRequest=" + URLEncoder.encode(encodedXML, "UTF-8") +
+        "&RelayState=" + URLEncoder.encode("http://sp.example.com/relaystate", "UTF-8") +
+        "&SigAlg=" + URLEncoder.encode(Algorithm.RS1.uri, "UTF-8") +
+        "&Signature=" + URLEncoder.encode(redirectSignature, "UTF-8");
+
     // Testing purposes, signatures can't be verified currently, TBD if this is a bug or just invalid signatures.
     // - Disable signature verification for now.
     boolean verifySignature = false;
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     LogoutResponse response = binding == Binding.HTTP_Redirect
-        ? service.parseLogoutResponseRedirectBinding(encodedXML, "http://sp.example.com/relaystate", logoutRequest -> new TestRedirectBindingSignatureHelper(Algorithm.RS1, publicKey, redirectSignature, verifySignature))
+        ? service.parseLogoutResponseRedirectBinding(queryString, logoutRequest -> new TestRedirectBindingSignatureHelper(publicKey, verifySignature))
         : service.parseLogoutResponsePostBinding(encodedXML, logoutRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(publicKey), verifySignature));
 
     assertEquals(response.id, binding == Binding.HTTP_Redirect
@@ -860,41 +896,21 @@ public class DefaultSAMLv2ServiceTest {
     request.issuer = "https://local.fusionauth.io";
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String encoded;
+    String queryString;
     if (binding == Binding.HTTP_Redirect) {
-      encoded = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+      queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
     } else {
       X509Certificate cert = generateX509Certificate(kp);
-      encoded = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+      queryString = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
     }
 
     if (binding == Binding.HTTP_Redirect) {
-      // Unwind the request
-      int start = encoded.indexOf("=");
-      int end = encoded.indexOf("&");
-      String encodedRequest = URLDecoder.decode(encoded.substring(start + 1, end), "UTF-8");
-
-      // Unwind the RelayState
-      start = encoded.indexOf("RelayState=");
-      end = encoded.indexOf("&", start);
-      String relayState = encoded.substring(start + "RelayState=".length(), end);
-      assertEquals(relayState, "Relay-State-String");
-
-      // Unwind the SigAlg
-      start = encoded.indexOf("SigAlg=");
-      end = encoded.indexOf("&", start);
-      String sigAlg = URLDecoder.decode(encoded.substring(start + "SigAlg=".length(), end), "UTF-8");
-
-      // Unwind the Signature
-      start = encoded.indexOf("Signature=");
-      end = encoded.length();
-      String signature = URLDecoder.decode(encoded.substring(start + "Signature=".length(), end), "UTF-8");
-      request = service.parseRequestRedirectBinding(encodedRequest, relayState, authRequest -> new TestRedirectBindingSignatureHelper(Algorithm.fromURI(sigAlg), kp.getPublic(), signature, true));
+      request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper(kp.getPublic(), true));
     } else {
-      request = service.parseRequestPostBinding(encoded, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
+      request = service.parseRequestPostBinding(queryString, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
     }
 
-    // Parse the request
+    // Assert the the parsed request
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
@@ -902,7 +918,8 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test(dataProvider = "signatureLocation")
-  public void roundTripResponseSignedAssertion(SignatureLocation signatureLocation, boolean includeKeyInfoInResponse) throws Exception {
+  public void roundTripResponseSignedAssertion(SignatureLocation signatureLocation, boolean includeKeyInfoInResponse)
+      throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
@@ -956,6 +973,42 @@ public class DefaultSAMLv2ServiceTest {
     };
   }
 
+  @Test
+  public void variousURLEncoding_SignatureVerification() throws Exception {
+    // Use case: URL encoding is not canonical, so when we calculate the signature we cannot assume if we URL encode a value it will be equal to the way it was URL encoded when the signature was first generated.
+    // - Try using different URl encoding to ensure we can calculate the signature correctly.
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "https://local.fusionauth.io";
+
+    MockDefaultSAMLv2Service service = new MockDefaultSAMLv2Service();
+
+    // Use our own URL encoding, expected to work.
+    String queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+    request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper(kp.getPublic(), true));
+
+    // Assert the the parsed request
+    assertEquals(request.id, "foobarbaz");
+    assertEquals(request.issuer, "https://local.fusionauth.io");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
+    assertEquals(request.version, "2.0");
+
+    // Rebuild the query string using lower case hex
+    service.lowerCaseURLEncoding = true;
+    queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
+    request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper(kp.getPublic(), true));
+
+    // Assert the the parsed request
+    assertEquals(request.id, "foobarbaz");
+    assertEquals(request.issuer, "https://local.fusionauth.io");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
+    assertEquals(request.version, "2.0");
+  }
+
   private X509Certificate generateX509Certificate(KeyPair keyPair) throws IllegalArgumentException {
     try {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
@@ -986,6 +1039,27 @@ public class DefaultSAMLv2ServiceTest {
       return builder.parse(new ByteArrayInputStream(bytes));
     } catch (ParserConfigurationException | SAXException | IOException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  private static class MockDefaultSAMLv2Service extends DefaultSAMLv2Service {
+    public boolean lowerCaseURLEncoding = false;
+
+    @Override
+    protected String urlEncode(String s) {
+      if (lowerCaseURLEncoding) {
+        try {
+          return URLEncoder.encode(s, "UTF-8")
+                           .replace("%2B", "%2b")
+                           .replace("%2F", "%2f")
+                           .replace("%3A", "%3a")
+                           .replace("%3D", "%3d");
+        } catch (UnsupportedEncodingException e) {
+          throw new RuntimeException(e);
+        }
+      } else {
+        return super.urlEncode(s);
+      }
     }
   }
 }

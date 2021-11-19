@@ -323,6 +323,39 @@ public class SAMLTools {
   }
 
   /**
+   * Separate query parameters, do not URL decode anything.
+   *
+   * @param queryString the query string to parse
+   * @return a POJO containing non-URL decoded SAML query parameters.
+   */
+  public static SAMLRequestParameters parseQueryString(String queryString) {
+    SAMLRequestParameters result = new SAMLRequestParameters();
+
+    String[] parts = queryString.split("&");
+    for (String part : parts) {
+      String[] param = part.split("=");
+      if (param.length == 2) {
+        switch (param[0]) {
+          case "RelayState":
+            result.RelayState = param[1];
+            break;
+          case "SAMLRequest":
+            result.SAMLRequest = param[1];
+            break;
+          case "SigAlg":
+            result.SigAlg = param[1];
+            break;
+          case "Signature":
+            result.Signature = param[1];
+            break;
+        }
+      }
+    }
+
+    return result;
+  }
+
+  /**
    * Convert a key descriptor type to a certificate
    *
    * @param keyDescriptorType the key descriptor type

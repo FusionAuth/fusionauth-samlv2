@@ -171,13 +171,13 @@ public interface SAMLv2Service {
   /**
    * Parses a HTTP-Redirect binding to a Logout request.
    *
-   * @param encodedRequest  the encoded SAML request, the request will be assumed to be encoded an deflated.
+   * @param queryString     the original query string including the URL encoded values provided by the caller.
    * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
    *                        necessary details to complete signature verification.
    * @return The parsed request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  LogoutRequest parseLogoutRequestRedirectBinding(String encodedRequest, String relayState,
+  LogoutRequest parseLogoutRequestRedirectBinding(String queryString,
                                                   Function<LogoutRequest, RedirectBindingSignatureHelper> signatureHelper)
       throws SAMLException;
 
@@ -197,13 +197,13 @@ public interface SAMLv2Service {
   /**
    * Parses a HTTP-Redirect binding to a Logout response.
    *
-   * @param encodedRequest  the encoded SAML request, the request will be assumed to be encoded an deflated.
+   * @param queryString     the original query string including the URL encoded values provided by the caller.
    * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
    *                        necessary details to complete signature verification.
    * @return The parsed request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  LogoutResponse parseLogoutResponseRedirectBinding(String encodedRequest, String relayState,
+  LogoutResponse parseLogoutResponseRedirectBinding(String queryString,
                                                     Function<LogoutResponse, RedirectBindingSignatureHelper> signatureHelper)
       throws SAMLException;
 
@@ -232,14 +232,13 @@ public interface SAMLv2Service {
   /**
    * Parses the authentication request from an HTTP redirect binding and verifies that it is valid.
    *
-   * @param encodedRequest  The encoded SAML request, the request will be assumed to be encoded an deflated.
-   * @param relayState      The RelayState URL parameter (only needed if verifying signatures).
+   * @param queryString     the original query string including the URL encoded values provided by the caller.
    * @param signatureHelper the signature helper used to determine if a signature is required and to provide additional
    *                        necessary details to complete signature verification.
    * @return The request.
    * @throws SAMLException If any unrecoverable errors occur.
    */
-  AuthenticationRequest parseRequestRedirectBinding(String encodedRequest, String relayState,
+  AuthenticationRequest parseRequestRedirectBinding(String queryString,
                                                     Function<AuthenticationRequest, RedirectBindingSignatureHelper> signatureHelper)
       throws SAMLException;
 
@@ -271,19 +270,9 @@ public interface SAMLv2Service {
 
   interface RedirectBindingSignatureHelper {
     /**
-     * @return the algorithm used to verify the signature.
-     */
-    Algorithm algorithm();
-
-    /**
      * @return the public key used to verify the signature.
      */
     PublicKey publicKey();
-
-    /**
-     * @return the signature string from the HTTP request to verify.
-     */
-    String signature();
 
     /**
      * @return true if the signature should be verified.

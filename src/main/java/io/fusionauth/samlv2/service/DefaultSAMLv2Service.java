@@ -110,6 +110,7 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusResponseType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.KeyInfoType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.X509DataType;
+import io.fusionauth.samlv2.util.SAMLRequestParameters;
 import io.fusionauth.samlv2.util.SAMLTools;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -446,13 +447,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public LogoutRequest parseLogoutRequestRedirectBinding(String encodedRequest, String relayState,
+  public LogoutRequest parseLogoutRequestRedirectBinding(String queryString,
                                                          Function<LogoutRequest, RedirectBindingSignatureHelper> signatureHelperFunction)
       throws SAMLException {
-    LogoutRequestParseResult result = parseLogoutRequest(decodeAndInflate(encodedRequest));
+    SAMLRequestParameters requestParameters = SAMLTools.parseQueryString(queryString);
+    LogoutRequestParseResult result = parseLogoutRequest(decodeAndInflate(requestParameters.urlDecodedSAMLRequest()));
     RedirectBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      verifyRequestSignature(encodedRequest, relayState, signatureHelper, result.request);
+      verifyRequestSignature(requestParameters, signatureHelper, result.request);
     }
 
     return result.request;
@@ -473,13 +475,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public LogoutResponse parseLogoutResponseRedirectBinding(String encodedRequest, String relayState,
+  public LogoutResponse parseLogoutResponseRedirectBinding(String queryString,
                                                            Function<LogoutResponse, RedirectBindingSignatureHelper> signatureHelperFunction)
       throws SAMLException {
-    LogoutResponseParseResult result = parseLogoutResponse(decodeAndInflate(encodedRequest));
+    SAMLRequestParameters requestParameters = SAMLTools.parseQueryString(queryString);
+    LogoutResponseParseResult result = parseLogoutResponse(decodeAndInflate(requestParameters.urlDecodedSAMLRequest()));
     RedirectBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.response);
     if (signatureHelper.verifySignature()) {
-      verifyRequestSignature(encodedRequest, relayState, signatureHelper, result.response);
+      verifyRequestSignature(requestParameters, signatureHelper, result.response);
     }
 
     return result.response;
@@ -569,13 +572,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   @Override
-  public AuthenticationRequest parseRequestRedirectBinding(String encodedRequest, String relayState,
+  public AuthenticationRequest parseRequestRedirectBinding(String queryString,
                                                            Function<AuthenticationRequest, RedirectBindingSignatureHelper> signatureHelperFunction)
       throws SAMLException {
-    AuthnRequestParseResult result = parseRequest(decodeAndInflate(encodedRequest));
+    SAMLRequestParameters requestParameters = SAMLTools.parseQueryString(queryString);
+    AuthnRequestParseResult result = parseRequest(decodeAndInflate(requestParameters.urlDecodedSAMLRequest()));
     RedirectBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      verifyRequestSignature(encodedRequest, relayState, signatureHelper, result.request);
+      verifyRequestSignature(requestParameters, signatureHelper, result.request);
     }
 
     return result.request;
@@ -682,9 +686,18 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return response;
   }
 
+  protected String urlEncode(String s) {
+    try {
+      return URLEncoder.encode(s, "UTF-8");
+    } catch (UnsupportedEncodingException e) {
+      throw new IllegalStateException("UTF-8 is not supported. You have a problem.", e);
+    }
+  }
+
   <T> String buildPostRequest(JAXBElement<T> object, Class<T> type, boolean sign, PrivateKey privateKey,
                               X509Certificate certificate,
-                              Algorithm algorithm, String xmlSignatureC14nMethod, boolean includeKeyInfo) throws SAMLException {
+                              Algorithm algorithm, String xmlSignatureC14nMethod, boolean includeKeyInfo)
+      throws SAMLException {
     Document document = marshallToDocument(object, type);
     try {
       Element toSign = document.getDocumentElement();
@@ -706,20 +719,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     try {
       byte[] xml = marshallToBytes(object, type);
       String encodedResult = SAMLTools.deflateAndEncode(xml);
-      String parameters = parameterName + "=" + URLEncoder.encode(encodedResult, "UTF-8");
+      String parameters = parameterName + "=" + urlEncode(encodedResult);
       if (relayState != null) {
-        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
+        parameters += "&RelayState=" + urlEncode(relayState);
       }
 
       if (sign && key != null && algorithm != null) {
         Signature signature;
-        parameters += "&SigAlg=" + URLEncoder.encode(algorithm.uri, "UTF-8");
+        parameters += "&SigAlg=" + urlEncode(algorithm.uri);
         signature = Signature.getInstance(algorithm.name);
         signature.initSign(key);
         signature.update(parameters.getBytes(StandardCharsets.UTF_8));
 
         String signatureParameter = new String(Base64.getEncoder().encode(signature.sign()), StandardCharsets.UTF_8);
-        parameters += "&Signature=" + URLEncoder.encode(signatureParameter, "UTF-8");
+        parameters += "&Signature=" + urlEncode(signatureParameter);
       }
 
       return parameters;
@@ -868,7 +881,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return result;
   }
 
-
   private LogoutResponseParseResult parseLogoutResponse(byte[] xmlBytes) throws SAMLException {
     String xml = new String(xmlBytes, StandardCharsets.UTF_8);
     if (logger.isDebugEnabled()) {
@@ -971,27 +983,29 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
-  private void verifyRequestSignature(String encodedRequest, String relayState,
+  private void verifyRequestSignature(SAMLRequestParameters requestParameters,
                                       RedirectBindingSignatureHelper signatureHelper, SAMLRequest request)
       throws SAMLException {
-    if (signatureHelper.signature() == null || signatureHelper.publicKey() == null || signatureHelper.algorithm() == null) {
+    Algorithm algorithm = Algorithm.fromURI(requestParameters.urlDecodedSigAlg());
+    if (requestParameters.Signature == null || algorithm == null || signatureHelper.publicKey() == null) {
       throw new SignatureNotFoundException("You must specify a signature, key and algorithm if you want to verify the SAML request signature", request);
     }
 
     try {
-      String parameters = "SAMLRequest=" + URLEncoder.encode(encodedRequest, "UTF-8");
-      if (relayState != null) {
-        parameters += "&RelayState=" + URLEncoder.encode(relayState, "UTF-8");
+      // We are assuming validation has already been performed to confirm the correct parameters are in the queryString.
+      String parameters = "SAMLRequest=" + requestParameters.SAMLRequest;
+      if (requestParameters.RelayState != null) {
+        parameters += "&RelayState=" + requestParameters.RelayState;
       }
-      parameters += "&SigAlg=" + URLEncoder.encode(signatureHelper.algorithm().uri, "UTF-8");
+      parameters += "&SigAlg=" + requestParameters.SigAlg;
 
-      Signature sig = Signature.getInstance(signatureHelper.algorithm().name);
+      Signature sig = Signature.getInstance(algorithm.name);
       sig.initVerify(signatureHelper.publicKey());
       sig.update(parameters.getBytes(StandardCharsets.UTF_8));
-      if (!sig.verify(Base64.getMimeDecoder().decode(signatureHelper.signature().getBytes(StandardCharsets.UTF_8)))) {
+      if (!sig.verify(Base64.getMimeDecoder().decode(requestParameters.urlDecodedSignature().getBytes(StandardCharsets.UTF_8)))) {
         throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
       }
-    } catch (GeneralSecurityException | UnsupportedEncodingException e) {
+    } catch (GeneralSecurityException e) {
       throw new SAMLException("Unable to verify signature", request, e);
     }
   }
