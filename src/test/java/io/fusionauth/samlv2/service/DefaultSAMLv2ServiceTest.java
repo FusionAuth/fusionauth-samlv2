@@ -653,6 +653,7 @@ public class DefaultSAMLv2ServiceTest {
         ? service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper())
         : service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper());
 
+    assertEquals(request.acsURL, "http://sp.example.com/demo1/index.php?acs");
     assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
     assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());

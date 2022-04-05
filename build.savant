@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2021, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2014-2022, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@ jakartaXMLBindVersion = "3.0.1"
 slf4jVersion = "2.0.0-alpha5"
 testngVersion = "7.3.0"
 
-project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.8.1", licenses: ["ApacheV2_0"]) {
+project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.8.2", licenses: ["ApacheV2_0"]) {
   workflow {
     fetch {
       cache()

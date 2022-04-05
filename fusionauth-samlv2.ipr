@@ -204,12 +204,6 @@
       <textMaps />
     </LinkMapSettings>
   </component>
-  <component name="MarkdownSettings">
-    <enabledExtensions>
-      <entry key="MermaidLanguageExtension" value="true" />
-      <entry key="PlantUMLLanguageExtension" value="true" />
-    </enabledExtensions>
-  </component>
   <component name="Palette2">
     <group name="Swing">
       <item class="com.intellij.uiDesigner.HSpacer" tooltip-text="Horizontal Spacer" icon="/com/intellij/uiDesigner/icons/hspacer.png" removable="false" auto-create-binding="false" can-attach-label="false">
@@ -1612,6 +1606,11 @@
   </component>
   <component name="SvnBranchConfigurationManager">
     <option name="mySupportsUserInfoFilter" value="true" />
+  </component>
+  <component name="SwUserDefinedSpecifications">
+    <option name="specTypeByUrl">
+      <map />
+    </option>
   </component>
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />

@@ -905,7 +905,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     result.document = newDocumentFromBytes(xmlBytes);
     result.authnRequest = unmarshallFromDocument(result.document, AuthnRequestType.class);
     result.request = new AuthenticationRequest();
-    result.request.xml = xml;
+    result.request.acsURL = result.authnRequest.getAssertionConsumerServiceURL();
     result.request.id = result.authnRequest.getID();
     result.request.issuer = result.authnRequest.getIssuer().getValue();
     result.request.issueInstant = result.authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();
@@ -916,6 +916,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       result.request.nameIdFormat = nameIdPolicyType.getFormat();
     }
     result.request.version = result.authnRequest.getVersion();
+    result.request.xml = xml;
     return result;
   }
 
