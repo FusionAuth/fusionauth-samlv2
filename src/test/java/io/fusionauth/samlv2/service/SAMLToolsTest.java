@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2021-2022, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,13 +16,31 @@
 package io.fusionauth.samlv2.service;
 
 import io.fusionauth.samlv2.domain.SAMLException;
+import io.fusionauth.samlv2.util.SAMLRequestParameters;
 import io.fusionauth.samlv2.util.SAMLTools;
 import org.testng.annotations.Test;
+import static org.testng.Assert.assertNull;
 
 /**
  * @author Daniel DeGroff
  */
 public class SAMLToolsTest {
+  @Test
+  public void parseQueryString() {
+    // Account for null
+    SAMLRequestParameters actual = SAMLTools.parseQueryString(null);
+
+    assertNull(actual.RelayState);
+    assertNull(actual.SAMLRequest);
+    assertNull(actual.SigAlg);
+    assertNull(actual.Signature);
+
+    assertNull(actual.urlDecodedRelayState());
+    assertNull(actual.urlDecodedSAMLRequest());
+    assertNull(actual.urlDecodedSigAlg());
+    assertNull(actual.urlDecodedSignature());
+  }
+
   @Test
   public void truncatedRequest() throws SAMLException {
     // Ensure we can handle a truncated deflated AuthN request.

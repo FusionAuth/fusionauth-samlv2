@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2021-2022, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -331,6 +331,10 @@ public class SAMLTools {
    */
   public static SAMLRequestParameters parseQueryString(String queryString) {
     SAMLRequestParameters result = new SAMLRequestParameters();
+
+    if (queryString == null) {
+      return result;
+    }
 
     String[] parts = queryString.split("&");
     for (String part : parts) {
