@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2021, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2022, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,6 +20,7 @@ import javax.xml.crypto.MarshalException;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
 import javax.xml.crypto.dsig.DigestMethod;
 import javax.xml.crypto.dsig.Reference;
+import javax.xml.crypto.dsig.SignatureMethod;
 import javax.xml.crypto.dsig.SignedInfo;
 import javax.xml.crypto.dsig.Transform;
 import javax.xml.crypto.dsig.XMLSignature;
@@ -55,6 +56,8 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
+import io.fusionauth.der.DerInputStream;
+import io.fusionauth.der.DerValue;
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
@@ -818,6 +821,54 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     });
   }
 
+  private void checkFor_CVE_2022_21449(SAMLRequest request, byte[] signature) throws SAMLException {
+    if (signature.length == 0) {
+      return;
+    }
+
+    DerInputStream is = new DerInputStream(signature);
+
+    // If the signature is not a sequence, it may be a bit string or something like that. This would mean the signature
+    // is in a different format and to properly validate it, we'd have to decode it first.
+    DerValue[] sequence;
+    try {
+      sequence = is.getSequence();
+    } catch (Exception e) {
+      // May not be a sequence
+      return;
+    }
+
+    // Expecting two integers
+    if (sequence.length != 2) {
+      return;
+    }
+
+    boolean rOk = false;
+    boolean sOk = false;
+
+    // Ensure r is not 0
+    byte[] r = sequence[0].toByteArray();
+    for (byte b : r) {
+      rOk = b != 0;
+      if (rOk) {
+        break;
+      }
+    }
+
+    // Ensure s is not 0
+    byte[] s = sequence[1].toByteArray();
+    for (byte b : s) {
+      sOk = b != 0;
+      if (sOk) {
+        break;
+      }
+    }
+
+    if (!rOk || !sOk) {
+      throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
+    }
+  }
+
   private void fixIDs(Element element) {
     NamedNodeMap attributes = element.getAttributes();
     for (int i = 0; i < attributes.getLength(); i++) {
@@ -968,6 +1019,16 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
       try {
         XMLSignature signature = factory.unmarshalXMLSignature(validateContext);
+        String algorith = signature.getSignedInfo().getSignatureMethod().getAlgorithm();
+
+        if (algorith.equals(SignatureMethod.ECDSA_SHA1) ||
+            algorith.equals(SignatureMethod.ECDSA_SHA224) ||
+            algorith.equals(SignatureMethod.ECDSA_SHA256) ||
+            algorith.equals(SignatureMethod.ECDSA_SHA384) ||
+            algorith.equals(SignatureMethod.ECDSA_SHA512)) {
+          checkFor_CVE_2022_21449(request, signature.getSignatureValue().getValue());
+        }
+
         boolean valid = signature.validate(validateContext);
         if (!valid) {
           throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
@@ -999,7 +1060,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       Signature sig = Signature.getInstance(algorithm.name);
       sig.initVerify(signatureHelper.publicKey());
       sig.update(parameters.getBytes(StandardCharsets.UTF_8));
-      if (!sig.verify(Base64.getMimeDecoder().decode(requestParameters.urlDecodedSignature().getBytes(StandardCharsets.UTF_8)))) {
+      byte[] signature = Base64.getMimeDecoder().decode(requestParameters.urlDecodedSignature().getBytes(StandardCharsets.UTF_8));
+
+      if (algorithm.uri.equals(SignatureMethod.ECDSA_SHA1) ||
+          algorithm.uri.equals(SignatureMethod.ECDSA_SHA224) ||
+          algorithm.uri.equals(SignatureMethod.ECDSA_SHA256) ||
+          algorithm.uri.equals(SignatureMethod.ECDSA_SHA384) ||
+          algorithm.uri.equals(SignatureMethod.ECDSA_SHA512)) {
+        checkFor_CVE_2022_21449(request, signature);
+      }
+
+      if (!sig.verify(signature)) {
         throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
       }
     } catch (GeneralSecurityException e) {

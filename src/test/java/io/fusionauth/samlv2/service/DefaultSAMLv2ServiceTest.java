@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2022, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -165,7 +165,7 @@ public class DefaultSAMLv2ServiceTest {
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
     PrivateKey privateKey = kp.getPrivate();
-    X509Certificate certificate = generateX509Certificate(kp);
+    X509Certificate certificate = generateX509Certificate(kp, "SHA256withRSA");
 
     LogoutRequest logoutRequest = new LogoutRequest();
     logoutRequest.id = "_1245";
@@ -223,7 +223,7 @@ public class DefaultSAMLv2ServiceTest {
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
     PrivateKey privateKey = kp.getPrivate();
-    X509Certificate certificate = generateX509Certificate(kp);
+    X509Certificate certificate = generateX509Certificate(kp, "SHA256withRSA");
 
     LogoutResponse logoutResponse = new LogoutResponse();
     logoutResponse.id = "_1245";
@@ -282,7 +282,7 @@ public class DefaultSAMLv2ServiceTest {
     kpg.initialize(2048);
     KeyPair kp = kpg.generateKeyPair();
     PrivateKey privateKey = kp.getPrivate();
-    X509Certificate certificate = generateX509Certificate(kp);
+    X509Certificate certificate = generateX509Certificate(kp, "SHA256withRSA");
 
     AuthenticationRequest request = new AuthenticationRequest();
     request.id = "foobarbaz";
@@ -356,6 +356,64 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(parsed.entityId, metaData.entityId);
     assertEquals(parsed.sp.acsEndpoint, metaData.sp.acsEndpoint);
     assertEquals(parsed.sp.nameIDFormat, metaData.sp.nameIDFormat);
+  }
+
+  @Test(dataProvider = "bindings")
+  public void hacking_CVE_2022_21449(Binding binding) throws Exception {
+    // Attempt to hack the signature for CVE-2022-21449
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
+    kpg.initialize(256);
+    KeyPair kp = kpg.generateKeyPair();
+
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "https://local.fusionauth.io";
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String queryString;
+    if (binding == Binding.HTTP_Redirect) {
+      queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.ES256);
+    } else {
+      X509Certificate cert = generateX509Certificate(kp, "SHA256withECDSA");
+      queryString = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.ES256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+    }
+
+    // Hack the signature
+    int start = queryString.indexOf("Signature=");
+    int end = queryString.indexOf("&", start);
+
+    // ECDSA-Sig-Value ::= SEQUENCE {
+    //   r  INTEGER,
+    //   s  INTEGER
+    // }
+
+    byte[] hackedBytes = new byte[]{48, 6, 2, 1, 0, 2, 1, 0};
+    String hackedSig = Base64.getUrlEncoder().encodeToString(hackedBytes);
+    String hacked;
+    if (binding == Binding.HTTP_Redirect) {
+      hacked = queryString.substring(0, start) + "Signature=" + hackedSig;
+      if (end != -1) {
+        hacked += queryString.substring(end);
+      }
+
+      try {
+        service.parseRequestRedirectBinding(hacked, authRequest -> new TestRedirectBindingSignatureHelper(kp.getPublic(), true));
+        fail("This should have exploded.");
+      } catch (SAMLException ignore) {
+      }
+    } else {
+      Document document = parseDocument(queryString);
+      Node signature = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature").item(0);
+      Node signatureValue = signature.getFirstChild().getNextSibling();
+      signatureValue.setTextContent(hackedSig);
+      String hackedDocument = SAMLTools.marshallToString(document);
+      String hackedDocumentEncoded = new String(Base64.getEncoder().encode(hackedDocument.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
+      try {
+        service.parseRequestPostBinding(hackedDocumentEncoded, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
+        fail("This should have exploded.");
+      } catch (SAMLException ignore) {
+      }
+    }
   }
 
   @DataProvider(name = "maxLineLength")
@@ -889,6 +947,39 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.xml.replace("\r\n", "\n"), expectedXML.replace("\r\n", "\n"));
   }
 
+
+  @Test(dataProvider = "bindings")
+  public void roundTripAuthnRequest_ECDSA(Binding binding) throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
+    kpg.initialize(256);
+    KeyPair kp = kpg.generateKeyPair();
+
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "https://local.fusionauth.io";
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String queryString;
+    if (binding == Binding.HTTP_Redirect) {
+      queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.ES256);
+    } else {
+      X509Certificate cert = generateX509Certificate(kp, "SHA256withECDSA");
+      queryString = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.ES256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+    }
+
+    if (binding == Binding.HTTP_Redirect) {
+      request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper(kp.getPublic(), true));
+    } else {
+      request = service.parseRequestPostBinding(queryString, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
+    }
+
+    // Assert the the parsed request
+    assertEquals(request.id, "foobarbaz");
+    assertEquals(request.issuer, "https://local.fusionauth.io");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
+    assertEquals(request.version, "2.0");
+  }
+
   @Test(dataProvider = "bindings")
   public void roundTripAuthnRequest(Binding binding) throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
@@ -904,7 +995,7 @@ public class DefaultSAMLv2ServiceTest {
     if (binding == Binding.HTTP_Redirect) {
       queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
     } else {
-      X509Certificate cert = generateX509Certificate(kp);
+      X509Certificate cert = generateX509Certificate(kp, "SHA256withRSA");
       queryString = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
     }
 
@@ -1013,7 +1104,7 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.version, "2.0");
   }
 
-  private X509Certificate generateX509Certificate(KeyPair keyPair) throws IllegalArgumentException {
+  private X509Certificate generateX509Certificate(KeyPair keyPair, String algorithm) throws IllegalArgumentException {
     try {
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       X509CertInfo certInfo = new X509CertInfo();
@@ -1027,7 +1118,7 @@ public class DefaultSAMLv2ServiceTest {
       certInfo.set(X509CertInfo.SERIAL_NUMBER, new CertificateSerialNumber(new BigInteger(UUID.randomUUID().toString().replace("-", ""), 16)));
 
       X509CertImpl impl = new X509CertImpl(certInfo);
-      impl.sign(keyPair.getPrivate(), "SHA256withRSA");
+      impl.sign(keyPair.getPrivate(), algorithm);
       return impl;
     } catch (Exception e) {
       throw new IllegalArgumentException(e);
