@@ -58,6 +58,7 @@ import java.util.stream.Collectors;
 
 import io.fusionauth.der.DerInputStream;
 import io.fusionauth.der.DerValue;
+import io.fusionauth.der.Tag;
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
@@ -826,28 +827,33 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       return;
     }
 
-    DerInputStream is = new DerInputStream(signature);
+    byte[] r;
+    byte[] s;
 
-    // If the signature is not a sequence, it may be a bit string or something like that. This would mean the signature
-    // is in a different format and to properly validate it, we'd have to decode it first.
-    DerValue[] sequence;
-    try {
-      sequence = is.getSequence();
-    } catch (Exception e) {
-      // May not be a sequence
-      return;
-    }
+    // Assume if the first byte is 48 (sequence) and the second byte is a positive integer that matches the actual length,
+    // this is likely DER encoded. If it is not a sequence, it is likely a raw signature, which is just r + s.
+    if (signature[0] == Tag.Sequence && signature[1] == signature.length - 2) {
+      try {
+        DerValue[] sequence = new DerInputStream(signature).getSequence();
+        if (sequence.length != 2) {
+          return;
+        }
 
-    // Expecting two integers
-    if (sequence.length != 2) {
-      return;
+        r = sequence[0].toByteArray();
+        s = sequence[1].toByteArray();
+      } catch (Exception e) {
+        throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request, e);
+      }
+    } else {
+      int half = signature.length / 2;
+      r = Arrays.copyOfRange(signature, 0, half);
+      s = Arrays.copyOfRange(signature, half, signature.length);
     }
 
     boolean rOk = false;
     boolean sOk = false;
 
     // Ensure r is not 0
-    byte[] r = sequence[0].toByteArray();
     for (byte b : r) {
       rOk = b != 0;
       if (rOk) {
@@ -856,7 +862,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     // Ensure s is not 0
-    byte[] s = sequence[1].toByteArray();
     for (byte b : s) {
       sOk = b != 0;
       if (sOk) {
