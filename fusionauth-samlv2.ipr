@@ -1589,6 +1589,7 @@
       <words>
         <w>saml</w>
         <w>samlv2</w>
+        <w>unmarshaller</w>
       </words>
     </dictionary>
   </component>
@@ -1606,11 +1607,6 @@
   </component>
   <component name="SvnBranchConfigurationManager">
     <option name="mySupportsUserInfoFilter" value="true" />
-  </component>
-  <component name="SwUserDefinedSpecifications">
-    <option name="specTypeByUrl">
-      <map />
-    </option>
   </component>
   <component name="VcsDirectoryMappings">
     <mapping directory="" vcs="Git" />

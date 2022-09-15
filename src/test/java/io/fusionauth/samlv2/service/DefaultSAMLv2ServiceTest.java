@@ -947,39 +947,6 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.xml.replace("\r\n", "\n"), expectedXML.replace("\r\n", "\n"));
   }
 
-
-  @Test(dataProvider = "bindings")
-  public void roundTripAuthnRequest_ECDSA(Binding binding) throws Exception {
-    KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
-    kpg.initialize(256);
-    KeyPair kp = kpg.generateKeyPair();
-
-    AuthenticationRequest request = new AuthenticationRequest();
-    request.id = "foobarbaz";
-    request.issuer = "https://local.fusionauth.io";
-
-    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    String queryString;
-    if (binding == Binding.HTTP_Redirect) {
-      queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.ES256);
-    } else {
-      X509Certificate cert = generateX509Certificate(kp, "SHA256withECDSA");
-      queryString = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.ES256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
-    }
-
-    if (binding == Binding.HTTP_Redirect) {
-      request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper(kp.getPublic(), true));
-    } else {
-      request = service.parseRequestPostBinding(queryString, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
-    }
-
-    // Assert the the parsed request
-    assertEquals(request.id, "foobarbaz");
-    assertEquals(request.issuer, "https://local.fusionauth.io");
-    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
-    assertEquals(request.version, "2.0");
-  }
-
   @Test(dataProvider = "bindings")
   public void roundTripAuthnRequest(Binding binding) throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
@@ -997,6 +964,38 @@ public class DefaultSAMLv2ServiceTest {
     } else {
       X509Certificate cert = generateX509Certificate(kp, "SHA256withRSA");
       queryString = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+    }
+
+    if (binding == Binding.HTTP_Redirect) {
+      request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper(kp.getPublic(), true));
+    } else {
+      request = service.parseRequestPostBinding(queryString, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
+    }
+
+    // Assert the the parsed request
+    assertEquals(request.id, "foobarbaz");
+    assertEquals(request.issuer, "https://local.fusionauth.io");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
+    assertEquals(request.version, "2.0");
+  }
+
+  @Test(dataProvider = "bindings")
+  public void roundTripAuthnRequest_ECDSA(Binding binding) throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("EC");
+    kpg.initialize(256);
+    KeyPair kp = kpg.generateKeyPair();
+
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "[https://local.fusionauth.io";
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String queryString;
+    if (binding == Binding.HTTP_Redirect) {
+      queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.ES256);
+    } else {
+      X509Certificate cert = generateX509Certificate(kp, "SHA256withECDSA");
+      queryString = service.buildPostAuthnRequest(request, true, kp.getPrivate(), cert, Algorithm.ES256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
     }
 
     if (binding == Binding.HTTP_Redirect) {
@@ -1066,6 +1065,24 @@ public class DefaultSAMLv2ServiceTest {
         {SignatureLocation.Response, true},
         {SignatureLocation.Response, false}
     };
+  }
+
+  @Test
+  public void unmarshalPerformance() throws Exception {
+    String encodedRequest = SAMLTools.encode(Files.readAllBytes(Paths.get("src/test/xml/authn-request-control.xml")));
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    long iterations = 5_000;
+    long start = System.currentTimeMillis();
+    for (int i = 0; i < iterations; i++) {
+      service.parseRequestPostBinding(encodedRequest, authRequest -> new TestPostBindingSignatureHelper());
+    }
+
+    long total = System.currentTimeMillis() - start;
+    double avg = total / iterations;
+
+    // Ensure this is reasonably fast
+    assertTrue(avg < 1.0, "Not fast enough!\nIterations: " + iterations + ", total time: " + total + " ms, avg: " + avg + " ms\n");
   }
 
   @Test

@@ -48,6 +48,7 @@ import java.util.GregorianCalendar;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
@@ -79,6 +80,8 @@ import static javax.xml.XMLConstants.FEATURE_SECURE_PROCESSING;
 @SuppressWarnings("unused")
 public class SAMLTools {
   private static final Map<String, Boolean> FactoryFeatures = new HashMap<>();
+
+  private static final Map<Class<?>, Unmarshaller> UnmarshallerCache = new ConcurrentHashMap<>();
 
   private static final Logger logger = LoggerFactory.getLogger(SAMLTools.class);
 
@@ -417,7 +420,7 @@ public class SAMLTools {
   }
 
   /**
-   * Convert a document to a JAXB Element
+   * Convert a document to a JAXB Element.
    *
    * @param document the XML document
    * @param type     the class of the JAXB element to marshal the document to
@@ -427,8 +430,7 @@ public class SAMLTools {
    */
   public static <T> T unmarshallFromDocument(Document document, Class<T> type) throws SAMLException {
     try {
-      JAXBContext context = JAXBContext.newInstance(type);
-      Unmarshaller unmarshaller = context.createUnmarshaller();
+      Unmarshaller unmarshaller = getUnmarshaller(type);
       JAXBElement<T> element = unmarshaller.unmarshal(document, type);
       return element.getValue();
     } catch (JAXBException e) {
@@ -480,6 +482,31 @@ public class SAMLTools {
     }
 
     return errors.error.isEmpty() && errors.fatal.isEmpty() && errors.warning.isEmpty();
+  }
+
+  /**
+   * Retrieve a JAXB unmarshaller for the specified type. Building the JAXBContext is rather slow, this method will
+   * cache the result and will lazily build new contexts.
+   *
+   * @param type the type to be un-marshalled
+   * @param <T>  the type
+   * @return an unmarshaller
+   * @throws SAMLException if $%#! goes south
+   */
+  private static <T> Unmarshaller getUnmarshaller(Class<T> type) throws SAMLException {
+    Unmarshaller result = UnmarshallerCache.get(type);
+    if (result == null) {
+      try {
+        JAXBContext context = JAXBContext.newInstance(type);
+        result = context.createUnmarshaller();
+      } catch (Exception e) {
+        throw new SAMLException(e.getCause());
+      }
+
+      UnmarshallerCache.put(type, result);
+    }
+
+    return result;
   }
 
   public static class SchemaValidationErrors implements ErrorHandler {
