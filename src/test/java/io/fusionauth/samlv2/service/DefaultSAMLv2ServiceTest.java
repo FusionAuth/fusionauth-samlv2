@@ -987,7 +987,7 @@ public class DefaultSAMLv2ServiceTest {
 
     AuthenticationRequest request = new AuthenticationRequest();
     request.id = "foobarbaz";
-    request.issuer = "[https://local.fusionauth.io";
+    request.issuer = "https://local.fusionauth.io";
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     String queryString;
