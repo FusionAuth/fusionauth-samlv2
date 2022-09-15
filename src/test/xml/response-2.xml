@@ -1,19 +1,4 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!--
-  ~ Copyright (c) 2019, Inversoft Inc., All Rights Reserved
-  ~
-  ~ Licensed under the Apache License, Version 2.0 (the "License");
-  ~ you may not use this file except in compliance with the License.
-  ~ You may obtain a copy of the License at
-  ~
-  ~   http://www.apache.org/licenses/LICENSE-2.0
-  ~
-  ~ Unless required by applicable law or agreed to in writing,
-  ~ software distributed under the License is distributed on an
-  ~ "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND,
-  ~ either express or implied. See the License for the specific
-  ~ language governing permissions and limitations under the License.
-  -->
 <ns3:Response xmlns:ns3="urn:oasis:names:tc:SAML:2.0:protocol" xmlns="urn:oasis:names:tc:SAML:2.0:assertion"
               Destination="https://www.google.com/a/fusionauth.io/acs" ID="_40cf1ea4-4776-48de-9f27-ccce20e11919"
               InResponseTo="aokkbfniiiicfbcohgpbmhnlhmheoecmihpcalaf" IssueInstant="2019-04-15T21:05:00.039Z"
