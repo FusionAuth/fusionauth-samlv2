@@ -17,7 +17,7 @@ savantVersion = "1.0.0"
 
 glassFishVersion = "3.0.2"
 jakartaXMLBindVersion = "3.0.1"
-slf4jVersion = "2.0.0-alpha5"
+slf4jVersion = "2.0.3"
 testngVersion = "7.3.0"
 
 project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.8.6", licenses: ["ApacheV2_0"]) {
