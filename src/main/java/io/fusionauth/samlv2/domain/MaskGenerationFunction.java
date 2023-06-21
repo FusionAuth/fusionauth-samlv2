@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -13,7 +13,6 @@
  * either express or implied. See the License for the specific
  * language governing permissions and limitations under the License.
  */
-
 package io.fusionauth.samlv2.domain;
 
 /**
@@ -32,9 +31,9 @@ public enum MaskGenerationFunction {
 
   MGF1_SHA512("MGF1 with SHA512", "http://www.w3.org/2009/xmlenc11#mgf1sha512", "SHA-512");
 
-  public final String name;
-
   public final String digest;
+
+  public final String name;
 
   public final String uri;
 
