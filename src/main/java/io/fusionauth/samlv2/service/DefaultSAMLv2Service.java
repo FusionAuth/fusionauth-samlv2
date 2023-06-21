@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -65,8 +65,13 @@ import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.Binding;
 import io.fusionauth.samlv2.domain.Conditions;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
+import io.fusionauth.samlv2.domain.DigestAlgorithm;
+import io.fusionauth.samlv2.domain.EncryptionAlgorithm;
+import io.fusionauth.samlv2.domain.KeyLocation;
+import io.fusionauth.samlv2.domain.KeyTransportAlgorithm;
 import io.fusionauth.samlv2.domain.LogoutRequest;
 import io.fusionauth.samlv2.domain.LogoutResponse;
+import io.fusionauth.samlv2.domain.MaskGenerationFunction;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.MetaData.IDPMetaData;
 import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
@@ -163,6 +168,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
                                    X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
                                    SignatureLocation signatureOption, boolean includeKeyInfo) throws SAMLException {
+    return buildAuthnResponse(response, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod, signatureOption, includeKeyInfo,
+        false, null, null, null, null, null, null);
+  }
+
+  @Override
+  public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
+                                   X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
+                                   SignatureLocation signatureOption, boolean includeKeyInfo, boolean encrypt,
+                                   EncryptionAlgorithm encryptionAlgorithm, KeyLocation keyLocation,
+                                   KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
+                                   DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
     ResponseType jaxbResponse = new ResponseType();
 
     // Status (element)
@@ -271,30 +287,28 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createResponse(jaxbResponse), ResponseType.class);
 
-    // Bail now if we aren't signing the response.
-    if (!sign) {
+    // Sign the Assertion if requested
+    if (sign && response.status.code == ResponseStatus.Success && signatureOption == SignatureLocation.Assertion) {
       try {
-        String xml = marshallToString(document);
-        return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
-      } catch (TransformerException e) {
-        throw new SAMLException("Unable to marshal the SAML response to XML.", e);
-      }
-    }
-
-    try {
-      // If successful, sign the assertion if requested, otherwise, sign the root
-      Element toSign;
-      Node insertBefore = null;
-      // The 'Signature' must come directly after the 'Issuer' element.
-      if (response.status.code == ResponseStatus.Success && signatureOption == SignatureLocation.Assertion) {
-        toSign = (Element) document.getElementsByTagName("Assertion").item(0);
+        Element toSign = (Element) document.getElementsByTagName("Assertion").item(0);
+        // The 'Signature' must come directly after the 'Issuer' element.
         // Issuer is the only required element. See schema for AssertionType in section 2.3.3 of SAML Core.
         // - The next sibling of the 'Issuer' may be null, this will cause the Signature to be inserted as the last element
         //   of the assertion which is what we want.
         Node issuer = toSign.getElementsByTagName("Issuer").item(0);
-        insertBefore = issuer.getNextSibling();
-      } else {
-        toSign = document.getDocumentElement();
+        Node insertBefore = issuer.getNextSibling();
+
+        signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, toSign, insertBefore, includeKeyInfo);
+      } catch (Exception e) {
+        throw new SAMLException("Unable to sign XML SAML assertion", e);
+      }
+    }
+
+    // Sign the response if requested
+    if (sign && signatureOption == SignatureLocation.Response) {
+      try {
+        Element toSign = document.getDocumentElement();
+        Node insertBefore = null;
         // The only required element in the StatusResponseType is Status. See Section 3.2.2 in SAML Core.
         // The children will be a sequence that must exist in the order of 'Issuer', 'Signature', 'Extensions', and then 'Status'
         // - If the first element is 'Issuer', then the next sibling will be used for 'insertBefore'.
@@ -307,12 +321,19 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
             break;
           }
         }
-      }
 
-      String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore, includeKeyInfo);
+        signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, toSign, insertBefore, includeKeyInfo);
+      } catch (Exception e) {
+        throw new SAMLException("Unable to sign XML SAML response", e);
+      }
+    }
+
+    // Marshall the XML to a string and base64 encode the response
+    try {
+      String xml = marshallToString(document);
       return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
-    } catch (Exception e) {
-      throw new SAMLException("Unable to sign XML SAML response", e);
+    } catch (TransformerException e) {
+      throw new SAMLException("Unable to marshall the SAML response to XML.", e);
     }
   }
 
@@ -674,7 +695,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
             if (attributeObject instanceof AttributeType attributeType) {
               String name = attributeType.getName();
               List<Object> attributeValues = attributeType.getAttributeValue();
-              List<String> values = attributeValues.stream().map(SAMLTools::attributeToString).collect(Collectors.toList());
+              List<String> values = attributeValues.stream().map(SAMLTools::attributeToString).toList();
               response.assertion.attributes.computeIfAbsent(name, k -> new ArrayList<>()).addAll(values);
             } else {
               throw new SAMLException("This library currently doesn't support encrypted attributes");
@@ -697,18 +718,22 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                               Algorithm algorithm, String xmlSignatureC14nMethod, boolean includeKeyInfo)
       throws SAMLException {
     Document document = marshallToDocument(object, type);
-    try {
-      Element toSign = document.getDocumentElement();
-      String xml;
-      if (sign) {
-        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null, includeKeyInfo);
-      } else {
-        xml = marshallToString(document);
-      }
 
+    // Sign the request if requested
+    if (sign) {
+      try {
+        Element toSign = document.getDocumentElement();
+        signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, toSign, null, includeKeyInfo);
+      } catch (Exception e) {
+        throw new SAMLException("Unable to sign XML SAML request", e);
+      }
+    }
+
+    try {
+      String xml = marshallToString(document);
       return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
     } catch (Exception e) {
-      throw new SAMLException("Unable to sign XML SAML response", e);
+      throw new SAMLException("Unable to marshall the SAML request to XML", e);
     }
   }
 
@@ -976,10 +1001,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return result;
   }
 
-  private String signXML(PrivateKey privateKey, X509Certificate certificate, Algorithm algorithm,
-                         String xmlSignatureC14nMethod, Document document, Element toSign, Node insertBefore,
-                         boolean includeKeyInfo)
-      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, MarshalException, XMLSignatureException, TransformerException {
+  private void signXML(PrivateKey privateKey, X509Certificate certificate, Algorithm algorithm,
+                       String xmlSignatureC14nMethod, Element toSign, Node insertBefore,
+                       boolean includeKeyInfo)
+      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, MarshalException, XMLSignatureException {
     // Set the id attribute node. Yucky! Yuck!
     toSign.setIdAttributeNode(toSign.getAttributeNode("ID"), true);
 
@@ -1006,7 +1031,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     XMLSignature signature = factory.newXMLSignature(si, ki);
 
     signature.sign(dsc);
-    return marshallToString(document);
   }
 
   private void verifyEmbeddedSignature(Document document, KeySelector keySelector, SAMLRequest request)
