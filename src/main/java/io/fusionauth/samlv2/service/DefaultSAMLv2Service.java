@@ -15,6 +15,14 @@
  */
 package io.fusionauth.samlv2.service;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.OAEPParameterSpec;
+import javax.crypto.spec.PSource.PSpecified;
 import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.MarshalException;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
@@ -35,14 +43,19 @@ import javax.xml.crypto.dsig.spec.C14NMethodParameterSpec;
 import javax.xml.crypto.dsig.spec.TransformParameterSpec;
 import javax.xml.transform.TransformerException;
 import java.net.URLEncoder;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.security.spec.MGF1ParameterSpec;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -115,8 +128,12 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ResponseType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusCodeType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusResponseType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.DigestMethodType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.KeyInfoType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.X509DataType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.CipherDataType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.EncryptedKeyType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.EncryptionMethodType;
 import io.fusionauth.samlv2.util.SAMLRequestParameters;
 import io.fusionauth.samlv2.util.SAMLTools;
 import jakarta.xml.bind.JAXBElement;
@@ -302,6 +319,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       } catch (Exception e) {
         throw new SAMLException("Unable to sign XML SAML assertion", e);
       }
+    }
+
+    if (encrypt && response.status.code == ResponseStatus.Success) {
+      encryptAssertion(document, encryptionAlgorithm, keyLocation, transportAlgorithm, encryptionCertificate, digest, mgf);
     }
 
     // Sign the response if requested
@@ -899,6 +920,105 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
+  private void encryptAssertion(Document document, EncryptionAlgorithm encryptionAlgorithm, KeyLocation keyLocation,
+                                KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
+                                DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
+    // Get the Assertion element to encrypt and marshall to XML string
+    Element toEncrypt = (Element) document.getElementsByTagName("Assertion").item(0);
+    String xmlToEncrypt;
+    try {
+      xmlToEncrypt = marshallToString(toEncrypt);
+    } catch (TransformerException e) {
+      throw new SAMLException("Unable to marshall the element to XML.", e);
+    }
+
+    Key k;
+    byte[] iv;
+    try {
+      k = generateAssertionEncryptionKey(encryptionAlgorithm);
+      iv = generateIV(encryptionAlgorithm);
+    } catch (NoSuchAlgorithmException e) {
+      throw new SAMLException("Unable to generate symmetric key encryption parameters for assertion encryption", e);
+    }
+
+    String assertionValue;
+    try {
+      assertionValue = encryptElement(xmlToEncrypt, encryptionAlgorithm, k, iv);
+    } catch (Exception e) {
+      throw new SAMLException("Unable to encrypt assertion using symmetric key", e);
+    }
+
+    String encryptedKeyValue;
+    try {
+      encryptedKeyValue = encryptKey(k, transportAlgorithm, encryptionCertificate, digest, mgf);
+    } catch (Exception e) {
+      throw new SAMLException("Unable to encrypt symmetric key for transport", e);
+    }
+
+    Element encryptedKeyElement = wrapEncryptedKey(encryptedKeyValue, transportAlgorithm, digest, mgf);
+  }
+
+  /**
+   * Encrypts the provided XML string using the provided symmetric key parameters and returns the base64-encoded
+   * ciphertext
+   *
+   * @param xmlToEncrypt        The XML string to be encrypted
+   * @param encryptionAlgorithm The algorithm to be used to encrypt the data
+   * @param k                   The symmetric encryption key
+   * @param iv                  The initialization vector for the encryption algorithm
+   * @return The base64-encoded ciphertext
+   */
+  private String encryptElement(String xmlToEncrypt, EncryptionAlgorithm encryptionAlgorithm, Key k, byte[] iv)
+      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
+    // Initialize the cipher
+    Cipher cipher = Cipher.getInstance(encryptionAlgorithm.transformation);
+    cipher.init(Cipher.ENCRYPT_MODE, k, new IvParameterSpec(iv));
+
+    // Encrypt the XML string. AES-GCM ciphers will generate and append the Authentication Tag to resulting ciphertext
+    byte[] ciphertext = cipher.doFinal(xmlToEncrypt.getBytes(StandardCharsets.UTF_8));
+    // Concatenate the IV and ciphertext
+    byte[] encryptedBytes = ByteBuffer.allocate(iv.length + ciphertext.length)
+                                      .put(iv)
+                                      .put(ciphertext)
+                                      .array();
+    // Base64 encode the result
+    return new String(Base64.getEncoder().encode(encryptedBytes), StandardCharsets.UTF_8);
+  }
+
+  /**
+   * Encrypt the symmetric key using the provided cipher information and return the base64-encoded ciphertext
+   *
+   * @param key                   The symmetric key to encrypt
+   * @param transportAlgorithm    The algorithm used to encrypt the symmetric key for transport
+   * @param encryptionCertificate The certificate containing the RSA public key to use for encryption
+   * @param digest                The message digest algorithm to use with RSA-OAEP encryption
+   * @param mgf                   The mask generation function to use with RSA-OAEP encryption (if necessary)
+   * @return The base64-encoded ciphertext
+   */
+  private String encryptKey(Key key, KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
+                            DigestAlgorithm digest, MaskGenerationFunction mgf)
+      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    // Create and initialize the cipher
+    Cipher cipher = Cipher.getInstance(transportAlgorithm.transformation);
+    if (transportAlgorithm == KeyTransportAlgorithm.RSAv15) {
+      cipher.init(Cipher.ENCRYPT_MODE, encryptionCertificate.getPublicKey());
+    } else {
+      OAEPParameterSpec oaepParameters = new OAEPParameterSpec(
+          digest.digest,
+          "MGF1",
+          // The RSA_OAEP_MGF1P algorithm implies the use of SHA-1 for the MGF digest algorithm
+          new MGF1ParameterSpec(transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP_MGF1P ? "SHA-1" : mgf.digest),
+          // Use the default (empty byte[])
+          PSpecified.DEFAULT
+      );
+      cipher.init(Cipher.ENCRYPT_MODE, encryptionCertificate.getPublicKey(), oaepParameters);
+    }
+
+    // Get the encrypted bytes for the key and base64 encode the result
+    byte[] encryptedBytes = cipher.doFinal(key.getEncoded());
+    return new String(Base64.getEncoder().encode(encryptedBytes), StandardCharsets.UTF_8);
+  }
+
   private void fixIDs(Element element) {
     NamedNodeMap attributes = element.getAttributes();
     for (int i = 0; i < attributes.getLength(); i++) {
@@ -915,6 +1035,51 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         fixIDs((Element) child);
       }
     }
+  }
+
+  private Key generateAssertionEncryptionKey(EncryptionAlgorithm encryptionAlgorithm) throws NoSuchAlgorithmException {
+    switch (encryptionAlgorithm) {
+      case TripleDES -> {
+        return KeyGenerator.getInstance("DESede")
+                           .generateKey();
+      }
+      case AES128, AES128GCM -> {
+        var keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(128);
+        return keyGen.generateKey();
+      }
+      case AES192, AES192GCM -> {
+        var keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(192);
+        return keyGen.generateKey();
+      }
+      case AES256, AES256GCM -> {
+        var keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(256);
+        return keyGen.generateKey();
+      }
+      default -> {
+        throw new NoSuchAlgorithmException("Requested key for unsupported algorithm " + encryptionAlgorithm);
+      }
+    }
+  }
+
+  private byte[] generateIV(EncryptionAlgorithm encryptionAlgorithm) {
+    int ivLength = 0;
+    switch (encryptionAlgorithm) {
+      case TripleDES -> {
+        ivLength = 8;
+      }
+      case AES128, AES192, AES256 -> {
+        ivLength = 16;
+      }
+      case AES128GCM, AES192GCM, AES256GCM -> {
+        ivLength = 12;
+      }
+    }
+    byte[] iv = new byte[ivLength];
+    new SecureRandom().nextBytes(iv);
+    return iv;
   }
 
   private SubjectConfirmation parseConfirmation(SubjectConfirmationType subjectConfirmationType) {
@@ -1105,6 +1270,38 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     } catch (GeneralSecurityException e) {
       throw new SAMLException("Unable to verify signature", request, e);
     }
+  }
+
+  /**
+   * {@code EncryptedKey} XML element as defined by the <a href="https://www.w3.org/TR/xmlenc-core1/">XML Encryption
+   * spec</a>
+   *
+   * @return
+   */
+  private Element wrapEncryptedKey(String encryptedKeyValue, KeyTransportAlgorithm transportAlgorithm,
+                                   DigestAlgorithm digest, MaskGenerationFunction mgf) {
+    // Create EncryptionMethod element
+    EncryptionMethodType encryptionMethod = new EncryptionMethodType();
+    encryptionMethod.setAlgorithm(transportAlgorithm.uri);
+    // Add DigestMethod for OAEP
+    if (transportAlgorithm != KeyTransportAlgorithm.RSAv15) {
+      DigestMethodType digestMethod = new DigestMethodType();
+      digestMethod.setAlgorithm(digest.uri);
+      encryptionMethod.getContent().add(digestMethod);
+
+      if (transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP) {
+        // TODO : Add xenc11:MGF element
+      }
+    }
+
+    // Create CipherData element
+    CipherDataType cipherData = new CipherDataType();
+    cipherData.setCipherValue(encryptedKeyValue.getBytes(StandardCharsets.UTF_8));
+
+    // Create top-level EncryptedKey element
+    EncryptedKeyType encryptedKey = new EncryptedKeyType();
+
+    return null;
   }
 
   private static class AuthnRequestParseResult {

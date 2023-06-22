@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2022, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2021-2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -67,6 +67,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
+import org.w3c.dom.Node;
 import org.xml.sax.ErrorHandler;
 import org.xml.sax.SAXException;
 import org.xml.sax.SAXNotRecognizedException;
@@ -252,12 +253,17 @@ public class SAMLTools {
    * @return a string form of the serialized document.
    */
   public static String marshallToString(Document document) throws TransformerException {
-    StringWriter sw = new StringWriter();
-    TransformerFactory tf = TransformerFactory.newInstance();
-    tf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
-    Transformer transformer = tf.newTransformer();
-    transformer.transform(new DOMSource(document), new StreamResult(sw));
-    return sw.toString();
+    return marshallNodeToString(document);
+  }
+
+  /**
+   * Serialize the provided element.
+   *
+   * @param element the element to serialize.
+   * @return a string form of the serialized element.
+   */
+  public static String marshallToString(Element element) throws TransformerException {
+    return marshallNodeToString(element);
   }
 
   /**
@@ -507,6 +513,21 @@ public class SAMLTools {
     }
 
     return result;
+  }
+
+  /**
+   * Serialize the provided node.
+   *
+   * @param node the node to serialize.
+   * @return a string form of the serialized node.
+   */
+  private static String marshallNodeToString(Node node) throws TransformerException {
+    StringWriter sw = new StringWriter();
+    TransformerFactory tf = TransformerFactory.newInstance();
+    tf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+    Transformer transformer = tf.newTransformer();
+    transformer.transform(new DOMSource(node), new StreamResult(sw));
+    return sw.toString();
   }
 
   public static class SchemaValidationErrors implements ErrorHandler {

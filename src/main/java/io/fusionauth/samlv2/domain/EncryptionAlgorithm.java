@@ -44,17 +44,17 @@ public enum EncryptionAlgorithm {
   /**
    * AES in GCM mode with 128-bit key, 96-bit IV, and 128-bit Authentication Tag
    */
-  AES128GCM("AES128-GCM", "http://www.w3.org/2009/xmlenc11#aes128-gcm", "AES/GCM/ISO10126Padding"),
+  AES128GCM("AES128-GCM", "http://www.w3.org/2009/xmlenc11#aes128-gcm", "AES/GCM/NoPadding"),
 
   /**
    * AES in GCM mode with 192-bit key, 96-bit IV, and 128-bit Authentication Tag
    */
-  AES192GCM("AES192-GCM", "http://www.w3.org/2009/xmlenc11#aes192-gcm", "AES/GCM/ISO10126Padding"),
+  AES192GCM("AES192-GCM", "http://www.w3.org/2009/xmlenc11#aes192-gcm", "AES/GCM/NoPadding"),
 
   /**
    * AES in GCM mode with 256-bit key, 96-bit IV, and 128-bit Authentication Tag
    */
-  AES256GCM("AES256-GCM", "http://www.w3.org/2009/xmlenc11#aes256-gcm", "AES/GCM/ISO10126Padding");
+  AES256GCM("AES256-GCM", "http://www.w3.org/2009/xmlenc11#aes256-gcm", "AES/GCM/NoPadding");
 
   public final String name;
 

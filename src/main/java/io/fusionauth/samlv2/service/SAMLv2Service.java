@@ -76,8 +76,8 @@ public interface SAMLv2Service {
    * @param keyLocation            The location of the encrypted symmetric key on the SAML response.
    * @param transportAlgorithm     The algorithm to use to encrypt the symmetric encryption key.
    * @param encryptionCertificate  The certificate used to encrypt the symmetric encryption key.
-   * @param digest                 The digest algorithm for encrypting the symmetric key.
-   * @param mgf                    The Mask Generation Function to use with RSA OAEP (if any).
+   * @param digest                 The digest algorithm for encrypting the symmetric key with RSA-OAEP.
+   * @param mgf                    The Mask Generation Function to use with RSA-OAEP (if any).
    * @return The response base-64 encoded.
    * @throws SAMLException If any unrecoverable errors occur.
    */
