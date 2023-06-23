@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -56,8 +56,13 @@ import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.Binding;
+import io.fusionauth.samlv2.domain.DigestAlgorithm;
+import io.fusionauth.samlv2.domain.EncryptionAlgorithm;
+import io.fusionauth.samlv2.domain.KeyLocation;
+import io.fusionauth.samlv2.domain.KeyTransportAlgorithm;
 import io.fusionauth.samlv2.domain.LogoutRequest;
 import io.fusionauth.samlv2.domain.LogoutResponse;
+import io.fusionauth.samlv2.domain.MaskGenerationFunction;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.MetaData.IDPMetaData;
 import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
@@ -105,6 +110,13 @@ import static org.testng.Assert.fail;
 @SuppressWarnings({"unchecked"})
 @Test(groups = "unit")
 public class DefaultSAMLv2ServiceTest {
+  @DataProvider(name = "assertionEncryption")
+  public Object[][] assertionEncryption() {
+    return new Object[][]{
+        {EncryptionAlgorithm.AES256, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA256}
+    };
+  }
+
   @BeforeClass
   public void beforeClass() {
     System.setProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks", "true");
@@ -1009,6 +1021,41 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
     assertEquals(request.version, "2.0");
+  }
+
+  @Test(dataProvider = "assertionEncryption")
+  public void roundTripResponseEncryptedAssertion(EncryptionAlgorithm encryptionAlgorithm, KeyLocation keyLocation,
+                                                  KeyTransportAlgorithm transportAlgorithm, DigestAlgorithm digest,
+                                                  MaskGenerationFunction mgf)
+      throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair signingKeyPair = kpg.generateKeyPair();
+    KeyPair encryptionKeyPair = kpg.generateKeyPair();
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    String encodedXML = service.buildAuthnResponse(
+        response,
+        true,
+        signingKeyPair.getPrivate(),
+        CertificateTools.fromKeyPair(signingKeyPair, Algorithm.RS256, "FooBar"),
+        Algorithm.RS256,
+        CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS,
+        SignatureLocation.Assertion,
+        true,
+        true,
+        encryptionAlgorithm,
+        keyLocation,
+        transportAlgorithm,
+        CertificateTools.fromKeyPair(encryptionKeyPair, Algorithm.RS256, "FooBar"),
+        digest,
+        mgf
+    );
+    System.out.println(new String(Base64.getMimeDecoder().decode(encodedXML)));
   }
 
   @Test(dataProvider = "signatureLocation")

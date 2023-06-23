@@ -173,6 +173,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
   private static final io.fusionauth.samlv2.domain.jaxb.oasis.metadata.ObjectFactory METADATA_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.oasis.metadata.ObjectFactory();
 
+  private static final io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc11.ObjectFactory XENC11_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc11.ObjectFactory();
+
+  private static final io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.ObjectFactory XENC_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.ObjectFactory();
+
   private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLv2Service.class);
 
   static {
@@ -905,7 +909,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     if (keyLocation == KeyLocation.Child) {
       // The EncryptedKey should be wrapped in ds:KeyInfo and added as a child of EncryptedData
       KeyInfoType keyInfo = new KeyInfoType();
-      keyInfo.getContent().add(encryptedKeyElement);
+      // The EncryptedKey element needs to be wrapped in a JAXBElement in order to be marshalled to an XML Document
+      keyInfo.getContent().add(XENC_OBJECT_FACTORY.createEncryptedKey(encryptedKeyElement));
       encryptedData.setKeyInfo(keyInfo);
     } else {
       // The EncryptedKey should be a sibling of EncryptedData
@@ -926,7 +931,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
    * @return The {@code EncryptedKey} JAXB XML element
    */
   private EncryptedKeyType buildEncryptedKey(String encryptedKeyValue, KeyTransportAlgorithm transportAlgorithm,
-                                             DigestAlgorithm digest, MaskGenerationFunction mgf) {
+                                             DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
     // Create EncryptionMethod element
     EncryptionMethodType encryptionMethod = new EncryptionMethodType();
     encryptionMethod.setAlgorithm(transportAlgorithm.uri);
@@ -935,13 +940,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       // Add DigestMethod for OAEP
       DigestMethodType digestMethod = new DigestMethodType();
       digestMethod.setAlgorithm(digest.uri);
-      encryptionMethod.getContent().add(digestMethod);
+      // We need to add DigestMethod as an Element in order to marshall the full response later
+      // We may be able to avoid this by regenerating the JAXB objects all at once, so they know about each other
+      Document doc = marshallToDocument(DSIG_OBJECT_FACTORY.createDigestMethod(digestMethod), DigestMethodType.class);
+      encryptionMethod.getContent().add(doc.getDocumentElement());
 
       if (transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP) {
         // Add MGF algorithm
         MGFType mgfType = new MGFType();
         mgfType.setAlgorithm(mgf.uri);
-        encryptionMethod.getContent().add(mgfType);
+        // We need to add MGF as an Element in order to marshall the full response later
+        // We may be able to avoid this by regenerating the JAXB objects all at once, so they know about each other
+        // Exception is: jakarta.xml.bind.JAXBException: io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc11.MGFType is not known to this context
+        Document mgfDoc = marshallToDocument(XENC11_OBJECT_FACTORY.createMGF(mgfType), MGFType.class);
+        encryptionMethod.getContent().add(mgfDoc.getDocumentElement());
       }
     }
 
