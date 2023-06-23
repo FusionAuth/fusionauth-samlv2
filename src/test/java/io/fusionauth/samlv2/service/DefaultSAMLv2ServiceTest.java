@@ -113,7 +113,13 @@ public class DefaultSAMLv2ServiceTest {
   @DataProvider(name = "assertionEncryption")
   public Object[][] assertionEncryption() {
     return new Object[][]{
-        {EncryptionAlgorithm.AES256, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA256}
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA256},
+        {EncryptionAlgorithm.AES192, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA256},
+        {EncryptionAlgorithm.AES256, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA256},
+        {EncryptionAlgorithm.AES128GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA256},
+        {EncryptionAlgorithm.AES192GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA256},
+        {EncryptionAlgorithm.AES256GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA256},
+        {EncryptionAlgorithm.TripleDES, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA256}
     };
   }
 

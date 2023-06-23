@@ -20,6 +20,7 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.OAEPParameterSpec;
 import javax.crypto.spec.PSource.PSpecified;
@@ -55,6 +56,7 @@ import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.security.spec.AlgorithmParameterSpec;
 import java.security.spec.MGF1ParameterSpec;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -1022,6 +1024,21 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   /**
+   * Creates the algorithm parameter spec according to the selected encryption algorithm
+   *
+   * @param encryptionAlgorithm The encryption algorithm
+   * @param iv                  The initialization vector
+   * @return The algorithm parameter spec for initializing the {@link Cipher}
+   */
+  private AlgorithmParameterSpec createAlgorithmParameterSpec(EncryptionAlgorithm encryptionAlgorithm, byte[] iv) {
+    if (List.of(EncryptionAlgorithm.AES128GCM, EncryptionAlgorithm.AES192GCM, EncryptionAlgorithm.AES256GCM).contains(encryptionAlgorithm)) {
+      return new GCMParameterSpec(128, iv);
+    } else {
+      return new IvParameterSpec(iv);
+    }
+  }
+
+  /**
    * Encrypt the SAML Assertion in the XML document and return a new XML document with the Assertion replaced by
    * EncryptedAssertion
    *
@@ -1102,8 +1119,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   private String encryptElement(String xmlToEncrypt, EncryptionAlgorithm encryptionAlgorithm, Key k, byte[] iv)
       throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
     // Initialize the cipher
+    AlgorithmParameterSpec spec = createAlgorithmParameterSpec(encryptionAlgorithm, iv);
     Cipher cipher = Cipher.getInstance(encryptionAlgorithm.transformation);
-    cipher.init(Cipher.ENCRYPT_MODE, k, new IvParameterSpec(iv));
+    cipher.init(Cipher.ENCRYPT_MODE, k, spec);
 
     // Encrypt the XML string. AES-GCM ciphers will generate and append the Authentication Tag to resulting ciphertext
     byte[] ciphertext = cipher.doFinal(xmlToEncrypt.getBytes(StandardCharsets.UTF_8));
