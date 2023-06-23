@@ -132,8 +132,10 @@ import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.DigestMethodType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.KeyInfoType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.X509DataType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.CipherDataType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.EncryptedDataType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.EncryptedKeyType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.EncryptionMethodType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc11.MGFType;
 import io.fusionauth.samlv2.util.SAMLRequestParameters;
 import io.fusionauth.samlv2.util.SAMLTools;
 import jakarta.xml.bind.JAXBElement;
@@ -322,7 +324,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     if (encrypt && response.status.code == ResponseStatus.Success) {
-      encryptAssertion(document, encryptionAlgorithm, keyLocation, transportAlgorithm, encryptionCertificate, digest, mgf);
+      // Encrypt the <Assertion> element in the document and generate a new document with the <EncryptedAssertion> in its place
+      document = encryptAssertion(document, encryptionAlgorithm, keyLocation, transportAlgorithm, encryptionCertificate, digest, mgf);
     }
 
     // Sign the response if requested
@@ -868,6 +871,92 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     });
   }
 
+  /**
+   * Build the {@code EncryptedAssertion} XML element as defined by the <a *
+   * href="https://www.w3.org/TR/xmlenc-core1/">XML Encryption spec</a>
+   *
+   * @param encryptionAlgorithm The algorithm used to encrypt the assertion
+   * @param assertionValue      The encrypted assertion as a base64-encoded string
+   * @param encryptedKeyElement The wrapped encrypted key JAXB XML element
+   * @param keyLocation         The location in the {@code EncryptedAssertion} where the {@code EncryptedKey} should be
+   *                            placed
+   * @return A JAXB XML element for the SAML {@code EncryptedAssertion}
+   */
+  private EncryptedElementType buildEncryptedAssertion(EncryptionAlgorithm encryptionAlgorithm, String assertionValue,
+                                                       EncryptedKeyType encryptedKeyElement, KeyLocation keyLocation) {
+    // Create the EncryptedData element
+    EncryptedDataType encryptedData = new EncryptedDataType();
+    encryptedData.setType("http://www.w3.org/2001/04/xmlenc#Element");
+
+    // Set the EncryptionMethod for the SAML assertion and add to EncryptedData
+    EncryptionMethodType encryptionMethod = new EncryptionMethodType();
+    encryptionMethod.setAlgorithm(encryptionAlgorithm.uri);
+    encryptedData.setEncryptionMethod(encryptionMethod);
+
+    // Create the CipherData and add to EncryptedData
+    CipherDataType cipherData = new CipherDataType();
+    cipherData.setCipherValue(assertionValue.getBytes(StandardCharsets.UTF_8));
+    encryptedData.setCipherData(cipherData);
+
+    // Create the EncryptedAssertion and add EncryptedData element
+    EncryptedElementType encryptedAssertion = new EncryptedElementType();
+    encryptedAssertion.setEncryptedData(encryptedData);
+
+    if (keyLocation == KeyLocation.Child) {
+      // The EncryptedKey should be wrapped in ds:KeyInfo and added as a child of EncryptedData
+      KeyInfoType keyInfo = new KeyInfoType();
+      keyInfo.getContent().add(encryptedKeyElement);
+      encryptedData.setKeyInfo(keyInfo);
+    } else {
+      // The EncryptedKey should be a sibling of EncryptedData
+      encryptedAssertion.getEncryptedKey().add(encryptedKeyElement);
+    }
+
+    return encryptedAssertion;
+  }
+
+  /**
+   * Wrap the encrypted key value in an {@code EncryptedKey} XML element as defined by the <a
+   * href="https://www.w3.org/TR/xmlenc-core1/">XML Encryption spec</a>
+   *
+   * @param encryptedKeyValue  The encrypted key value as a base64-encoded string
+   * @param transportAlgorithm The algorithm used to encrypt the key
+   * @param digest             The message digest algorithm for RSA-OAEP (if necessary)
+   * @param mgf                The Mask Generation function for RSA-OAEP (if necessary)
+   * @return The {@code EncryptedKey} JAXB XML element
+   */
+  private EncryptedKeyType buildEncryptedKey(String encryptedKeyValue, KeyTransportAlgorithm transportAlgorithm,
+                                             DigestAlgorithm digest, MaskGenerationFunction mgf) {
+    // Create EncryptionMethod element
+    EncryptionMethodType encryptionMethod = new EncryptionMethodType();
+    encryptionMethod.setAlgorithm(transportAlgorithm.uri);
+
+    if (transportAlgorithm != KeyTransportAlgorithm.RSAv15) {
+      // Add DigestMethod for OAEP
+      DigestMethodType digestMethod = new DigestMethodType();
+      digestMethod.setAlgorithm(digest.uri);
+      encryptionMethod.getContent().add(digestMethod);
+
+      if (transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP) {
+        // Add MGF algorithm
+        MGFType mgfType = new MGFType();
+        mgfType.setAlgorithm(mgf.uri);
+        encryptionMethod.getContent().add(mgfType);
+      }
+    }
+
+    // Create CipherData element
+    CipherDataType cipherData = new CipherDataType();
+    cipherData.setCipherValue(encryptedKeyValue.getBytes(StandardCharsets.UTF_8));
+
+    // Create top-level EncryptedKey element
+    EncryptedKeyType encryptedKey = new EncryptedKeyType();
+    encryptedKey.setEncryptionMethod(encryptionMethod);
+    encryptedKey.setCipherData(cipherData);
+
+    return encryptedKey;
+  }
+
   private void checkFor_CVE_2022_21449(SAMLRequest request, byte[] signature) throws SAMLException {
     if (signature.length == 0) {
       return;
@@ -920,9 +1009,23 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
-  private void encryptAssertion(Document document, EncryptionAlgorithm encryptionAlgorithm, KeyLocation keyLocation,
-                                KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
-                                DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
+  /**
+   * Encrypt the SAML Assertion in the XML document and return a new XML document with the Assertion replaced by
+   * EncryptedAssertion
+   *
+   * @param document              The XML document containing the SAML Response with an unencrypted Assertion
+   * @param encryptionAlgorithm   The algorithm used to encrypt the SAML Assertion
+   * @param keyLocation           The location to place the EncryptedKey in EncryptedAssertion
+   * @param transportAlgorithm    The algorithm used to encrypt the symmetric key for transport
+   * @param encryptionCertificate The certificate containing the public key for encrypting the symmetric key
+   * @param digest                The message digest algorithm to use with RSA-OAEP encryption (if necessary)
+   * @param mgf                   The mask generation function to use with RSA-OAEP encryption (if necessary)
+   * @return A new XML document containing the SAML response with an EncryptedAssertion
+   * @throws SAMLException if there is an issue encrypting the SAML Assertion or generating a new document
+   */
+  private Document encryptAssertion(Document document, EncryptionAlgorithm encryptionAlgorithm, KeyLocation keyLocation,
+                                    KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
+                                    DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
     // Get the Assertion element to encrypt and marshall to XML string
     Element toEncrypt = (Element) document.getElementsByTagName("Assertion").item(0);
     String xmlToEncrypt;
@@ -932,6 +1035,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       throw new SAMLException("Unable to marshall the element to XML.", e);
     }
 
+    // Generate symmetric key material for encrypting the assertion
     Key k;
     byte[] iv;
     try {
@@ -941,6 +1045,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       throw new SAMLException("Unable to generate symmetric key encryption parameters for assertion encryption", e);
     }
 
+    // Encrypt the Assertion element to a base64-encoded string
     String assertionValue;
     try {
       assertionValue = encryptElement(xmlToEncrypt, encryptionAlgorithm, k, iv);
@@ -948,6 +1053,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       throw new SAMLException("Unable to encrypt assertion using symmetric key", e);
     }
 
+    // Encrypt the symmetric key to a base64-encoded string
     String encryptedKeyValue;
     try {
       encryptedKeyValue = encryptKey(k, transportAlgorithm, encryptionCertificate, digest, mgf);
@@ -955,7 +1061,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       throw new SAMLException("Unable to encrypt symmetric key for transport", e);
     }
 
-    Element encryptedKeyElement = wrapEncryptedKey(encryptedKeyValue, transportAlgorithm, digest, mgf);
+    // Build the EncryptedKey element
+    EncryptedKeyType encryptedKeyElement = buildEncryptedKey(encryptedKeyValue, transportAlgorithm, digest, mgf);
+
+    // Build the EncryptedAssertion element
+    EncryptedElementType encryptedAssertion = buildEncryptedAssertion(encryptionAlgorithm, assertionValue, encryptedKeyElement, keyLocation);
+
+    // Unmarshall the XML document
+    ResponseType samlResponse = unmarshallFromDocument(document, ResponseType.class);
+    // Clear the unencrypted Assertion and add the EncryptedAssertion
+    samlResponse.getAssertionOrEncryptedAssertion().clear();
+    samlResponse.getAssertionOrEncryptedAssertion().add(encryptedAssertion);
+
+    // Marshall the JAXB XML back to a document
+    return marshallToDocument(PROTOCOL_OBJECT_FACTORY.createResponse(samlResponse), ResponseType.class);
   }
 
   /**
@@ -991,7 +1110,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
    * @param key                   The symmetric key to encrypt
    * @param transportAlgorithm    The algorithm used to encrypt the symmetric key for transport
    * @param encryptionCertificate The certificate containing the RSA public key to use for encryption
-   * @param digest                The message digest algorithm to use with RSA-OAEP encryption
+   * @param digest                The message digest algorithm to use with RSA-OAEP encryption (if necessary)
    * @param mgf                   The mask generation function to use with RSA-OAEP encryption (if necessary)
    * @return The base64-encoded ciphertext
    */
@@ -1270,38 +1389,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     } catch (GeneralSecurityException e) {
       throw new SAMLException("Unable to verify signature", request, e);
     }
-  }
-
-  /**
-   * {@code EncryptedKey} XML element as defined by the <a href="https://www.w3.org/TR/xmlenc-core1/">XML Encryption
-   * spec</a>
-   *
-   * @return
-   */
-  private Element wrapEncryptedKey(String encryptedKeyValue, KeyTransportAlgorithm transportAlgorithm,
-                                   DigestAlgorithm digest, MaskGenerationFunction mgf) {
-    // Create EncryptionMethod element
-    EncryptionMethodType encryptionMethod = new EncryptionMethodType();
-    encryptionMethod.setAlgorithm(transportAlgorithm.uri);
-    // Add DigestMethod for OAEP
-    if (transportAlgorithm != KeyTransportAlgorithm.RSAv15) {
-      DigestMethodType digestMethod = new DigestMethodType();
-      digestMethod.setAlgorithm(digest.uri);
-      encryptionMethod.getContent().add(digestMethod);
-
-      if (transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP) {
-        // TODO : Add xenc11:MGF element
-      }
-    }
-
-    // Create CipherData element
-    CipherDataType cipherData = new CipherDataType();
-    cipherData.setCipherValue(encryptedKeyValue.getBytes(StandardCharsets.UTF_8));
-
-    // Create top-level EncryptedKey element
-    EncryptedKeyType encryptedKey = new EncryptedKeyType();
-
-    return null;
   }
 
   private static class AuthnRequestParseResult {
