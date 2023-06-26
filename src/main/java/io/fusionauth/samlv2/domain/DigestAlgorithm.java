@@ -23,11 +23,11 @@ package io.fusionauth.samlv2.domain;
 public enum DigestAlgorithm {
   SHA1("SHA1", "http://www.w3.org/2000/09/xmldsig#sha1", "SHA-1"),
 
-  SHA256("SHA256", "http://www.w3.org/2000/09/xmldsig#sha256", "SHA-256"),
+  SHA256("SHA256", "http://www.w3.org/2001/04/xmlenc#sha256", "SHA-256"),
 
-  SHA384("SHA384", "http://www.w3.org/2000/09/xmldsig#sha384", "SHA-384"),
+  SHA384("SHA384", "http://www.w3.org/2001/04/xmlenc#sha384", "SHA-384"),
 
-  SHA512("SHA512", "http://www.w3.org/2000/09/xmldsig#sha512", "SHA-512");
+  SHA512("SHA512", "http://www.w3.org/2001/04/xmlenc#sha512", "SHA-512");
 
   public final String digest;
 
