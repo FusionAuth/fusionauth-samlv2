@@ -22,6 +22,7 @@ import javax.xml.datatype.XMLGregorianCalendar;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
+import javax.xml.transform.OutputKeys;
 import javax.xml.transform.Source;
 import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerException;
@@ -253,7 +254,7 @@ public class SAMLTools {
    * @return a string form of the serialized document.
    */
   public static String marshallToString(Document document) throws TransformerException {
-    return marshallNodeToString(document);
+    return marshallNodeToString(document, false);
   }
 
   /**
@@ -263,7 +264,7 @@ public class SAMLTools {
    * @return a string form of the serialized element.
    */
   public static String marshallToString(Element element) throws TransformerException {
-    return marshallNodeToString(element);
+    return marshallNodeToString(element, true);
   }
 
   /**
@@ -518,14 +519,16 @@ public class SAMLTools {
   /**
    * Serialize the provided node.
    *
-   * @param node the node to serialize.
+   * @param node               the node to serialize.
+   * @param omitXMLDeclaration If {@code true}, the XML declaration will be omitted from the string
    * @return a string form of the serialized node.
    */
-  private static String marshallNodeToString(Node node) throws TransformerException {
+  private static String marshallNodeToString(Node node, boolean omitXMLDeclaration) throws TransformerException {
     StringWriter sw = new StringWriter();
     TransformerFactory tf = TransformerFactory.newInstance();
     tf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
     Transformer transformer = tf.newTransformer();
+    transformer.setOutputProperty(OutputKeys.OMIT_XML_DECLARATION, omitXMLDeclaration ? "yes" : "no");
     transformer.transform(new DOMSource(node), new StreamResult(sw));
     return sw.toString();
   }

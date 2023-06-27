@@ -882,13 +882,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
    * href="https://www.w3.org/TR/xmlenc-core1/">XML Encryption spec</a>
    *
    * @param encryptionAlgorithm The algorithm used to encrypt the assertion
-   * @param assertionValue      The encrypted assertion as a base64-encoded string
+   * @param assertionValue      The encrypted assertion as a byte array
    * @param encryptedKeyElement The wrapped encrypted key JAXB XML element
    * @param keyLocation         The location in the {@code EncryptedAssertion} where the {@code EncryptedKey} should be
    *                            placed
    * @return A JAXB XML element for the SAML {@code EncryptedAssertion}
    */
-  private EncryptedElementType buildEncryptedAssertion(EncryptionAlgorithm encryptionAlgorithm, String assertionValue,
+  private EncryptedElementType buildEncryptedAssertion(EncryptionAlgorithm encryptionAlgorithm, byte[] assertionValue,
                                                        EncryptedKeyType encryptedKeyElement, KeyLocation keyLocation) {
     // Create the EncryptedData element
     EncryptedDataType encryptedData = new EncryptedDataType();
@@ -901,7 +901,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     // Create the CipherData and add to EncryptedData
     CipherDataType cipherData = new CipherDataType();
-    cipherData.setCipherValue(assertionValue.getBytes(StandardCharsets.UTF_8));
+    cipherData.setCipherValue(assertionValue);
     encryptedData.setCipherData(cipherData);
 
     // Create the EncryptedAssertion and add EncryptedData element
@@ -926,13 +926,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
    * Wrap the encrypted key value in an {@code EncryptedKey} XML element as defined by the <a
    * href="https://www.w3.org/TR/xmlenc-core1/">XML Encryption spec</a>
    *
-   * @param encryptedKeyValue  The encrypted key value as a base64-encoded string
+   * @param encryptedKeyValue  The encrypted key value as a byte array
    * @param transportAlgorithm The algorithm used to encrypt the key
    * @param digest             The message digest algorithm for RSA-OAEP (if necessary)
    * @param mgf                The Mask Generation function for RSA-OAEP (if necessary)
    * @return The {@code EncryptedKey} JAXB XML element
    */
-  private EncryptedKeyType buildEncryptedKey(String encryptedKeyValue, KeyTransportAlgorithm transportAlgorithm,
+  private EncryptedKeyType buildEncryptedKey(byte[] encryptedKeyValue, KeyTransportAlgorithm transportAlgorithm,
                                              DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
     // Create EncryptionMethod element
     EncryptionMethodType encryptionMethod = new EncryptionMethodType();
@@ -961,7 +961,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     // Create CipherData element
     CipherDataType cipherData = new CipherDataType();
-    cipherData.setCipherValue(encryptedKeyValue.getBytes(StandardCharsets.UTF_8));
+    cipherData.setCipherValue(encryptedKeyValue);
 
     // Create top-level EncryptedKey element
     EncryptedKeyType encryptedKey = new EncryptedKeyType();
@@ -1074,8 +1074,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       throw new SAMLException("Unable to generate symmetric key encryption parameters for assertion encryption", e);
     }
 
-    // Encrypt the Assertion element to a base64-encoded string
-    String assertionValue;
+    // Encrypt the Assertion element to a byte array
+    byte[] assertionValue;
     try {
       assertionValue = encryptElement(xmlToEncrypt, encryptionAlgorithm, k, iv);
     } catch (Exception e) {
@@ -1083,7 +1083,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     // Encrypt the symmetric key to a base64-encoded string
-    String encryptedKeyValue;
+    byte[] encryptedKeyValue;
     try {
       encryptedKeyValue = encryptKey(k, transportAlgorithm, encryptionCertificate, digest, mgf);
     } catch (Exception e) {
@@ -1107,16 +1107,16 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   /**
-   * Encrypts the provided XML string using the provided symmetric key parameters and returns the base64-encoded
-   * ciphertext
+   * Encrypts the provided XML string using the provided symmetric key parameters and returns a byte array containing
+   * the ciphertext
    *
    * @param xmlToEncrypt        The XML string to be encrypted
    * @param encryptionAlgorithm The algorithm to be used to encrypt the data
    * @param k                   The symmetric encryption key
    * @param iv                  The initialization vector for the encryption algorithm
-   * @return The base64-encoded ciphertext
+   * @return A byte array containing the ciphertext
    */
-  private String encryptElement(String xmlToEncrypt, EncryptionAlgorithm encryptionAlgorithm, Key k, byte[] iv)
+  private byte[] encryptElement(String xmlToEncrypt, EncryptionAlgorithm encryptionAlgorithm, Key k, byte[] iv)
       throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
     // Initialize the cipher
     AlgorithmParameterSpec spec = createAlgorithmParameterSpec(encryptionAlgorithm, iv);
@@ -1125,26 +1125,24 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     // Encrypt the XML string. AES-GCM ciphers will generate and append the Authentication Tag to resulting ciphertext
     byte[] ciphertext = cipher.doFinal(xmlToEncrypt.getBytes(StandardCharsets.UTF_8));
-    // Concatenate the IV and ciphertext
-    byte[] encryptedBytes = ByteBuffer.allocate(iv.length + ciphertext.length)
-                                      .put(iv)
-                                      .put(ciphertext)
-                                      .array();
-    // Base64 encode the result
-    return new String(Base64.getEncoder().encode(encryptedBytes), StandardCharsets.UTF_8);
+    // Concatenate the IV and ciphertext and return the result
+    return ByteBuffer.allocate(iv.length + ciphertext.length)
+                     .put(iv)
+                     .put(ciphertext)
+                     .array();
   }
 
   /**
-   * Encrypt the symmetric key using the provided cipher information and return the base64-encoded ciphertext
+   * Encrypt the symmetric key using the provided cipher information and return a byte array containing ciphertext
    *
    * @param key                   The symmetric key to encrypt
    * @param transportAlgorithm    The algorithm used to encrypt the symmetric key for transport
    * @param encryptionCertificate The certificate containing the RSA public key to use for encryption
    * @param digest                The message digest algorithm to use with RSA-OAEP encryption (if necessary)
    * @param mgf                   The mask generation function to use with RSA-OAEP encryption (if necessary)
-   * @return The base64-encoded ciphertext
+   * @return A byte array containing the ciphertext
    */
-  private String encryptKey(Key key, KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
+  private byte[] encryptKey(Key key, KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
                             DigestAlgorithm digest, MaskGenerationFunction mgf)
       throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
     // Create and initialize the cipher
@@ -1163,9 +1161,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       cipher.init(Cipher.ENCRYPT_MODE, encryptionCertificate.getPublicKey(), oaepParameters);
     }
 
-    // Get the encrypted bytes for the key and base64 encode the result
-    byte[] encryptedBytes = cipher.doFinal(key.getEncoded());
-    return new String(Base64.getEncoder().encode(encryptedBytes), StandardCharsets.UTF_8);
+    // Get the encrypted bytes for the key and return the result
+    return cipher.doFinal(key.getEncoded());
   }
 
   private void fixIDs(Element element) {
