@@ -114,7 +114,9 @@ public class DefaultSAMLv2ServiceTest {
   public Object[][] assertionEncryption() {
     return new Object[][]{
         {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSAv15, DigestAlgorithm.SHA256, null},
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP_MGF1P, DigestAlgorithm.SHA256, null},
         {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA512, MaskGenerationFunction.MGF1_SHA256},
         {EncryptionAlgorithm.AES192, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
         {EncryptionAlgorithm.AES256, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
         {EncryptionAlgorithm.AES256, KeyLocation.Sibling, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
