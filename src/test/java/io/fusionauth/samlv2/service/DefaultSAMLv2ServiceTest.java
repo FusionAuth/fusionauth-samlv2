@@ -1044,7 +1044,7 @@ public class DefaultSAMLv2ServiceTest {
     KeyPair encryptionKeyPair = kpg.generateKeyPair();
 
     byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
-    String encodedResponse = new String(ba);
+    String encodedResponse = new String(ba, StandardCharsets.UTF_8);
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
