@@ -1204,24 +1204,16 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         keyGen.init(256);
         return keyGen.generateKey();
       }
-      default -> {
-        throw new NoSuchAlgorithmException("Requested key for unsupported algorithm " + encryptionAlgorithm);
-      }
+      default -> throw new NoSuchAlgorithmException("Requested key for unsupported algorithm " + encryptionAlgorithm);
     }
   }
 
   private byte[] generateIV(EncryptionAlgorithm encryptionAlgorithm) {
     int ivLength = 0;
     switch (encryptionAlgorithm) {
-      case TripleDES -> {
-        ivLength = 8;
-      }
-      case AES128, AES192, AES256 -> {
-        ivLength = 16;
-      }
-      case AES128GCM, AES192GCM, AES256GCM -> {
-        ivLength = 12;
-      }
+      case TripleDES -> ivLength = 8;
+      case AES128, AES192, AES256 -> ivLength = 16;
+      case AES128GCM, AES192GCM, AES256GCM -> ivLength = 12;
     }
     byte[] iv = new byte[ivLength];
     new SecureRandom().nextBytes(iv);
