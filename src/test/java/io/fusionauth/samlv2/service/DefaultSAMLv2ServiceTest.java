@@ -992,7 +992,7 @@ public class DefaultSAMLv2ServiceTest {
       request = service.parseRequestPostBinding(queryString, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
     }
 
-    // Assert the the parsed request
+    // Assert the parsed request
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
@@ -1024,7 +1024,7 @@ public class DefaultSAMLv2ServiceTest {
       request = service.parseRequestPostBinding(queryString, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(kp.getPublic()), true));
     }
 
-    // Assert the the parsed request
+    // Assert the parsed request
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
@@ -1157,7 +1157,7 @@ public class DefaultSAMLv2ServiceTest {
     String queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
     request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper(kp.getPublic(), true));
 
-    // Assert the the parsed request
+    // Assert the parsed request
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
@@ -1168,7 +1168,7 @@ public class DefaultSAMLv2ServiceTest {
     queryString = service.buildRedirectAuthnRequest(request, "Relay-State-String", true, kp.getPrivate(), Algorithm.RS256);
     request = service.parseRequestRedirectBinding(queryString, authRequest -> new TestRedirectBindingSignatureHelper(kp.getPublic(), true));
 
-    // Assert the the parsed request
+    // Assert the parsed request
     assertEquals(request.id, "foobarbaz");
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());

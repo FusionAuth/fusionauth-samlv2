@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 package io.fusionauth.samlv2.domain;
 
 /**
- * The SAML v2.0 authentication response object that is sent back from the IDP.
+ * The SAML v2.0 authentication request object that is sent from the SP.
  *
  * @author Brian Pontarelli
  */
