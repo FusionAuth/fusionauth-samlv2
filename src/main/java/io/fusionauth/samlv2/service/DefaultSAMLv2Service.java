@@ -878,7 +878,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   /**
-   * Build the {@code EncryptedAssertion} XML element as defined by the <a *
+   * Build the {@code EncryptedAssertion} XML element as defined by the <a
    * href="https://www.w3.org/TR/xmlenc-core1/">XML Encryption spec</a>
    *
    * @param encryptionAlgorithm The algorithm used to encrypt the assertion
@@ -1082,7 +1082,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       throw new SAMLException("Unable to encrypt assertion using symmetric key", e);
     }
 
-    // Encrypt the symmetric key to a base64-encoded string
+    // Encrypt the symmetric key to a byte array
     byte[] encryptedKeyValue;
     try {
       encryptedKeyValue = encryptKey(k, transportAlgorithm, encryptionCertificate, digest, mgf);
