@@ -701,7 +701,11 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       Element toSign = document.getDocumentElement();
       String xml;
       if (sign) {
-        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, null, includeKeyInfo);
+        // - The next sibling of the 'Issuer' may be null, this will cause the Signature to be inserted as the last element
+        //   of the assertion which is what we want.
+        Node issuer = toSign.getElementsByTagName("Issuer").item(0);
+        Node insertBefore = issuer.getNextSibling();
+        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore, includeKeyInfo);
       } else {
         xml = marshallToString(document);
       }
