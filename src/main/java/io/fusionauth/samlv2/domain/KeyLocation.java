@@ -21,6 +21,14 @@ package io.fusionauth.samlv2.domain;
  * @author Spencer Witt
  */
 public enum KeyLocation {
+  /**
+   * The {@code EncryptedKey} element will be wrapped in a {@code KeyInfo} element and added inside the
+   * {@code EncryptedData}
+   */
   Child,
+
+  /**
+   * The {@code EncryptedKey} element will be added to the document as a sibling of {@code EncryptedData}
+   */
   Sibling
 }
