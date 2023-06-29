@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -77,6 +77,7 @@ import org.testng.annotations.BeforeClass;
 import org.testng.annotations.DataProvider;
 import org.testng.annotations.Test;
 import org.w3c.dom.Document;
+import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.xml.sax.SAXException;
 import sun.security.util.KnownOIDs;
@@ -274,6 +275,33 @@ public class DefaultSAMLv2ServiceTest {
       String sigAlg = URLDecoder.decode(rawResponse.substring(start + "SigAlg=".length(), end), StandardCharsets.UTF_8);
       assertEquals(sigAlg, "http://www.w3.org/2001/04/xmldsig-more#rsa-sha256");
     }
+  }
+
+  @Test
+  public void buildPostAuthnRequest_signatureFollowsIssuer() throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+    PrivateKey privateKey = kp.getPrivate();
+    X509Certificate certificate = generateX509Certificate(kp, "SHA256withRSA");
+
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "https://local.fusionauth.io";
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    String samlRequest = service.buildPostAuthnRequest(request, true, privateKey, certificate, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+    assertNotNull(samlRequest);
+
+    byte[] bytes = SAMLTools.decode(samlRequest);
+    DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
+    DocumentBuilder builder = factory.newDocumentBuilder();
+    Document doc = builder.parse(new ByteArrayInputStream(bytes));
+
+    // Confirm that the Signature element immediately follows the Issuer element as required by the spec
+    Element issuer = (Element) doc.getElementsByTagName("Issuer").item(0);
+    Element signature = (Element) issuer.getNextSibling();
+    assertEquals(signature.getTagName(), "Signature");
   }
 
   @Test(dataProvider = "bindings")
