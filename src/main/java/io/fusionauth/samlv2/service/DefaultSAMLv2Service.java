@@ -757,7 +757,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         //   of the assertion which is what we want.
         Node issuer = toSign.getElementsByTagName("Issuer").item(0);
         Node insertBefore = issuer.getNextSibling();
-        signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, toSign, null, includeKeyInfo);
+        signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, toSign, insertBefore, includeKeyInfo);
       } catch (Exception e) {
         throw new SAMLException("Unable to sign XML SAML request", e);
       }
