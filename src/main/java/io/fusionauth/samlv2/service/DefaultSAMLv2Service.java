@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2022, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,15 @@
  */
 package io.fusionauth.samlv2.service;
 
+import javax.crypto.BadPaddingException;
+import javax.crypto.Cipher;
+import javax.crypto.IllegalBlockSizeException;
+import javax.crypto.KeyGenerator;
+import javax.crypto.NoSuchPaddingException;
+import javax.crypto.spec.GCMParameterSpec;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.OAEPParameterSpec;
+import javax.crypto.spec.PSource.PSpecified;
 import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.MarshalException;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
@@ -35,14 +44,20 @@ import javax.xml.crypto.dsig.spec.C14NMethodParameterSpec;
 import javax.xml.crypto.dsig.spec.TransformParameterSpec;
 import javax.xml.transform.TransformerException;
 import java.net.URLEncoder;
+import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.InvalidAlgorithmParameterException;
+import java.security.InvalidKeyException;
+import java.security.Key;
 import java.security.NoSuchAlgorithmException;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
+import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.MGF1ParameterSpec;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -65,8 +80,13 @@ import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.Binding;
 import io.fusionauth.samlv2.domain.Conditions;
 import io.fusionauth.samlv2.domain.ConfirmationMethod;
+import io.fusionauth.samlv2.domain.DigestAlgorithm;
+import io.fusionauth.samlv2.domain.EncryptionAlgorithm;
+import io.fusionauth.samlv2.domain.KeyLocation;
+import io.fusionauth.samlv2.domain.KeyTransportAlgorithm;
 import io.fusionauth.samlv2.domain.LogoutRequest;
 import io.fusionauth.samlv2.domain.LogoutResponse;
+import io.fusionauth.samlv2.domain.MaskGenerationFunction;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.MetaData.IDPMetaData;
 import io.fusionauth.samlv2.domain.MetaData.SPMetaData;
@@ -110,8 +130,14 @@ import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.ResponseType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusCodeType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusResponseType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.StatusType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.DigestMethodType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.KeyInfoType;
 import io.fusionauth.samlv2.domain.jaxb.w3c.xmldsig.X509DataType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.CipherDataType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.EncryptedDataType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.EncryptedKeyType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.EncryptionMethodType;
+import io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc11.MGFType;
 import io.fusionauth.samlv2.util.SAMLRequestParameters;
 import io.fusionauth.samlv2.util.SAMLTools;
 import jakarta.xml.bind.JAXBElement;
@@ -149,6 +175,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
   private static final io.fusionauth.samlv2.domain.jaxb.oasis.metadata.ObjectFactory METADATA_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.oasis.metadata.ObjectFactory();
 
+  private static final io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc11.ObjectFactory XENC11_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc11.ObjectFactory();
+
+  private static final io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.ObjectFactory XENC_OBJECT_FACTORY = new io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc.ObjectFactory();
+
   private static final Logger logger = LoggerFactory.getLogger(DefaultSAMLv2Service.class);
 
   static {
@@ -163,6 +193,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
                                    X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
                                    SignatureLocation signatureOption, boolean includeKeyInfo) throws SAMLException {
+    return buildAuthnResponse(response, sign, privateKey, certificate, algorithm, xmlSignatureC14nMethod, signatureOption, includeKeyInfo,
+        false, null, null, null, null, null, null);
+  }
+
+  @Override
+  public String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
+                                   X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
+                                   SignatureLocation signatureOption, boolean includeKeyInfo, boolean encrypt,
+                                   EncryptionAlgorithm encryptionAlgorithm, KeyLocation keyLocation,
+                                   KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
+                                   DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
     ResponseType jaxbResponse = new ResponseType();
 
     // Status (element)
@@ -271,30 +312,33 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     Document document = marshallToDocument(PROTOCOL_OBJECT_FACTORY.createResponse(jaxbResponse), ResponseType.class);
 
-    // Bail now if we aren't signing the response.
-    if (!sign) {
+    // Sign the Assertion if requested
+    if (sign && response.status.code == ResponseStatus.Success && signatureOption == SignatureLocation.Assertion) {
       try {
-        String xml = marshallToString(document);
-        return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
-      } catch (TransformerException e) {
-        throw new SAMLException("Unable to marshal the SAML response to XML.", e);
-      }
-    }
-
-    try {
-      // If successful, sign the assertion if requested, otherwise, sign the root
-      Element toSign;
-      Node insertBefore = null;
-      // The 'Signature' must come directly after the 'Issuer' element.
-      if (response.status.code == ResponseStatus.Success && signatureOption == SignatureLocation.Assertion) {
-        toSign = (Element) document.getElementsByTagName("Assertion").item(0);
+        Element toSign = (Element) document.getElementsByTagName("Assertion").item(0);
+        // The 'Signature' must come directly after the 'Issuer' element.
         // Issuer is the only required element. See schema for AssertionType in section 2.3.3 of SAML Core.
         // - The next sibling of the 'Issuer' may be null, this will cause the Signature to be inserted as the last element
         //   of the assertion which is what we want.
         Node issuer = toSign.getElementsByTagName("Issuer").item(0);
-        insertBefore = issuer.getNextSibling();
-      } else {
-        toSign = document.getDocumentElement();
+        Node insertBefore = issuer.getNextSibling();
+
+        signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, toSign, insertBefore, includeKeyInfo);
+      } catch (Exception e) {
+        throw new SAMLException("Unable to sign XML SAML assertion", e);
+      }
+    }
+
+    if (encrypt && response.status.code == ResponseStatus.Success) {
+      // Encrypt the <Assertion> element in the document and generate a new document with the <EncryptedAssertion> in its place
+      document = encryptAssertion(document, encryptionAlgorithm, keyLocation, transportAlgorithm, encryptionCertificate, digest, mgf);
+    }
+
+    // Sign the response if requested
+    if (sign && signatureOption == SignatureLocation.Response) {
+      try {
+        Element toSign = document.getDocumentElement();
+        Node insertBefore = null;
         // The only required element in the StatusResponseType is Status. See Section 3.2.2 in SAML Core.
         // The children will be a sequence that must exist in the order of 'Issuer', 'Signature', 'Extensions', and then 'Status'
         // - If the first element is 'Issuer', then the next sibling will be used for 'insertBefore'.
@@ -307,12 +351,19 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
             break;
           }
         }
-      }
 
-      String xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore, includeKeyInfo);
+        signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, toSign, insertBefore, includeKeyInfo);
+      } catch (Exception e) {
+        throw new SAMLException("Unable to sign XML SAML response", e);
+      }
+    }
+
+    // Marshall the XML to a string and base64 encode the response
+    try {
+      String xml = marshallToString(document);
       return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
-    } catch (Exception e) {
-      throw new SAMLException("Unable to sign XML SAML response", e);
+    } catch (TransformerException e) {
+      throw new SAMLException("Unable to marshall the SAML response to XML.", e);
     }
   }
 
@@ -674,7 +725,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
             if (attributeObject instanceof AttributeType attributeType) {
               String name = attributeType.getName();
               List<Object> attributeValues = attributeType.getAttributeValue();
-              List<String> values = attributeValues.stream().map(SAMLTools::attributeToString).collect(Collectors.toList());
+              List<String> values = attributeValues.stream().map(SAMLTools::attributeToString).toList();
               response.assertion.attributes.computeIfAbsent(name, k -> new ArrayList<>()).addAll(values);
             } else {
               throw new SAMLException("This library currently doesn't support encrypted attributes");
@@ -697,22 +748,26 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                               Algorithm algorithm, String xmlSignatureC14nMethod, boolean includeKeyInfo)
       throws SAMLException {
     Document document = marshallToDocument(object, type);
-    try {
-      Element toSign = document.getDocumentElement();
-      String xml;
-      if (sign) {
+
+    // Sign the request if requested
+    if (sign) {
+      try {
+        Element toSign = document.getDocumentElement();
         // - The next sibling of the 'Issuer' may be null, this will cause the Signature to be inserted as the last element
         //   of the assertion which is what we want.
         Node issuer = toSign.getElementsByTagName("Issuer").item(0);
         Node insertBefore = issuer.getNextSibling();
-        xml = signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, document, toSign, insertBefore, includeKeyInfo);
-      } else {
-        xml = marshallToString(document);
+        signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, toSign, null, includeKeyInfo);
+      } catch (Exception e) {
+        throw new SAMLException("Unable to sign XML SAML request", e);
       }
+    }
 
+    try {
+      String xml = marshallToString(document);
       return new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
     } catch (Exception e) {
-      throw new SAMLException("Unable to sign XML SAML response", e);
+      throw new SAMLException("Unable to marshall the SAML request to XML", e);
     }
   }
 
@@ -826,6 +881,100 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     });
   }
 
+  /**
+   * Build the {@code EncryptedAssertion} XML element as defined by the <a
+   * href="https://www.w3.org/TR/xmlenc-core1/">XML Encryption spec</a>
+   *
+   * @param encryptionAlgorithm The algorithm used to encrypt the assertion
+   * @param assertionValue      The encrypted assertion as a byte array
+   * @param encryptedKeyElement The wrapped encrypted key JAXB XML element
+   * @param keyLocation         The location in the {@code EncryptedAssertion} where the {@code EncryptedKey} should be
+   *                            placed
+   * @return A JAXB XML element for the SAML {@code EncryptedAssertion}
+   */
+  private EncryptedElementType buildEncryptedAssertion(EncryptionAlgorithm encryptionAlgorithm, byte[] assertionValue,
+                                                       EncryptedKeyType encryptedKeyElement, KeyLocation keyLocation) {
+    // Create the EncryptedData element
+    EncryptedDataType encryptedData = new EncryptedDataType();
+    encryptedData.setType("http://www.w3.org/2001/04/xmlenc#Element");
+
+    // Set the EncryptionMethod for the SAML assertion and add to EncryptedData
+    EncryptionMethodType encryptionMethod = new EncryptionMethodType();
+    encryptionMethod.setAlgorithm(encryptionAlgorithm.uri);
+    encryptedData.setEncryptionMethod(encryptionMethod);
+
+    // Create the CipherData and add to EncryptedData
+    CipherDataType cipherData = new CipherDataType();
+    cipherData.setCipherValue(assertionValue);
+    encryptedData.setCipherData(cipherData);
+
+    // Create the EncryptedAssertion and add EncryptedData element
+    EncryptedElementType encryptedAssertion = new EncryptedElementType();
+    encryptedAssertion.setEncryptedData(encryptedData);
+
+    if (keyLocation == KeyLocation.Child) {
+      // The EncryptedKey should be wrapped in ds:KeyInfo and added as a child of EncryptedData
+      KeyInfoType keyInfo = new KeyInfoType();
+      // The EncryptedKey element needs to be wrapped in a JAXBElement in order to be marshalled to an XML Document
+      keyInfo.getContent().add(XENC_OBJECT_FACTORY.createEncryptedKey(encryptedKeyElement));
+      encryptedData.setKeyInfo(keyInfo);
+    } else {
+      // The EncryptedKey should be a sibling of EncryptedData
+      encryptedAssertion.getEncryptedKey().add(encryptedKeyElement);
+    }
+
+    return encryptedAssertion;
+  }
+
+  /**
+   * Wrap the encrypted key value in an {@code EncryptedKey} XML element as defined by the <a
+   * href="https://www.w3.org/TR/xmlenc-core1/">XML Encryption spec</a>
+   *
+   * @param encryptedKeyValue  The encrypted key value as a byte array
+   * @param transportAlgorithm The algorithm used to encrypt the key
+   * @param digest             The message digest algorithm for RSA-OAEP (if necessary)
+   * @param mgf                The Mask Generation function for RSA-OAEP (if necessary)
+   * @return The {@code EncryptedKey} JAXB XML element
+   */
+  private EncryptedKeyType buildEncryptedKey(byte[] encryptedKeyValue, KeyTransportAlgorithm transportAlgorithm,
+                                             DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
+    // Create EncryptionMethod element
+    EncryptionMethodType encryptionMethod = new EncryptionMethodType();
+    encryptionMethod.setAlgorithm(transportAlgorithm.uri);
+
+    if (transportAlgorithm != KeyTransportAlgorithm.RSAv15) {
+      // Add DigestMethod for OAEP
+      DigestMethodType digestMethod = new DigestMethodType();
+      digestMethod.setAlgorithm(digest.uri);
+      // We need to add DigestMethod as an Element in order to marshall the full response later
+      // We may be able to avoid this by regenerating the JAXB objects all at once, so they know about each other
+      Document doc = marshallToDocument(DSIG_OBJECT_FACTORY.createDigestMethod(digestMethod), DigestMethodType.class);
+      encryptionMethod.getContent().add(doc.getDocumentElement());
+
+      if (transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP) {
+        // Add MGF algorithm
+        MGFType mgfType = new MGFType();
+        mgfType.setAlgorithm(mgf.uri);
+        // We need to add MGF as an Element in order to marshall the full response later
+        // We may be able to avoid this by regenerating the JAXB objects all at once, so they know about each other
+        // Exception is: jakarta.xml.bind.JAXBException: io.fusionauth.samlv2.domain.jaxb.w3c.xmlenc11.MGFType is not known to this context
+        Document mgfDoc = marshallToDocument(XENC11_OBJECT_FACTORY.createMGF(mgfType), MGFType.class);
+        encryptionMethod.getContent().add(mgfDoc.getDocumentElement());
+      }
+    }
+
+    // Create CipherData element
+    CipherDataType cipherData = new CipherDataType();
+    cipherData.setCipherValue(encryptedKeyValue);
+
+    // Create top-level EncryptedKey element
+    EncryptedKeyType encryptedKey = new EncryptedKeyType();
+    encryptedKey.setEncryptionMethod(encryptionMethod);
+    encryptedKey.setCipherData(cipherData);
+
+    return encryptedKey;
+  }
+
   private void checkFor_CVE_2022_21449(SAMLRequest request, byte[] signature) throws SAMLException {
     if (signature.length == 0) {
       return;
@@ -878,6 +1027,148 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
+  /**
+   * Creates the algorithm parameter spec according to the selected encryption algorithm
+   *
+   * @param encryptionAlgorithm The encryption algorithm
+   * @param iv                  The initialization vector
+   * @return The algorithm parameter spec for initializing the {@link Cipher}
+   */
+  private AlgorithmParameterSpec createAlgorithmParameterSpec(EncryptionAlgorithm encryptionAlgorithm, byte[] iv) {
+    if (List.of(EncryptionAlgorithm.AES128GCM, EncryptionAlgorithm.AES192GCM, EncryptionAlgorithm.AES256GCM).contains(encryptionAlgorithm)) {
+      return new GCMParameterSpec(128, iv);
+    } else {
+      return new IvParameterSpec(iv);
+    }
+  }
+
+  /**
+   * Encrypt the SAML Assertion in the XML document and return a new XML document with the Assertion replaced by
+   * EncryptedAssertion
+   *
+   * @param document              The XML document containing the SAML Response with an unencrypted Assertion
+   * @param encryptionAlgorithm   The algorithm used to encrypt the SAML Assertion
+   * @param keyLocation           The location to place the EncryptedKey in EncryptedAssertion
+   * @param transportAlgorithm    The algorithm used to encrypt the symmetric key for transport
+   * @param encryptionCertificate The certificate containing the public key for encrypting the symmetric key
+   * @param digest                The message digest algorithm to use with RSA-OAEP encryption (if necessary)
+   * @param mgf                   The mask generation function to use with RSA-OAEP encryption (if necessary)
+   * @return A new XML document containing the SAML response with an EncryptedAssertion
+   * @throws SAMLException if there is an issue encrypting the SAML Assertion or generating a new document
+   */
+  private Document encryptAssertion(Document document, EncryptionAlgorithm encryptionAlgorithm, KeyLocation keyLocation,
+                                    KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
+                                    DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
+    // Get the Assertion element to encrypt and marshall to XML string
+    Element toEncrypt = (Element) document.getElementsByTagName("Assertion").item(0);
+    String xmlToEncrypt;
+    try {
+      xmlToEncrypt = marshallToString(toEncrypt);
+    } catch (TransformerException e) {
+      throw new SAMLException("Unable to marshall the element to XML.", e);
+    }
+
+    // Generate symmetric key material for encrypting the assertion
+    Key k;
+    byte[] iv;
+    try {
+      k = generateAssertionEncryptionKey(encryptionAlgorithm);
+      iv = generateIV(encryptionAlgorithm);
+    } catch (NoSuchAlgorithmException e) {
+      throw new SAMLException("Unable to generate symmetric key encryption parameters for assertion encryption", e);
+    }
+
+    // Encrypt the Assertion element to a byte array
+    byte[] assertionValue;
+    try {
+      assertionValue = encryptElement(xmlToEncrypt, encryptionAlgorithm, k, iv);
+    } catch (Exception e) {
+      throw new SAMLException("Unable to encrypt assertion using symmetric key", e);
+    }
+
+    // Encrypt the symmetric key to a byte array
+    byte[] encryptedKeyValue;
+    try {
+      encryptedKeyValue = encryptKey(k, transportAlgorithm, encryptionCertificate, digest, mgf);
+    } catch (Exception e) {
+      throw new SAMLException("Unable to encrypt symmetric key for transport", e);
+    }
+
+    // Build the EncryptedKey element
+    EncryptedKeyType encryptedKeyElement = buildEncryptedKey(encryptedKeyValue, transportAlgorithm, digest, mgf);
+
+    // Build the EncryptedAssertion element
+    EncryptedElementType encryptedAssertion = buildEncryptedAssertion(encryptionAlgorithm, assertionValue, encryptedKeyElement, keyLocation);
+
+    // Unmarshall the XML document
+    ResponseType samlResponse = unmarshallFromDocument(document, ResponseType.class);
+    // Clear the unencrypted Assertion and add the EncryptedAssertion
+    samlResponse.getAssertionOrEncryptedAssertion().clear();
+    samlResponse.getAssertionOrEncryptedAssertion().add(encryptedAssertion);
+
+    // Marshall the JAXB XML back to a document
+    return marshallToDocument(PROTOCOL_OBJECT_FACTORY.createResponse(samlResponse), ResponseType.class);
+  }
+
+  /**
+   * Encrypts the provided XML string using the provided symmetric key parameters and returns a byte array containing
+   * the ciphertext
+   *
+   * @param xmlToEncrypt        The XML string to be encrypted
+   * @param encryptionAlgorithm The algorithm to be used to encrypt the data
+   * @param k                   The symmetric encryption key
+   * @param iv                  The initialization vector for the encryption algorithm
+   * @return A byte array containing the ciphertext
+   */
+  private byte[] encryptElement(String xmlToEncrypt, EncryptionAlgorithm encryptionAlgorithm, Key k, byte[] iv)
+      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidKeyException, InvalidAlgorithmParameterException, IllegalBlockSizeException, BadPaddingException {
+    // Initialize the cipher
+    AlgorithmParameterSpec spec = createAlgorithmParameterSpec(encryptionAlgorithm, iv);
+    Cipher cipher = Cipher.getInstance(encryptionAlgorithm.transformation);
+    cipher.init(Cipher.ENCRYPT_MODE, k, spec);
+
+    // Encrypt the XML string. AES-GCM ciphers will generate and append the Authentication Tag to resulting ciphertext
+    byte[] ciphertext = cipher.doFinal(xmlToEncrypt.getBytes(StandardCharsets.UTF_8));
+    // Concatenate the IV and ciphertext and return the result
+    return ByteBuffer.allocate(iv.length + ciphertext.length)
+                     .put(iv)
+                     .put(ciphertext)
+                     .array();
+  }
+
+  /**
+   * Encrypt the symmetric key using the provided cipher information and return a byte array containing ciphertext
+   *
+   * @param key                   The symmetric key to encrypt
+   * @param transportAlgorithm    The algorithm used to encrypt the symmetric key for transport
+   * @param encryptionCertificate The certificate containing the RSA public key to use for encryption
+   * @param digest                The message digest algorithm to use with RSA-OAEP encryption (if necessary)
+   * @param mgf                   The mask generation function to use with RSA-OAEP encryption (if necessary)
+   * @return A byte array containing the ciphertext
+   */
+  private byte[] encryptKey(Key key, KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
+                            DigestAlgorithm digest, MaskGenerationFunction mgf)
+      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    // Create and initialize the cipher
+    Cipher cipher = Cipher.getInstance(transportAlgorithm.transformation);
+    if (transportAlgorithm == KeyTransportAlgorithm.RSAv15) {
+      cipher.init(Cipher.ENCRYPT_MODE, encryptionCertificate.getPublicKey());
+    } else {
+      OAEPParameterSpec oaepParameters = new OAEPParameterSpec(
+          digest.digest,
+          "MGF1",
+          // The RSA_OAEP_MGF1P algorithm implies the use of SHA-1 for the MGF digest algorithm
+          new MGF1ParameterSpec(transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP_MGF1P ? "SHA-1" : mgf.digest),
+          // Use the default (empty byte[])
+          PSpecified.DEFAULT
+      );
+      cipher.init(Cipher.ENCRYPT_MODE, encryptionCertificate.getPublicKey(), oaepParameters);
+    }
+
+    // Get the encrypted bytes for the key and return the result
+    return cipher.doFinal(key.getEncoded());
+  }
+
   private void fixIDs(Element element) {
     NamedNodeMap attributes = element.getAttributes();
     for (int i = 0; i < attributes.getLength(); i++) {
@@ -894,6 +1185,43 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         fixIDs((Element) child);
       }
     }
+  }
+
+  private Key generateAssertionEncryptionKey(EncryptionAlgorithm encryptionAlgorithm) throws NoSuchAlgorithmException {
+    switch (encryptionAlgorithm) {
+      case TripleDES -> {
+        return KeyGenerator.getInstance("DESede")
+                           .generateKey();
+      }
+      case AES128, AES128GCM -> {
+        var keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(128);
+        return keyGen.generateKey();
+      }
+      case AES192, AES192GCM -> {
+        var keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(192);
+        return keyGen.generateKey();
+      }
+      case AES256, AES256GCM -> {
+        var keyGen = KeyGenerator.getInstance("AES");
+        keyGen.init(256);
+        return keyGen.generateKey();
+      }
+      default -> throw new NoSuchAlgorithmException("Requested key for unsupported algorithm " + encryptionAlgorithm);
+    }
+  }
+
+  private byte[] generateIV(EncryptionAlgorithm encryptionAlgorithm) {
+    int ivLength = 0;
+    switch (encryptionAlgorithm) {
+      case TripleDES -> ivLength = 8;
+      case AES128, AES192, AES256 -> ivLength = 16;
+      case AES128GCM, AES192GCM, AES256GCM -> ivLength = 12;
+    }
+    byte[] iv = new byte[ivLength];
+    new SecureRandom().nextBytes(iv);
+    return iv;
   }
 
   private SubjectConfirmation parseConfirmation(SubjectConfirmationType subjectConfirmationType) {
@@ -980,10 +1308,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return result;
   }
 
-  private String signXML(PrivateKey privateKey, X509Certificate certificate, Algorithm algorithm,
-                         String xmlSignatureC14nMethod, Document document, Element toSign, Node insertBefore,
-                         boolean includeKeyInfo)
-      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, MarshalException, XMLSignatureException, TransformerException {
+  private void signXML(PrivateKey privateKey, X509Certificate certificate, Algorithm algorithm,
+                       String xmlSignatureC14nMethod, Element toSign, Node insertBefore,
+                       boolean includeKeyInfo)
+      throws NoSuchAlgorithmException, InvalidAlgorithmParameterException, MarshalException, XMLSignatureException {
     // Set the id attribute node. Yucky! Yuck!
     toSign.setIdAttributeNode(toSign.getAttributeNode("ID"), true);
 
@@ -1010,7 +1338,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     XMLSignature signature = factory.newXMLSignature(si, ki);
 
     signature.sign(dsc);
-    return marshallToString(document);
   }
 
   private void verifyEmbeddedSignature(Document document, KeySelector keySelector, SAMLRequest request)
