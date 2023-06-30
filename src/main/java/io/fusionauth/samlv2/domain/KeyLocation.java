@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2023, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,14 +16,19 @@
 package io.fusionauth.samlv2.domain;
 
 /**
- * The SAML v2.0 authentication request object that is sent from the SP.
+ * Location for the encrypted symmetric key in relation to the {@code <EncryptedData>} element.
  *
- * @author Brian Pontarelli
+ * @author Spencer Witt
  */
-public class AuthenticationRequest extends SAMLRequest {
-  public String acsURL;
+public enum KeyLocation {
+  /**
+   * The {@code EncryptedKey} element will be wrapped in a {@code KeyInfo} element and added inside the
+   * {@code EncryptedData}
+   */
+  Child,
 
-  public Boolean allowCreate = false;
-
-  public String nameIdFormat;
+  /**
+   * The {@code EncryptedKey} element will be added to the document as a sibling of {@code EncryptedData}
+   */
+  Sibling
 }

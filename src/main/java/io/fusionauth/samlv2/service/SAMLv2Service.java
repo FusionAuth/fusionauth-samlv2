@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,8 +24,13 @@ import java.util.function.Function;
 import io.fusionauth.samlv2.domain.Algorithm;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
+import io.fusionauth.samlv2.domain.DigestAlgorithm;
+import io.fusionauth.samlv2.domain.EncryptionAlgorithm;
+import io.fusionauth.samlv2.domain.KeyLocation;
+import io.fusionauth.samlv2.domain.KeyTransportAlgorithm;
 import io.fusionauth.samlv2.domain.LogoutRequest;
 import io.fusionauth.samlv2.domain.LogoutResponse;
+import io.fusionauth.samlv2.domain.MaskGenerationFunction;
 import io.fusionauth.samlv2.domain.MetaData;
 import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.SignatureLocation;
@@ -53,6 +58,35 @@ public interface SAMLv2Service {
   String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
                             X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
                             SignatureLocation signatureLocation, boolean includeKeyInfo)
+      throws SAMLException;
+
+  /**
+   * Builds a SAML AuthnResponse that can be sent back to the service provider with optional encryption parameters.
+   *
+   * @param response               The authentication response that is converted to a AuthnResponse.
+   * @param sign                   Determines if the XML should be signed or not.
+   * @param privateKey             The key that is used to sign the response (private key, shared, secret, etc).
+   * @param certificate            The certificate that is included in the response.
+   * @param algorithm              The signing algorithm to use (if any).
+   * @param xmlSignatureC14nMethod The XML signature canonicalization method used.
+   * @param signatureLocation      The signature location that instructs where to place the signature in the response.
+   * @param includeKeyInfo         When true the KeyInfo element will be added to the response
+   * @param encrypt                Determines if the SAML Assertion should be encrypted or not.
+   * @param encryptionAlgorithm    The algorithm to use to encrypt the assertion (if any).
+   * @param keyLocation            The location of the encrypted symmetric key on the SAML response.
+   * @param transportAlgorithm     The algorithm to use to encrypt the symmetric encryption key.
+   * @param encryptionCertificate  The certificate used to encrypt the symmetric encryption key.
+   * @param digest                 The digest algorithm for encrypting the symmetric key with RSA-OAEP.
+   * @param mgf                    The Mask Generation Function to use with RSA-OAEP (if any).
+   * @return The response base-64 encoded.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  String buildAuthnResponse(AuthenticationResponse response, boolean sign, PrivateKey privateKey,
+                            X509Certificate certificate, Algorithm algorithm, String xmlSignatureC14nMethod,
+                            SignatureLocation signatureLocation, boolean includeKeyInfo, boolean encrypt,
+                            EncryptionAlgorithm encryptionAlgorithm, KeyLocation keyLocation,
+                            KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
+                            DigestAlgorithm digest, MaskGenerationFunction mgf)
       throws SAMLException;
 
   /**
