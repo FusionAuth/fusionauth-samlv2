@@ -334,8 +334,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       document = encryptAssertion(document, encryptionAlgorithm, keyLocation, transportAlgorithm, encryptionCertificate, digest, mgf);
     }
 
-    // Sign the response if requested
-    if (sign && signatureOption == SignatureLocation.Response) {
+    // Sign the response if requested or if the response is a failure (successes may have had the assertion signed above)
+    if (sign && (signatureOption == SignatureLocation.Response || response.status.code != ResponseStatus.Success)) {
       try {
         Element toSign = document.getDocumentElement();
         Node insertBefore = null;
