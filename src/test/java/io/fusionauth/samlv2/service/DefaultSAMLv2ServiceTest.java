@@ -1128,18 +1128,12 @@ public class DefaultSAMLv2ServiceTest {
     String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureLocation, includeKeyInfoInResponse);
     response = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
 
-    // Assert the signature is in the correct location based upon the signature option provided.
+    // Since the request is failed there should always be a signature in the response because there is no assertion present
     Document document = parseDocument(encodedXML);
     Node signature = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature").item(0);
-    if (signatureLocation == SignatureLocation.Assertion) {
-      // Previous sibling is expected to be the Issuer, and the next sibling should be Subject.
-      assertEquals(signature.getPreviousSibling().getLocalName(), "Issuer");
-      assertEquals(signature.getNextSibling().getLocalName(), "Status");
-    } else {
-      // The Signature should be a child of the Response, and come immediately following the Issuer.
-      assertEquals(signature.getParentNode().getLocalName(), "Response");
-      assertEquals(signature.getPreviousSibling().getLocalName(), "Issuer");
-    }
+    assertEquals(signature.getPreviousSibling().getLocalName(), "Issuer");
+    assertEquals(signature.getNextSibling().getLocalName(), "Status");
+    assertEquals(signature.getParentNode().getLocalName(), "Response");
 
     assertEquals(response.destination, "https://local.fusionauth.io/samlv2/acs");
     assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
