@@ -753,10 +753,27 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     if (sign) {
       try {
         Element toSign = document.getDocumentElement();
-        // - The next sibling of the 'Issuer' may be null, this will cause the Signature to be inserted as the last element
-        //   of the assertion which is what we want.
-        Node issuer = toSign.getElementsByTagName("Issuer").item(0);
-        Node insertBefore = issuer.getNextSibling();
+        Node insertBefore = null;
+        // This method is used for AuthnRequestType, LogoutRequestType, and StatusResponseType (LogoutResponse)
+        // The only required element in the StatusResponseType is Status. See Section 3.2.2 in SAML Core.
+        // The children will be a sequence that must exist in the order of 'Issuer', 'Signature', 'Extensions', and then 'Status'
+        // - If the first element is 'Issuer', then the next sibling will be used for 'insertBefore'.
+        // - If the first element is NOT 'Issuer', it MUST be 'Extensions' or 'Status', and thus is the 'insertBefore' node.
+        //
+        // AuthnRequestType and LogoutRequestType both extend RequestAbstractType.
+        //  - AuthnRequestType has no required fields. See Section 3.4.1 in SAML Core.
+        //  - LogoutRequestType only requires an ID field. See Section 3.7.1 in SAML Core.
+        // The RequestAbstractType requires its children in the sequence of 'Issuer', 'Signature', and then 'Extensions'. See Section 3.2.1 in SAML Core.
+        // - If the first element is 'Issuer', then the next sibling will be used for 'insertBefore'.
+        // - If the first element is NOT 'Issuer', it MUST be 'Extensions', and thus is the 'insertBefore' node.
+        NodeList children = toSign.getChildNodes();
+        for (int i = 0; i < children.getLength(); i++) {
+          Node n = children.item(i);
+          if (n instanceof Element) {
+            insertBefore = n.getLocalName().equals("Issuer") ? n.getNextSibling() : n;
+            break;
+          }
+        }
         signXML(privateKey, certificate, algorithm, xmlSignatureC14nMethod, toSign, insertBefore, includeKeyInfo);
       } catch (Exception e) {
         throw new SAMLException("Unable to sign XML SAML request", e);
