@@ -1199,6 +1199,34 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
   }
 
+  @Test(dataProvider = "signatureLocation")
+  public void roundTripResponseFailedRequestSignedAssertion(SignatureLocation signatureLocation, boolean includeKeyInfoInResponse)
+      throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse-authnFailed.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureLocation, includeKeyInfoInResponse);
+    response = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
+
+    // Since the request is failed there should always be a signature in the response because there is no assertion present
+    Document document = parseDocument(encodedXML);
+    Node signature = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature").item(0);
+    assertEquals(signature.getPreviousSibling().getLocalName(), "Issuer");
+    assertEquals(signature.getNextSibling().getLocalName(), "Status");
+    assertEquals(signature.getParentNode().getLocalName(), "Response");
+
+    assertEquals(response.destination, "https://local.fusionauth.io/samlv2/acs");
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertEquals(response.issuer, "https://acme.com/saml/idp");
+    assertEquals(response.status.code, ResponseStatus.AuthenticationFailed);
+  }
+
   @DataProvider(name = "signatureLocation")
   public Object[][] signatureLocation() {
     return new Object[][]{
