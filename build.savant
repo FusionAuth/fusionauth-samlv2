@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2014-2022, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2014-2023, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,16 +14,17 @@
  * language governing permissions and limitations under the License.
  */
 
-glassFishVersion = "3.0.2"
-jakartaXMLBindVersion = "3.0.1"
-slf4jVersion = "2.0.3"
-testngVersion = "7.3.0"
+glassFishVersion = "4.0.2"
+jakartaXMLBindVersion = "4.0.0"
+slf4jVersion = "2.0.7"
+testngVersion = "7.8.0"
 
-project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.9.0", licenses: ["ApacheV2_0"]) {
+project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.10.0", licenses: ["ApacheV2_0"]) {
   workflow {
     fetch {
       cache()
       url(url: "https://repository.savantbuild.org")
+      maven()
     }
     publish {
       cache()
@@ -37,7 +38,7 @@ project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.9.0", lic
   dependencies {
     group(name: "compile") {
       dependency(id: "jakarta.xml.bind:jakarta.xml.bind-api:${jakartaXMLBindVersion}")
-      dependency(id: "org.slf4j:slf4j-api:${slf4jVersion}")
+      dependency(id: "org.slf4j:slf4j-api:${slf4jVersion}",  skipCompatibilityCheck: true)
     }
     group(name: "test-compile", export: false) {
       dependency(id: "org.testng:testng:${testngVersion}")
