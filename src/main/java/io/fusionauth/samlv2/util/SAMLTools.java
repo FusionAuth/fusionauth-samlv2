@@ -158,6 +158,8 @@ public class SAMLTools {
         int length = inflater.inflate(buf);
         if (length > 0) {
           os.write(buf, 0, length);
+        } else {
+          break;
         }
       }
 
