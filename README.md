@@ -5,7 +5,7 @@ This repository is SAML v2.0 bindings in Java using JAXB.
 You'd use this library to process SAML requests and responses. See the tests for example code.
 
 ## Security disclosures
-If you find a vulnerability or other security related bug, please send a note to security@fusionauth.io before opening a GitHub issue. This will allow us to assess the disclosure and prepare a fix prior to a public disclosure. 
+If you find a vulnerability or other security related bug, [please report the vulnerability here](https://fusionauth.io/security) before opening a GitHub issue. This will allow us to assess the disclosure and prepare a fix prior to a public disclosure.
 
 We are very interested in compensating anyone that can identify a security related bug or vulnerability and properly disclose it to us.
 
