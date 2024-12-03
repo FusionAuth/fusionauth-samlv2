@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2023, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2024, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,13 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.DESKeySpec;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.OAEPParameterSpec;
 import javax.crypto.spec.PSource.PSpecified;
+import javax.crypto.spec.SecretKeySpec;
 import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.MarshalException;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
@@ -57,6 +60,7 @@ import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.MGF1ParameterSpec;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -634,6 +638,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   @Override
   public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, KeySelector keySelector)
       throws SAMLException {
+    return parseResponse(encodedResponse, verifySignature, keySelector, false, null);
+  }
+
+  @Override
+  public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature,
+                                              KeySelector signatureKeySelector, boolean requireEncryptedAssertion,
+                                              PrivateKey encryptionKey)
+      throws SAMLException {
 
     AuthenticationResponse response = new AuthenticationResponse();
     byte[] decodedResponse = Base64.getMimeDecoder().decode(encodedResponse);
@@ -641,7 +653,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     Document document = newDocumentFromBytes(decodedResponse);
     if (verifySignature) {
-      verifyEmbeddedSignature(document, keySelector, null);
+      verifyEmbeddedSignature(document, signatureKeySelector, null);
     }
 
     ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
@@ -656,8 +668,15 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     List<Object> assertions = jaxbResponse.getAssertionOrEncryptedAssertion();
     for (Object assertion : assertions) {
       if (assertion instanceof EncryptedElementType) {
-        logger.warn("SAML response contained encrypted attribute. It was ignored.");
-        continue;
+        if (encryptionKey == null) {
+          logger.warn("SAML response contained encrypted attribute, but no encryption key was provided. It was ignored.");
+          continue;
+        } else {
+          // TODO : do decrypt
+          assertion = decryptAssertion((EncryptedElementType) assertion, encryptionKey);
+        }
+      } else if (requireEncryptedAssertion) {
+        logger.warn("Assertion encryption is required, but the SAML response contained an unencrypted attribute. It was ignored.");
       }
 
       AssertionType assertionType = (AssertionType) assertion;
@@ -1039,6 +1058,123 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       return new GCMParameterSpec(128, iv);
     } else {
       return new IvParameterSpec(iv);
+    }
+  }
+
+  private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey encryptionKey) {
+    // Get the EncryptedData element
+    EncryptedDataType encryptedData = encryptedAssertion.getEncryptedData();
+
+    // Extract the encrypted key value
+    EncryptedKeyType encryptedKey = null;
+    var encryptedKeys = encryptedAssertion.getEncryptedKey();
+    if (!encryptedKeys.isEmpty()) {
+      // Check for EncryptedKey as a sibling of EncryptedData
+      encryptedKey = encryptedKeys.get(0);
+    } else {
+      var keyInfo = encryptedData.getKeyInfo();
+      if (keyInfo != null) {
+        var content = keyInfo.getContent();
+        if (!content.isEmpty()) {
+          JAXBElement<?> element = (JAXBElement<?>) content.get(0);
+          encryptedKey = (EncryptedKeyType) element.getValue();
+        }
+      }
+    }
+
+    try {
+      var encryptionAlgorithm = EncryptionAlgorithm.fromURI(encryptedData.getEncryptionMethod().getAlgorithm());
+      Key symmetricKey = decryptKey(encryptedKey, encryptionKey, encryptionAlgorithm);
+      int ivLength = 0;
+      switch (encryptionAlgorithm) {
+        case TripleDES -> ivLength = 8;
+        case AES128, AES192, AES256 -> ivLength = 16;
+        case AES128GCM, AES192GCM, AES256GCM -> ivLength = 12;
+      }
+
+      byte[] encryptedAssertionBytes = encryptedData.getCipherData().getCipherValue();
+      byte[] iv = Arrays.copyOfRange(encryptedAssertionBytes, 0, ivLength);
+      byte[] cipherValue = Arrays.copyOfRange(encryptedAssertionBytes, ivLength, encryptedAssertionBytes.length);
+      // Initialize the cipher
+      AlgorithmParameterSpec spec = createAlgorithmParameterSpec(encryptionAlgorithm, iv);
+      Cipher cipher = Cipher.getInstance(encryptionAlgorithm.transformation);
+      cipher.init(Cipher.DECRYPT_MODE, symmetricKey, spec);
+      byte[] assertionBytes = cipher.doFinal(cipherValue);
+      Document doc = newDocumentFromBytes(assertionBytes);
+      return unmarshallFromDocument(doc, AssertionType.class);
+    } catch (Exception e) {
+      throw new RuntimeException(e);
+    }
+  }
+
+  private Key decryptKey(EncryptedKeyType encryptedKey, PrivateKey encryptionKey,
+                         EncryptionAlgorithm encryptionAlgorithm)
+      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidKeySpecException {
+    EncryptionMethodType encryptionMethod = encryptedKey.getEncryptionMethod();
+    KeyTransportAlgorithm transportAlgorithm = KeyTransportAlgorithm.fromURI(encryptionMethod.getAlgorithm());
+    // Create the cipher instance
+    Cipher cipher = Cipher.getInstance(transportAlgorithm.transformation);
+
+    if (transportAlgorithm == KeyTransportAlgorithm.RSAv15) {
+      cipher.init(Cipher.DECRYPT_MODE, encryptionKey);
+    } else {
+      // Extract other parameters for OAEP
+      DigestAlgorithm digest = null;
+      MaskGenerationFunction mgf = null;
+
+      for (Object item : encryptionMethod.getContent()) {
+        // TODO : for some reason the MGF is not parsed as a JAXB element despite being created and added in the same way. This is true even if the builder code is reversed to create MGF first.
+        if (item instanceof JAXBElement<?>) {
+          JAXBElement<?> element = (JAXBElement<?>) item;
+          if (element.getDeclaredType() == DigestMethodType.class) {
+            DigestMethodType digestMethod = (DigestMethodType) element.getValue();
+            digest = DigestAlgorithm.fromURI(digestMethod.getAlgorithm());
+          } else if (element.getDeclaredType() == MGFType.class) {
+            MGFType mgfType = (MGFType) element.getValue();
+            mgf = MaskGenerationFunction.fromURI(mgfType.getAlgorithm());
+          }
+        }
+      }
+
+      if (
+//          transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP_MGF1P &&
+          mgf == null) {
+        mgf = MaskGenerationFunction.MGF1_SHA1;
+      }
+
+      OAEPParameterSpec oaepParameters = new OAEPParameterSpec(
+          digest.digest,
+          "MGF1",
+          // The RSA_OAEP_MGF1P algorithm implies the use of SHA-1 for the MGF digest algorithm
+          new MGF1ParameterSpec(transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP_MGF1P ? "SHA-1" : mgf.digest),
+          // Use the default (empty byte[])
+          PSpecified.DEFAULT
+      );
+      cipher.init(Cipher.DECRYPT_MODE, encryptionKey, oaepParameters);
+    }
+
+    byte[] encryptedBytes = encryptedKey.getCipherData().getCipherValue();
+
+//
+//    // Create CipherData element
+//    CipherDataType cipherData = new CipherDataType();
+//    cipherData.setCipherValue(encryptedKeyValue);
+//
+//    // Create top-level EncryptedKey element
+//    EncryptedKeyType encryptedKey = new EncryptedKeyType();
+//    encryptedKey.setEncryptionMethod(encryptionMethod);
+//    encryptedKey.setCipherData(cipherData);
+//
+//    return encryptedKey;
+//
+
+    // Get the decrypted bytes for the key and return the result
+    byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
+    if (encryptionAlgorithm == EncryptionAlgorithm.TripleDES) {
+      return SecretKeyFactory.getInstance("DES")
+                             .generateSecret(new DESKeySpec(decryptedBytes));
+    } else {
+      return new SecretKeySpec(decryptedBytes, 0, decryptedBytes.length, "AES");
     }
   }
 
