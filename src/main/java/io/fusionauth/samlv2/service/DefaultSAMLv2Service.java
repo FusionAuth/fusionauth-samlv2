@@ -21,7 +21,7 @@ import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
 import javax.crypto.SecretKeyFactory;
-import javax.crypto.spec.DESKeySpec;
+import javax.crypto.spec.DESedeKeySpec;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.OAEPParameterSpec;
@@ -1165,8 +1165,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     // Get the decrypted bytes for the key and return the result
     byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
     if (encryptionAlgorithm == EncryptionAlgorithm.TripleDES) {
-      return SecretKeyFactory.getInstance("DES")
-                             .generateSecret(new DESKeySpec(decryptedBytes));
+      return SecretKeyFactory.getInstance("DESede")
+                             .generateSecret(new DESedeKeySpec(decryptedBytes));
     } else {
       return new SecretKeySpec(decryptedBytes, 0, decryptedBytes.length, "AES");
     }
