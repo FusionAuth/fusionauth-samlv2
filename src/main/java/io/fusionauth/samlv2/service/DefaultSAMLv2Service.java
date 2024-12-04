@@ -1123,7 +1123,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       MaskGenerationFunction mgf = null;
 
       for (Object item : encryptionMethod.getContent()) {
-        // TODO : for some reason the MGF is not parsed as a JAXB element despite being created and added in the same way. This is true even if the builder code is reversed to create MGF first.
+        // The DigestMethod is parsed as a JAXB element while MGF is parsed as a W3C DOM Element.
+        // Cover both cases for determining other parameters
         if (item instanceof JAXBElement<?>) {
           JAXBElement<?> element = (JAXBElement<?>) item;
           if (element.getDeclaredType() == DigestMethodType.class) {
@@ -1133,12 +1134,18 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
             MGFType mgfType = (MGFType) element.getValue();
             mgf = MaskGenerationFunction.fromURI(mgfType.getAlgorithm());
           }
+        } else if (item instanceof Element) {
+          Element element = (Element) item;
+          if (element.getTagName().equals("DigestMethod")) {
+            digest = DigestAlgorithm.fromURI(element.getAttribute("Algorithm"));
+          } else if (element.getTagName().equals("MGF")) {
+            mgf = MaskGenerationFunction.fromURI(element.getAttribute("Algorithm"));
+          }
         }
       }
 
-      if (
-//          transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP_MGF1P &&
-          mgf == null) {
+      if (transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP_MGF1P) {
+        // The RSA_OAEP_MGF1P implies the use of SHA-1 for the MGF digest algorithm
         mgf = MaskGenerationFunction.MGF1_SHA1;
       }
 
@@ -1154,19 +1161,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     byte[] encryptedBytes = encryptedKey.getCipherData().getCipherValue();
-
-//
-//    // Create CipherData element
-//    CipherDataType cipherData = new CipherDataType();
-//    cipherData.setCipherValue(encryptedKeyValue);
-//
-//    // Create top-level EncryptedKey element
-//    EncryptedKeyType encryptedKey = new EncryptedKeyType();
-//    encryptedKey.setEncryptionMethod(encryptionMethod);
-//    encryptedKey.setCipherData(cipherData);
-//
-//    return encryptedKey;
-//
 
     // Get the decrypted bytes for the key and return the result
     byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
