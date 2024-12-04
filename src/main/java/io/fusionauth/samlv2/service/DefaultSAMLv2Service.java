@@ -1060,6 +1060,15 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
+  /**
+   * Decrypt an encrypted XML element according to the XML Encryption spec
+   *
+   * @param encryptedAssertion     an {@code EncryptedElement} containing an encrypted assertion
+   * @param transportEncryptionKey a private key used to decrypt the symmetric key used to decrypt the assertion
+   * @return the decrypted {@code Assertion} element
+   * @throws SAMLException if there was an issue decrypting the {@code EncryptedElement} to a SAML {@code Assertion}
+   *                       element
+   */
   private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey transportEncryptionKey)
       throws SAMLException {
     // Extract the encrypted assertion encryption key from the XML
@@ -1095,6 +1104,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return unmarshallFromDocument(doc, AssertionType.class);
   }
 
+  /**
+   * Decrypt the provided bytes and return the result
+   *
+   * @param encryptedAssertionBytes      the ciphertext for the encrypted assertion
+   * @param assertionEncryptionAlgorithm the algorithm used to encrypt the assertion
+   * @param assertionEncryptionKey       a symmetric key used to decrypt the assertion
+   * @return the plaintext element XML
+   */
   private byte[] decryptElement(byte[] encryptedAssertionBytes, EncryptionAlgorithm assertionEncryptionAlgorithm,
                                 Key assertionEncryptionKey)
       throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
@@ -1107,8 +1124,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return cipher.doFinal(cipherValue);
   }
 
-  private Key decryptKey(EncryptedKeyType encryptedKey, PrivateKey encryptionKey,
-                         EncryptionAlgorithm encryptionAlgorithm)
+  /**
+   * Decrypts the provided {@code EncryptedKey} element and creates a symmetric encryption key from the value
+   *
+   * @param encryptedKey                 the {@code EncryptedKey} element
+   * @param transportEncryptionKey       the private key used to decrypt the symmetric key
+   * @param assertionEncryptionAlgorithm the algorithm used to encrypt/decrypt the assertion
+   * @return the decrypted symmetric key
+   * @throws SAMLException if there was an issue extracting an encryption parameter from the {@code EncryptedKey} XML
+   */
+  private Key decryptKey(EncryptedKeyType encryptedKey, PrivateKey transportEncryptionKey,
+                         EncryptionAlgorithm assertionEncryptionAlgorithm)
       throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidKeySpecException, SAMLException {
     EncryptionMethodType encryptionMethod = encryptedKey.getEncryptionMethod();
     String transportAlgorithmUri = encryptionMethod.getAlgorithm();
@@ -1120,7 +1146,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     Cipher cipher = Cipher.getInstance(transportAlgorithm.transformation);
 
     if (transportAlgorithm == KeyTransportAlgorithm.RSAv15) {
-      cipher.init(Cipher.DECRYPT_MODE, encryptionKey);
+      cipher.init(Cipher.DECRYPT_MODE, transportEncryptionKey);
     } else {
       // Extract URIs for OAEP parameters
       String digestUri = null;
@@ -1171,14 +1197,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           // Use the default (empty byte[])
           PSpecified.DEFAULT
       );
-      cipher.init(Cipher.DECRYPT_MODE, encryptionKey, oaepParameters);
+      cipher.init(Cipher.DECRYPT_MODE, transportEncryptionKey, oaepParameters);
     }
 
     byte[] encryptedBytes = encryptedKey.getCipherData().getCipherValue();
 
     // Get the decrypted bytes for the key and return the result
     byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
-    if (encryptionAlgorithm == EncryptionAlgorithm.TripleDES) {
+    if (assertionEncryptionAlgorithm == EncryptionAlgorithm.TripleDES) {
       return SecretKeyFactory.getInstance("DESede")
                              .generateSecret(new DESedeKeySpec(decryptedBytes));
     } else {
@@ -1313,6 +1339,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return cipher.doFinal(key.getEncoded());
   }
 
+  /**
+   * Extract the {@code EncryptedKey} element from the {@code EncryptedElement}. The key may be a sibling or child of
+   * the {@code EncryptedData} element.
+   *
+   * @param encryptedAssertion an {@code EncryptedElement} containing the encrypted assertion
+   * @return the {@code EncryptedKey} element containing the encrypted assertion encryption key
+   */
   private EncryptedKeyType extractEncryptedAssertionEncryptionKey(EncryptedElementType encryptedAssertion) {
     // Get the EncryptedData element
     EncryptedDataType encryptedData = encryptedAssertion.getEncryptedData();
