@@ -672,7 +672,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           logger.warn("SAML response contained encrypted attribute, but no encryption key was provided. It was ignored.");
           continue;
         } else {
-          // TODO : do decrypt
           assertion = decryptAssertion((EncryptedElementType) assertion, encryptionKey);
         }
       } else if (requireEncryptedAssertion) {
@@ -1061,50 +1060,51 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
   }
 
-  private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey encryptionKey) {
-    // Get the EncryptedData element
-    EncryptedDataType encryptedData = encryptedAssertion.getEncryptedData();
+  private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey transportEncryptionKey)
+      throws SAMLException {
+    // Extract the encrypted assertion encryption key from the XML
+    EncryptedKeyType encryptedKey = extractEncryptedAssertionEncryptionKey(encryptedAssertion);
 
-    // Extract the encrypted key value
-    EncryptedKeyType encryptedKey = null;
-    var encryptedKeys = encryptedAssertion.getEncryptedKey();
-    if (!encryptedKeys.isEmpty()) {
-      // Check for EncryptedKey as a sibling of EncryptedData
-      encryptedKey = encryptedKeys.get(0);
-    } else {
-      var keyInfo = encryptedData.getKeyInfo();
-      if (keyInfo != null) {
-        var content = keyInfo.getContent();
-        if (!content.isEmpty()) {
-          JAXBElement<?> element = (JAXBElement<?>) content.get(0);
-          encryptedKey = (EncryptedKeyType) element.getValue();
-        }
-      }
+    // Determine the assertion EncryptionAlgorithm.
+    var assertionEncryptionAlgorithmUri = encryptedAssertion.getEncryptedData().getEncryptionMethod().getAlgorithm();
+    var assertionEncryptionAlgorithm = EncryptionAlgorithm.fromURI(assertionEncryptionAlgorithmUri);
+    if (assertionEncryptionAlgorithm == null) {
+      throw new SAMLException("Unable to determine assertion encryption algorithm from URI [" + assertionEncryptionAlgorithmUri + "]");
     }
 
+    // Decrypt the assertion encryption key using the transport key
+    Key assertionEncryptionKey;
     try {
-      var encryptionAlgorithm = EncryptionAlgorithm.fromURI(encryptedData.getEncryptionMethod().getAlgorithm());
-      Key symmetricKey = decryptKey(encryptedKey, encryptionKey, encryptionAlgorithm);
-      int ivLength = 0;
-      switch (encryptionAlgorithm) {
-        case TripleDES -> ivLength = 8;
-        case AES128, AES192, AES256 -> ivLength = 16;
-        case AES128GCM, AES192GCM, AES256GCM -> ivLength = 12;
-      }
-
-      byte[] encryptedAssertionBytes = encryptedData.getCipherData().getCipherValue();
-      byte[] iv = Arrays.copyOfRange(encryptedAssertionBytes, 0, ivLength);
-      byte[] cipherValue = Arrays.copyOfRange(encryptedAssertionBytes, ivLength, encryptedAssertionBytes.length);
-      // Initialize the cipher
-      AlgorithmParameterSpec spec = createAlgorithmParameterSpec(encryptionAlgorithm, iv);
-      Cipher cipher = Cipher.getInstance(encryptionAlgorithm.transformation);
-      cipher.init(Cipher.DECRYPT_MODE, symmetricKey, spec);
-      byte[] assertionBytes = cipher.doFinal(cipherValue);
-      Document doc = newDocumentFromBytes(assertionBytes);
-      return unmarshallFromDocument(doc, AssertionType.class);
-    } catch (Exception e) {
-      throw new RuntimeException(e);
+      assertionEncryptionKey = decryptKey(encryptedKey, transportEncryptionKey, assertionEncryptionAlgorithm);
+    } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidAlgorithmParameterException |
+             InvalidKeyException | IllegalBlockSizeException | BadPaddingException | InvalidKeySpecException e) {
+      throw new SAMLException("Unable to decrypt symmetric key using transport key", e);
     }
+
+    // Decrypt the assertion using the decrypted symmetric key
+    byte[] assertionBytes;
+    try {
+      assertionBytes = decryptElement(encryptedAssertion.getEncryptedData().getCipherData().getCipherValue(), assertionEncryptionAlgorithm, assertionEncryptionKey);
+    } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidAlgorithmParameterException |
+             InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
+      throw new SAMLException("Unable to decrypt assertion using symmetric key", e);
+    }
+
+    // Parse the bytes into an XML document and then unmarshall into the AssertionType
+    Document doc = newDocumentFromBytes(assertionBytes);
+    return unmarshallFromDocument(doc, AssertionType.class);
+  }
+
+  private byte[] decryptElement(byte[] encryptedAssertionBytes, EncryptionAlgorithm assertionEncryptionAlgorithm,
+                                Key assertionEncryptionKey)
+      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    byte[] iv = Arrays.copyOfRange(encryptedAssertionBytes, 0, assertionEncryptionAlgorithm.ivLength);
+    byte[] cipherValue = Arrays.copyOfRange(encryptedAssertionBytes, assertionEncryptionAlgorithm.ivLength, encryptedAssertionBytes.length);
+    // Initialize the cipher
+    AlgorithmParameterSpec spec = createAlgorithmParameterSpec(assertionEncryptionAlgorithm, iv);
+    Cipher cipher = Cipher.getInstance(assertionEncryptionAlgorithm.transformation);
+    cipher.init(Cipher.DECRYPT_MODE, assertionEncryptionKey, spec);
+    return cipher.doFinal(cipherValue);
   }
 
   private Key decryptKey(EncryptedKeyType encryptedKey, PrivateKey encryptionKey,
@@ -1299,6 +1299,30 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return cipher.doFinal(key.getEncoded());
   }
 
+  private EncryptedKeyType extractEncryptedAssertionEncryptionKey(EncryptedElementType encryptedAssertion) {
+    // Get the EncryptedData element
+    EncryptedDataType encryptedData = encryptedAssertion.getEncryptedData();
+
+    // Extract the encrypted key value
+    EncryptedKeyType encryptedKey = null;
+    var encryptedKeys = encryptedAssertion.getEncryptedKey();
+    if (!encryptedKeys.isEmpty()) {
+      // Check for EncryptedKey as a sibling of EncryptedData
+      encryptedKey = encryptedKeys.get(0);
+    } else {
+      var keyInfo = encryptedData.getKeyInfo();
+      if (keyInfo != null) {
+        var content = keyInfo.getContent();
+        if (!content.isEmpty()) {
+          JAXBElement<?> element = (JAXBElement<?>) content.get(0);
+          encryptedKey = (EncryptedKeyType) element.getValue();
+        }
+      }
+    }
+
+    return encryptedKey;
+  }
+
   /**
    * Finds the element that the XML signature should be inserted before in the DOM. This method is suitable when the XML
    * schema indicates the Signature should be inserted after the Issuer when the Issuer is the first optional element.
@@ -1363,13 +1387,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   private byte[] generateIV(EncryptionAlgorithm encryptionAlgorithm) {
-    int ivLength = 0;
-    switch (encryptionAlgorithm) {
-      case TripleDES -> ivLength = 8;
-      case AES128, AES192, AES256 -> ivLength = 16;
-      case AES128GCM, AES192GCM, AES256GCM -> ivLength = 12;
-    }
-    byte[] iv = new byte[ivLength];
+    byte[] iv = new byte[encryptionAlgorithm.ivLength];
     new SecureRandom().nextBytes(iv);
     return iv;
   }
