@@ -284,7 +284,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         assertionType.setConditions(conditionsType);
 
         // Audiences (element)
-        if (response.assertion.conditions.audiences.size() > 0) {
+        if (!response.assertion.conditions.audiences.isEmpty()) {
           AudienceRestrictionType audienceRestrictionType = new AudienceRestrictionType();
           audienceRestrictionType.getAudience().addAll(response.assertion.conditions.audiences);
           conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(audienceRestrictionType);
@@ -595,9 +595,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     if (spDescriptor.isPresent()) {
       SPSSODescriptorType sp = (SPSSODescriptorType) spDescriptor.get();
       metaData.sp = new SPMetaData();
-      metaData.sp.acsEndpoint = sp.getAssertionConsumerService().size() > 0 ? sp.getAssertionConsumerService().get(0).getLocation() : null;
+      metaData.sp.acsEndpoint = !sp.getAssertionConsumerService().isEmpty() ? sp.getAssertionConsumerService().get(0).getLocation() : null;
       try {
-        metaData.sp.nameIDFormat = sp.getNameIDFormat().size() > 0 ? NameIDFormat.fromSAMLFormat(sp.getNameIDFormat().get(0)) : null;
+        metaData.sp.nameIDFormat = !sp.getNameIDFormat().isEmpty() ? NameIDFormat.fromSAMLFormat(sp.getNameIDFormat().get(0)) : null;
       } catch (Exception e) {
         // fromSAMLFormat may throw an exception if the Name ID Format is not defined by our NameIDFormat enum.
         throw new SAMLException(e.getCause());
@@ -1109,18 +1109,22 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
   private Key decryptKey(EncryptedKeyType encryptedKey, PrivateKey encryptionKey,
                          EncryptionAlgorithm encryptionAlgorithm)
-      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidKeySpecException {
+      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidKeySpecException, SAMLException {
     EncryptionMethodType encryptionMethod = encryptedKey.getEncryptionMethod();
-    KeyTransportAlgorithm transportAlgorithm = KeyTransportAlgorithm.fromURI(encryptionMethod.getAlgorithm());
+    String transportAlgorithmUri = encryptionMethod.getAlgorithm();
+    KeyTransportAlgorithm transportAlgorithm = KeyTransportAlgorithm.fromURI(transportAlgorithmUri);
+    if (transportAlgorithm == null) {
+      throw new SAMLException("Unable to determine key transport encryption algorithm from URI [" + transportAlgorithmUri + "]");
+    }
     // Create the cipher instance
     Cipher cipher = Cipher.getInstance(transportAlgorithm.transformation);
 
     if (transportAlgorithm == KeyTransportAlgorithm.RSAv15) {
       cipher.init(Cipher.DECRYPT_MODE, encryptionKey);
     } else {
-      // Extract other parameters for OAEP
-      DigestAlgorithm digest = null;
-      MaskGenerationFunction mgf = null;
+      // Extract URIs for OAEP parameters
+      String digestUri = null;
+      String mgfUri = null;
 
       for (Object item : encryptionMethod.getContent()) {
         // The DigestMethod is parsed as a JAXB element while MGF is parsed as a W3C DOM Element.
@@ -1129,31 +1133,41 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           JAXBElement<?> element = (JAXBElement<?>) item;
           if (element.getDeclaredType() == DigestMethodType.class) {
             DigestMethodType digestMethod = (DigestMethodType) element.getValue();
-            digest = DigestAlgorithm.fromURI(digestMethod.getAlgorithm());
+            digestUri = digestMethod.getAlgorithm();
           } else if (element.getDeclaredType() == MGFType.class) {
             MGFType mgfType = (MGFType) element.getValue();
-            mgf = MaskGenerationFunction.fromURI(mgfType.getAlgorithm());
+            mgfUri = mgfType.getAlgorithm();
           }
         } else if (item instanceof Element) {
           Element element = (Element) item;
           if (element.getTagName().equals("DigestMethod")) {
-            digest = DigestAlgorithm.fromURI(element.getAttribute("Algorithm"));
+            digestUri = element.getAttribute("Algorithm");
           } else if (element.getTagName().equals("MGF")) {
-            mgf = MaskGenerationFunction.fromURI(element.getAttribute("Algorithm"));
+            mgfUri = element.getAttribute("Algorithm");
           }
         }
       }
+
+      // Extract other parameters for OAEP
+      DigestAlgorithm digest = DigestAlgorithm.fromURI(digestUri);
+      MaskGenerationFunction mgf = MaskGenerationFunction.fromURI(mgfUri);
 
       if (transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP_MGF1P) {
         // The RSA_OAEP_MGF1P implies the use of SHA-1 for the MGF digest algorithm
         mgf = MaskGenerationFunction.MGF1_SHA1;
       }
 
+      if (digest == null) {
+        throw new SAMLException("Unable to determine digest algorithm from URI [" + digestUri + "]");
+      }
+      if (mgf == null) {
+        throw new SAMLException("Unable to determine mask generation function from URI [" + mgfUri + "]");
+      }
+
       OAEPParameterSpec oaepParameters = new OAEPParameterSpec(
           digest.digest,
           "MGF1",
-          // The RSA_OAEP_MGF1P algorithm implies the use of SHA-1 for the MGF digest algorithm
-          new MGF1ParameterSpec(transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP_MGF1P ? "SHA-1" : mgf.digest),
+          new MGF1ParameterSpec(mgf.digest),
           // Use the default (empty byte[])
           PSpecified.DEFAULT
       );
