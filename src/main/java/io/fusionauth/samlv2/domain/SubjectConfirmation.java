@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2024, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,7 @@
 package io.fusionauth.samlv2.domain;
 
 import java.time.ZonedDateTime;
+import java.util.Objects;
 
 /**
  * @author Brian Pontarelli
@@ -30,4 +31,25 @@ public class SubjectConfirmation {
   public ZonedDateTime notOnOrAfter;
 
   public String recipient;
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    SubjectConfirmation that = (SubjectConfirmation) o;
+    return Objects.equals(address, that.address) &&
+        Objects.equals(inResponseTo, that.inResponseTo) &&
+        method == that.method &&
+        Objects.equals(notOnOrAfter, that.notOnOrAfter) &&
+        Objects.equals(recipient, that.recipient);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(address, inResponseTo, method, notOnOrAfter, recipient);
+  }
 }
