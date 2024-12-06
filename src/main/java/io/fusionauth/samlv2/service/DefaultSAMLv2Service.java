@@ -673,6 +673,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           continue;
         } else {
           assertion = decryptAssertion((EncryptedElementType) assertion, encryptionKey);
+          if (verifySignature) {
+            verifyEmbeddedSignature(document, signatureKeySelector, null);
+          }
         }
       } else if (requireEncryptedAssertion) {
         logger.warn("Assertion encryption is required, but the SAML response contained an unencrypted attribute. It was ignored.");
@@ -1561,8 +1564,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     fixIDs(document.getDocumentElement());
 
     NodeList nl = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+    boolean encryptedDataExists = document.getElementsByTagNameNS("http://www.w3.org/2001/04/xmlenc#", "EncryptedData").getLength() != 0;
     if (nl.getLength() == 0) {
-      throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.", request);
+      if (encryptedDataExists) {
+        logger.debug("Could not locate Signature element in XML. It may be present in the EncryptedData.");
+      } else {
+        throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.", request);
+      }
     }
 
     for (int i = 0; i < nl.getLength(); i++) {

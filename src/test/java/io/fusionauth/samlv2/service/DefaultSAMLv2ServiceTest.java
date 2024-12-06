@@ -1134,6 +1134,7 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
+    // Build an encrypted AuthenticationResponse with the signature at the Response level
     String encodedXML = service.buildAuthnResponse(
         response,
         true,
@@ -1152,24 +1153,44 @@ public class DefaultSAMLv2ServiceTest {
         mgf
     );
 
+    // Parse the encrypted response
     AuthenticationResponse parsedResponse = service.parseResponse(
         encodedXML,
         true, KeySelector.singletonKeySelector(signingKeyPair.getPublic()),
         true, encryptionKeyPair.getPrivate()
     );
-    assertEquals(parsedResponse.destination, "https://local.fusionauth.io/oauth2/callback");
-    assertTrue(parsedResponse.assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
-    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(parsedResponse.assertion.conditions.notOnOrAfter));
-    assertTrue(parsedResponse.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
-    assertEquals(parsedResponse.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
-    assertEquals(parsedResponse.status.code, ResponseStatus.Success);
-    assertEquals(parsedResponse.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
-    assertEquals(parsedResponse.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
-    assertEquals(parsedResponse.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
-    assertEquals(parsedResponse.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
-    assertNotNull(parsedResponse.assertion.subject.nameIDs);
-    assertEquals(parsedResponse.assertion.subject.nameIDs.size(), 1);
-    assertEquals(parsedResponse.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
+
+    // Verify the parsed encrypted response matches the original pulled from file
+    assertEquals(parsedResponse, response);
+
+    // Build an encrypted AuthenticationResponse with the inside the encrypted Assertion
+    encodedXML = service.buildAuthnResponse(
+        response,
+        true,
+        signingKeyPair.getPrivate(),
+        CertificateTools.fromKeyPair(signingKeyPair, Algorithm.RS256, "FooBar"),
+        Algorithm.RS256,
+        CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS,
+        SignatureLocation.Assertion,
+        true,
+        true,
+        encryptionAlgorithm,
+        keyLocation,
+        transportAlgorithm,
+        CertificateTools.fromKeyPair(encryptionKeyPair, Algorithm.RS256, "FooBar"),
+        digest,
+        mgf
+    );
+
+    // Parse the encrypted response
+    parsedResponse = service.parseResponse(
+        encodedXML,
+        true, KeySelector.singletonKeySelector(signingKeyPair.getPublic()),
+        true, encryptionKeyPair.getPrivate()
+    );
+
+    // Verify the parsed encrypted response matches the original pulled from file
+    assertEquals(parsedResponse, response);
   }
 
   @Test(dataProvider = "signatureLocation")
