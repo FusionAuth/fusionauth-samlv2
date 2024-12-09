@@ -490,7 +490,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     LogoutRequestParseResult result = parseLogoutRequest(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request);
+      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request, false);
     }
 
     return result.request;
@@ -518,7 +518,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     LogoutResponseParseResult result = parseLogoutResponse(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.response);
     if (signatureHelper.verifySignature()) {
-      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.response);
+      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.response, false);
     }
 
     return result.response;
@@ -615,7 +615,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     AuthnRequestParseResult result = parseRequest(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request);
+      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request, false);
     }
 
     return result.request;
@@ -652,8 +652,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     response.rawResponse = new String(decodedResponse, StandardCharsets.UTF_8);
 
     Document document = newDocumentFromBytes(decodedResponse);
+    boolean signatureVerified = false;
     if (verifySignature) {
-      verifyEmbeddedSignature(document, signatureKeySelector, null);
+      signatureVerified = verifyEmbeddedSignature(document, signatureKeySelector, null, encryptionKey != null);
     }
 
     ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
@@ -672,10 +673,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           logger.warn("SAML response contained encrypted attribute, but no encryption key was provided. It was ignored.");
           continue;
         } else {
-          assertion = decryptAssertion((EncryptedElementType) assertion, encryptionKey);
-          if (verifySignature) {
-            verifyEmbeddedSignature(document, signatureKeySelector, null);
-          }
+          assertion = decryptAssertion((EncryptedElementType) assertion, encryptionKey, verifySignature && !signatureVerified, signatureKeySelector);
         }
       } else if (requireEncryptedAssertion) {
         logger.warn("Assertion encryption is required, but the SAML response contained an unencrypted attribute. It was ignored.");
@@ -1064,15 +1062,19 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   /**
-   * Decrypt an encrypted XML element according to the XML Encryption spec
+   * Decrypt an encrypted XML element according to the XML Encryption spec and optionally verify the signature.
    *
    * @param encryptedAssertion     an {@code EncryptedElement} containing an encrypted assertion
    * @param transportEncryptionKey a private key used to decrypt the symmetric key used to decrypt the assertion
+   * @param verifySignature        if {@code true}, the method will verify an embedded signature. Failure to locate or
+   *                               verify the signature will result in an exception.
+   * @param signatureKeySelector   a key
    * @return the decrypted {@code Assertion} element
    * @throws SAMLException if there was an issue decrypting the {@code EncryptedElement} to a SAML {@code Assertion}
    *                       element
    */
-  private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey transportEncryptionKey)
+  private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey transportEncryptionKey,
+                                         boolean verifySignature, KeySelector signatureKeySelector)
       throws SAMLException {
     // Extract the encrypted assertion encryption key from the XML
     EncryptedKeyType encryptedKey = extractEncryptedAssertionEncryptionKey(encryptedAssertion);
@@ -1104,6 +1106,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     // Parse the bytes into an XML document and then unmarshall into the AssertionType
     Document doc = newDocumentFromBytes(assertionBytes);
+    if (verifySignature) {
+      verifyEmbeddedSignature(doc, signatureKeySelector, null, false);
+    }
     return unmarshallFromDocument(doc, AssertionType.class);
   }
 
@@ -1558,17 +1563,24 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     signature.sign(dsc);
   }
 
-  private void verifyEmbeddedSignature(Document document, KeySelector keySelector, SAMLRequest request)
+  private boolean verifyEmbeddedSignature(Document document, KeySelector keySelector, SAMLRequest request,
+                                          boolean allowEncryptedSignature)
       throws SAMLException {
+    boolean verified = false;
     // Fix the IDs in the entire document per the suggestions at http://stackoverflow.com/questions/17331187/xml-dig-sig-error-after-upgrade-to-java7u25
     fixIDs(document.getDocumentElement());
 
     NodeList nl = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
     boolean encryptedDataExists = document.getElementsByTagNameNS("http://www.w3.org/2001/04/xmlenc#", "EncryptedData").getLength() != 0;
     if (nl.getLength() == 0) {
-      if (encryptedDataExists) {
+      if (encryptedDataExists && allowEncryptedSignature) {
+        // If there is an encrypted element in the document, and we allow the signature inside the encrypted element, log a message and continue.
         logger.debug("Could not locate Signature element in XML. It may be present in the EncryptedData.");
       } else {
+        // If we did not find a signature and either
+        //  1) there was no encrypted data element or
+        //  2) an encrypted signature is not allowed for this case
+        // then throw an exception
         throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.", request);
       }
     }
@@ -1578,18 +1590,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
       try {
         XMLSignature signature = factory.unmarshalXMLSignature(validateContext);
-        String algorith = signature.getSignedInfo().getSignatureMethod().getAlgorithm();
+        String algorithm = signature.getSignedInfo().getSignatureMethod().getAlgorithm();
 
-        if (algorith.equals(SignatureMethod.ECDSA_SHA1) ||
-            algorith.equals(SignatureMethod.ECDSA_SHA224) ||
-            algorith.equals(SignatureMethod.ECDSA_SHA256) ||
-            algorith.equals(SignatureMethod.ECDSA_SHA384) ||
-            algorith.equals(SignatureMethod.ECDSA_SHA512)) {
+        if (algorithm.equals(SignatureMethod.ECDSA_SHA1) ||
+            algorithm.equals(SignatureMethod.ECDSA_SHA224) ||
+            algorithm.equals(SignatureMethod.ECDSA_SHA256) ||
+            algorithm.equals(SignatureMethod.ECDSA_SHA384) ||
+            algorithm.equals(SignatureMethod.ECDSA_SHA512)) {
           checkFor_CVE_2022_21449(request, signature.getSignatureValue().getValue());
         }
 
         boolean valid = signature.validate(validateContext);
-        if (!valid) {
+        if (valid) {
+          verified = true;
+        } else {
           throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
         }
       } catch (MarshalException e) {
@@ -1598,6 +1612,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. The signature was unmarshalled but we couldn't validate it. Possible reasons include a key was not provided that was eligible to verify the signature, or an un-expected exception occurred.", request, e);
       }
     }
+
+    return verified;
   }
 
   private void verifyRequestSignature(SAMLRequestParameters requestParameters,
