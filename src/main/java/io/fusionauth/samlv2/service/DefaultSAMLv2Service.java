@@ -1104,11 +1104,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       throw new SAMLException("Unable to decrypt assertion using symmetric key", e);
     }
 
-    // Parse the bytes into an XML document and then unmarshall into the AssertionType
+    // Parse the bytes into an XML document
     Document doc = newDocumentFromBytes(assertionBytes);
+
+    // Verify the signature if requested. The code assumes this Document contains the signature. Verification will fail if it does not.
+    // The signature must be verified here because unmarshalling to a Java type can add namespace prefixes and other data that was not
+    // present when the signature was generated.
     if (verifySignature) {
       verifyEmbeddedSignature(doc, signatureKeySelector, null, false);
     }
+    
+    // Unmarshall the Document into AssertionType.
     return unmarshallFromDocument(doc, AssertionType.class);
   }
 
@@ -1123,12 +1129,16 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   private byte[] decryptElement(byte[] encryptedAssertionBytes, EncryptionAlgorithm assertionEncryptionAlgorithm,
                                 Key assertionEncryptionKey)
       throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    // Copy the IV and ciphertext to separate arrays
     byte[] iv = Arrays.copyOfRange(encryptedAssertionBytes, 0, assertionEncryptionAlgorithm.ivLength);
     byte[] cipherValue = Arrays.copyOfRange(encryptedAssertionBytes, assertionEncryptionAlgorithm.ivLength, encryptedAssertionBytes.length);
+
     // Initialize the cipher
     AlgorithmParameterSpec spec = createAlgorithmParameterSpec(assertionEncryptionAlgorithm, iv);
     Cipher cipher = Cipher.getInstance(assertionEncryptionAlgorithm.transformation);
     cipher.init(Cipher.DECRYPT_MODE, assertionEncryptionKey, spec);
+
+    // Decrypt and return raw bytes
     return cipher.doFinal(cipherValue);
   }
 
@@ -1144,6 +1154,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   private Key decryptKey(EncryptedKeyType encryptedKey, PrivateKey transportEncryptionKey,
                          EncryptionAlgorithm assertionEncryptionAlgorithm)
       throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidKeySpecException, SAMLException {
+    // Determine the algorithm used to encrypt the symmetric key.
     EncryptionMethodType encryptionMethod = encryptedKey.getEncryptionMethod();
     String transportAlgorithmUri = encryptionMethod.getAlgorithm();
     KeyTransportAlgorithm transportAlgorithm = KeyTransportAlgorithm.fromURI(transportAlgorithmUri);
@@ -1153,6 +1164,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     // Create the cipher instance
     Cipher cipher = Cipher.getInstance(transportAlgorithm.transformation);
 
+    // Initialize the cipher instance, extracting additional parameters from XML as needed
     if (transportAlgorithm == KeyTransportAlgorithm.RSAv15) {
       cipher.init(Cipher.DECRYPT_MODE, transportEncryptionKey);
     } else {
@@ -1182,7 +1194,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         }
       }
 
-      // Extract other parameters for OAEP
+      // Parse URIs for OAEP
       DigestAlgorithm digest = DigestAlgorithm.fromURI(digestUri);
       MaskGenerationFunction mgf = MaskGenerationFunction.fromURI(mgfUri);
 
@@ -1191,6 +1203,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         mgf = MaskGenerationFunction.MGF1_SHA1;
       }
 
+      // Check we have necessary parameters
       if (digest == null) {
         throw new SAMLException("Unable to determine digest algorithm from URI [" + digestUri + "]");
       }
@@ -1198,6 +1211,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         throw new SAMLException("Unable to determine mask generation function from URI [" + mgfUri + "]");
       }
 
+      // Create cryptographic parameters and initialize the cipher instance
       OAEPParameterSpec oaepParameters = new OAEPParameterSpec(
           digest.digest,
           "MGF1",
@@ -1210,8 +1224,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     byte[] encryptedBytes = encryptedKey.getCipherData().getCipherValue();
 
-    // Get the decrypted bytes for the key and return the result
+    // Get the decrypted bytes for the key
     byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
+    // Create the appropriate symmetric Key based on the algorithm used to encrypt the assertion
     if (assertionEncryptionAlgorithm == EncryptionAlgorithm.TripleDES) {
       return SecretKeyFactory.getInstance("DESede")
                              .generateSecret(new DESedeKeySpec(decryptedBytes));
