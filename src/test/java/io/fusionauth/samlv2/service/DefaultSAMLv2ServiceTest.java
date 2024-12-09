@@ -965,6 +965,52 @@ public class DefaultSAMLv2ServiceTest {
     }
   }
 
+  @Test
+  public void parseResponse_signatureCheck_missingEncrypted() throws Exception {
+    // Test that a response containing an encrypted assertion fails when an expected signature is missing.
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair encryptionKeyPair = kpg.generateKeyPair();
+
+    // Load response from file
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba, StandardCharsets.UTF_8);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    // Build an encrypted AuthenticationResponse without a signature
+    String encodedXML = service.buildAuthnResponse(
+        response,
+        false,
+        null,
+        null,
+        Algorithm.RS256,
+        CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS,
+        SignatureLocation.Response,
+        false,
+        true,
+        EncryptionAlgorithm.AES128GCM,
+        KeyLocation.Child,
+        KeyTransportAlgorithm.RSA_OAEP,
+        CertificateTools.fromKeyPair(encryptionKeyPair, Algorithm.RS256, "FooBar"),
+        DigestAlgorithm.SHA256,
+        MaskGenerationFunction.MGF1_SHA1
+    );
+
+    try {
+      // Attempt to parse the encrypted response. Expect an exception for missing signature
+      service.parseResponse(
+          encodedXML,
+          true, null,
+          true, encryptionKeyPair.getPrivate()
+      );
+      fail("Should have thrown an exception");
+    } catch (SAMLException e) {
+      // Should throw
+      assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
+    }
+  }
+
   @Test(dataProvider = "bindings")
   public void parse_LogoutRequest(Binding binding) throws Exception {
     byte[] bytes = binding == Binding.HTTP_Redirect
