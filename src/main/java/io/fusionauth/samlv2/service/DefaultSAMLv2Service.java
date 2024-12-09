@@ -1070,14 +1070,18 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
    *                               verify the signature will result in an exception.
    * @param signatureKeySelector   a key
    * @return the decrypted {@code Assertion} element
-   * @throws SAMLException if there was an issue decrypting the {@code EncryptedElement} to a SAML {@code Assertion}
-   *                       element
+   * @throws SAMLException if there was an issue decrypting the {@code EncryptedElement}, parsing the SAML
+   *                       {@code Assertion} element, or verifying the signature embedded in the
+   *                       {@code EncryptedElement} when {@code verifySignature} is {@code true}
    */
   private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey transportEncryptionKey,
                                          boolean verifySignature, KeySelector signatureKeySelector)
       throws SAMLException {
     // Extract the encrypted assertion encryption key from the XML
     EncryptedKeyType encryptedKey = extractEncryptedAssertionEncryptionKey(encryptedAssertion);
+    if (encryptedKey == null) {
+      throw new SAMLException("Unable to extract the encrypted symmetric key from the encrypted XML element.");
+    }
 
     // Determine the assertion EncryptionAlgorithm.
     var assertionEncryptionAlgorithmUri = encryptedAssertion.getEncryptedData().getEncryptionMethod().getAlgorithm();
