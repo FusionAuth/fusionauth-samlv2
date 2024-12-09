@@ -290,13 +290,13 @@ public interface SAMLv2Service {
       throws SAMLException;
 
   /**
-   * Parses the authentication response from the given String, verifies that the signature, and decrypts the assertion.
+   * Parses the authentication response from the given String, verifies the signature, and decrypts the assertion.
    *
    * @param response                  The response in base 64 deflated format.
    * @param verifySignature           Determines if the responses signature should be verified or not.
    * @param signatureKeySelector      The key selector that is used to find the correct key to verify the signature in
    *                                  the response.
-   * @param requireEncryptedAssertion Determines if the SAML Assertion is required to be encrypted
+   * @param requireEncryptedAssertion Determines if the SAML Assertion is required to be encrypted.
    * @param encryptionKey             The private key used to decrypt the symmetric encryption key.
    * @return The response.
    * @throws SAMLException If any unrecoverable errors occur.

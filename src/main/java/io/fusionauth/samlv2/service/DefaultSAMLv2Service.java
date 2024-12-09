@@ -1090,8 +1090,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     Key assertionEncryptionKey;
     try {
       assertionEncryptionKey = decryptKey(encryptedKey, transportEncryptionKey, assertionEncryptionAlgorithm);
-    } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidAlgorithmParameterException |
-             InvalidKeyException | IllegalBlockSizeException | BadPaddingException | InvalidKeySpecException e) {
+    } catch (GeneralSecurityException e) {
       throw new SAMLException("Unable to decrypt symmetric key using transport key", e);
     }
 
@@ -1099,8 +1098,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     byte[] assertionBytes;
     try {
       assertionBytes = decryptElement(encryptedAssertion.getEncryptedData().getCipherData().getCipherValue(), assertionEncryptionAlgorithm, assertionEncryptionKey);
-    } catch (NoSuchPaddingException | NoSuchAlgorithmException | InvalidAlgorithmParameterException |
-             InvalidKeyException | IllegalBlockSizeException | BadPaddingException e) {
+    } catch (GeneralSecurityException e) {
       throw new SAMLException("Unable to decrypt assertion using symmetric key", e);
     }
 
@@ -1113,7 +1111,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     if (verifySignature) {
       verifyEmbeddedSignature(doc, signatureKeySelector, null, false);
     }
-    
+
     // Unmarshall the Document into AssertionType.
     return unmarshallFromDocument(doc, AssertionType.class);
   }
