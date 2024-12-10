@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2024, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.fusionauth.samlv2.domain;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 public class Assertion {
   public Map<String, List<String>> attributes = new HashMap<>();
@@ -27,4 +28,24 @@ public class Assertion {
   public String issuer;
 
   public Subject subject;
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    Assertion assertion = (Assertion) o;
+    return Objects.equals(attributes, assertion.attributes) &&
+        Objects.equals(conditions, assertion.conditions) &&
+        Objects.equals(issuer, assertion.issuer) &&
+        Objects.equals(subject, assertion.subject);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(attributes, conditions, issuer, subject);
+  }
 }

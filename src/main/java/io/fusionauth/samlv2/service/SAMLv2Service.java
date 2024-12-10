@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2023, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2024, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -287,6 +287,22 @@ public interface SAMLv2Service {
    * @throws SAMLException If any unrecoverable errors occur.
    */
   AuthenticationResponse parseResponse(String response, boolean verifySignature, KeySelector keySelector)
+      throws SAMLException;
+
+  /**
+   * Parses the authentication response from the given String, verifies the signature, and decrypts the assertion.
+   *
+   * @param response                  The response in base 64 deflated format.
+   * @param verifySignature           Determines if the responses signature should be verified or not.
+   * @param signatureKeySelector      The key selector that is used to find the correct key to verify the signature in
+   *                                  the response.
+   * @param requireEncryptedAssertion Determines if the SAML Assertion is required to be encrypted.
+   * @param encryptionKey             The private key used to decrypt the symmetric encryption key.
+   * @return The response.
+   * @throws SAMLException If any unrecoverable errors occur.
+   */
+  AuthenticationResponse parseResponse(String response, boolean verifySignature, KeySelector signatureKeySelector,
+                                       boolean requireEncryptedAssertion, PrivateKey encryptionKey)
       throws SAMLException;
 
 

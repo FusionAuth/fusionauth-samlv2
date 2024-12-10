@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2024, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,8 +15,28 @@
  */
 package io.fusionauth.samlv2.domain;
 
+import java.util.Objects;
+
 public class NameID {
   public String format;
 
   public String id;
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    NameID nameID = (NameID) o;
+    return Objects.equals(format, nameID.format) &&
+        Objects.equals(id, nameID.id);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(format, id);
+  }
 }

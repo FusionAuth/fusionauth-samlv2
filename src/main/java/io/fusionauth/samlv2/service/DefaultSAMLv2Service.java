@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2023, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2024, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -20,10 +20,13 @@ import javax.crypto.Cipher;
 import javax.crypto.IllegalBlockSizeException;
 import javax.crypto.KeyGenerator;
 import javax.crypto.NoSuchPaddingException;
+import javax.crypto.SecretKeyFactory;
+import javax.crypto.spec.DESedeKeySpec;
 import javax.crypto.spec.GCMParameterSpec;
 import javax.crypto.spec.IvParameterSpec;
 import javax.crypto.spec.OAEPParameterSpec;
 import javax.crypto.spec.PSource.PSpecified;
+import javax.crypto.spec.SecretKeySpec;
 import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.MarshalException;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
@@ -57,6 +60,7 @@ import java.security.Signature;
 import java.security.cert.Certificate;
 import java.security.cert.X509Certificate;
 import java.security.spec.AlgorithmParameterSpec;
+import java.security.spec.InvalidKeySpecException;
 import java.security.spec.MGF1ParameterSpec;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
@@ -280,7 +284,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         assertionType.setConditions(conditionsType);
 
         // Audiences (element)
-        if (response.assertion.conditions.audiences.size() > 0) {
+        if (!response.assertion.conditions.audiences.isEmpty()) {
           AudienceRestrictionType audienceRestrictionType = new AudienceRestrictionType();
           audienceRestrictionType.getAudience().addAll(response.assertion.conditions.audiences);
           conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(audienceRestrictionType);
@@ -486,7 +490,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     LogoutRequestParseResult result = parseLogoutRequest(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request);
+      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request, false);
     }
 
     return result.request;
@@ -514,7 +518,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     LogoutResponseParseResult result = parseLogoutResponse(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.response);
     if (signatureHelper.verifySignature()) {
-      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.response);
+      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.response, false);
     }
 
     return result.response;
@@ -591,9 +595,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     if (spDescriptor.isPresent()) {
       SPSSODescriptorType sp = (SPSSODescriptorType) spDescriptor.get();
       metaData.sp = new SPMetaData();
-      metaData.sp.acsEndpoint = sp.getAssertionConsumerService().size() > 0 ? sp.getAssertionConsumerService().get(0).getLocation() : null;
+      metaData.sp.acsEndpoint = !sp.getAssertionConsumerService().isEmpty() ? sp.getAssertionConsumerService().get(0).getLocation() : null;
       try {
-        metaData.sp.nameIDFormat = sp.getNameIDFormat().size() > 0 ? NameIDFormat.fromSAMLFormat(sp.getNameIDFormat().get(0)) : null;
+        metaData.sp.nameIDFormat = !sp.getNameIDFormat().isEmpty() ? NameIDFormat.fromSAMLFormat(sp.getNameIDFormat().get(0)) : null;
       } catch (Exception e) {
         // fromSAMLFormat may throw an exception if the Name ID Format is not defined by our NameIDFormat enum.
         throw new SAMLException(e.getCause());
@@ -611,7 +615,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     AuthnRequestParseResult result = parseRequest(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request);
+      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request, false);
     }
 
     return result.request;
@@ -634,14 +638,23 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   @Override
   public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature, KeySelector keySelector)
       throws SAMLException {
+    return parseResponse(encodedResponse, verifySignature, keySelector, false, null);
+  }
+
+  @Override
+  public AuthenticationResponse parseResponse(String encodedResponse, boolean verifySignature,
+                                              KeySelector signatureKeySelector, boolean requireEncryptedAssertion,
+                                              PrivateKey encryptionKey)
+      throws SAMLException {
 
     AuthenticationResponse response = new AuthenticationResponse();
     byte[] decodedResponse = Base64.getMimeDecoder().decode(encodedResponse);
     response.rawResponse = new String(decodedResponse, StandardCharsets.UTF_8);
 
     Document document = newDocumentFromBytes(decodedResponse);
+    boolean signatureVerified = false;
     if (verifySignature) {
-      verifyEmbeddedSignature(document, keySelector, null);
+      signatureVerified = verifyEmbeddedSignature(document, signatureKeySelector, null, encryptionKey != null);
     }
 
     ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
@@ -656,8 +669,14 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     List<Object> assertions = jaxbResponse.getAssertionOrEncryptedAssertion();
     for (Object assertion : assertions) {
       if (assertion instanceof EncryptedElementType) {
-        logger.warn("SAML response contained encrypted attribute. It was ignored.");
-        continue;
+        if (encryptionKey == null) {
+          logger.warn("SAML response contained encrypted attribute, but no encryption key was provided. It was ignored.");
+          continue;
+        } else {
+          assertion = decryptAssertion((EncryptedElementType) assertion, encryptionKey, verifySignature && !signatureVerified, signatureKeySelector);
+        }
+      } else if (requireEncryptedAssertion) {
+        logger.warn("Assertion encryption is required, but the SAML response contained an unencrypted attribute. It was ignored.");
       }
 
       AssertionType assertionType = (AssertionType) assertion;
@@ -1043,6 +1062,182 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   /**
+   * Decrypt an encrypted XML element according to the XML Encryption spec and optionally verify the signature.
+   *
+   * @param encryptedAssertion     an {@code EncryptedElement} containing an encrypted assertion
+   * @param transportEncryptionKey a private key used to decrypt the symmetric key used to decrypt the assertion
+   * @param verifySignature        if {@code true}, the method will verify an embedded signature. Failure to locate or
+   *                               verify the signature will result in an exception.
+   * @param signatureKeySelector   a key
+   * @return the decrypted {@code Assertion} element
+   * @throws SAMLException if there was an issue decrypting the {@code EncryptedElement}, parsing the SAML
+   *                       {@code Assertion} element, or verifying the signature embedded in the
+   *                       {@code EncryptedElement} when {@code verifySignature} is {@code true}
+   */
+  private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey transportEncryptionKey,
+                                         boolean verifySignature, KeySelector signatureKeySelector)
+      throws SAMLException {
+    // Extract the encrypted assertion encryption key from the XML
+    EncryptedKeyType encryptedKey = extractEncryptedAssertionEncryptionKey(encryptedAssertion);
+    if (encryptedKey == null) {
+      throw new SAMLException("Unable to extract the encrypted symmetric key from the encrypted XML element.");
+    }
+
+    // Determine the assertion EncryptionAlgorithm.
+    var assertionEncryptionAlgorithmUri = encryptedAssertion.getEncryptedData().getEncryptionMethod().getAlgorithm();
+    var assertionEncryptionAlgorithm = EncryptionAlgorithm.fromURI(assertionEncryptionAlgorithmUri);
+    if (assertionEncryptionAlgorithm == null) {
+      throw new SAMLException("Unable to determine assertion encryption algorithm from URI [" + assertionEncryptionAlgorithmUri + "]");
+    }
+
+    // Decrypt the assertion encryption key using the transport key
+    Key assertionEncryptionKey;
+    try {
+      assertionEncryptionKey = decryptKey(encryptedKey, transportEncryptionKey, assertionEncryptionAlgorithm);
+    } catch (GeneralSecurityException e) {
+      throw new SAMLException("Unable to decrypt symmetric key using transport key", e);
+    }
+
+    // Decrypt the assertion using the decrypted symmetric key
+    byte[] assertionBytes;
+    try {
+      assertionBytes = decryptElement(encryptedAssertion.getEncryptedData().getCipherData().getCipherValue(), assertionEncryptionAlgorithm, assertionEncryptionKey);
+    } catch (GeneralSecurityException e) {
+      throw new SAMLException("Unable to decrypt assertion using symmetric key", e);
+    }
+
+    // Parse the bytes into an XML document
+    Document doc = newDocumentFromBytes(assertionBytes);
+
+    // Verify the signature if requested. The code assumes this Document contains the signature. Verification will fail if it does not.
+    // The signature must be verified here because unmarshalling to a Java type can add namespace prefixes and other data that was not
+    // present when the signature was generated.
+    if (verifySignature) {
+      verifyEmbeddedSignature(doc, signatureKeySelector, null, false);
+    }
+
+    // Unmarshall the Document into AssertionType.
+    return unmarshallFromDocument(doc, AssertionType.class);
+  }
+
+  /**
+   * Decrypt the provided bytes and return the result
+   *
+   * @param encryptedAssertionBytes      the ciphertext for the encrypted assertion
+   * @param assertionEncryptionAlgorithm the algorithm used to encrypt the assertion
+   * @param assertionEncryptionKey       a symmetric key used to decrypt the assertion
+   * @return the plaintext element XML
+   */
+  private byte[] decryptElement(byte[] encryptedAssertionBytes, EncryptionAlgorithm assertionEncryptionAlgorithm,
+                                Key assertionEncryptionKey)
+      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException {
+    // Copy the IV and ciphertext to separate arrays
+    byte[] iv = Arrays.copyOfRange(encryptedAssertionBytes, 0, assertionEncryptionAlgorithm.ivLength);
+    byte[] cipherValue = Arrays.copyOfRange(encryptedAssertionBytes, assertionEncryptionAlgorithm.ivLength, encryptedAssertionBytes.length);
+
+    // Initialize the cipher
+    AlgorithmParameterSpec spec = createAlgorithmParameterSpec(assertionEncryptionAlgorithm, iv);
+    Cipher cipher = Cipher.getInstance(assertionEncryptionAlgorithm.transformation);
+    cipher.init(Cipher.DECRYPT_MODE, assertionEncryptionKey, spec);
+
+    // Decrypt and return raw bytes
+    return cipher.doFinal(cipherValue);
+  }
+
+  /**
+   * Decrypts the provided {@code EncryptedKey} element and creates a symmetric encryption key from the value
+   *
+   * @param encryptedKey                 the {@code EncryptedKey} element
+   * @param transportEncryptionKey       the private key used to decrypt the symmetric key
+   * @param assertionEncryptionAlgorithm the algorithm used to encrypt/decrypt the assertion
+   * @return the decrypted symmetric key
+   * @throws SAMLException if there was an issue extracting an encryption parameter from the {@code EncryptedKey} XML
+   */
+  private Key decryptKey(EncryptedKeyType encryptedKey, PrivateKey transportEncryptionKey,
+                         EncryptionAlgorithm assertionEncryptionAlgorithm)
+      throws NoSuchPaddingException, NoSuchAlgorithmException, InvalidAlgorithmParameterException, InvalidKeyException, IllegalBlockSizeException, BadPaddingException, InvalidKeySpecException, SAMLException {
+    // Determine the algorithm used to encrypt the symmetric key.
+    EncryptionMethodType encryptionMethod = encryptedKey.getEncryptionMethod();
+    String transportAlgorithmUri = encryptionMethod.getAlgorithm();
+    KeyTransportAlgorithm transportAlgorithm = KeyTransportAlgorithm.fromURI(transportAlgorithmUri);
+    if (transportAlgorithm == null) {
+      throw new SAMLException("Unable to determine key transport encryption algorithm from URI [" + transportAlgorithmUri + "]");
+    }
+    // Create the cipher instance
+    Cipher cipher = Cipher.getInstance(transportAlgorithm.transformation);
+
+    // Initialize the cipher instance, extracting additional parameters from XML as needed
+    if (transportAlgorithm == KeyTransportAlgorithm.RSAv15) {
+      cipher.init(Cipher.DECRYPT_MODE, transportEncryptionKey);
+    } else {
+      // Extract URIs for OAEP parameters
+      String digestUri = null;
+      String mgfUri = null;
+
+      for (Object item : encryptionMethod.getContent()) {
+        // The DigestMethod is parsed as a JAXB element while MGF is parsed as a W3C DOM Element.
+        // Cover both cases for determining other parameters
+        if (item instanceof JAXBElement<?>) {
+          JAXBElement<?> element = (JAXBElement<?>) item;
+          if (element.getDeclaredType() == DigestMethodType.class) {
+            DigestMethodType digestMethod = (DigestMethodType) element.getValue();
+            digestUri = digestMethod.getAlgorithm();
+          } else if (element.getDeclaredType() == MGFType.class) {
+            MGFType mgfType = (MGFType) element.getValue();
+            mgfUri = mgfType.getAlgorithm();
+          }
+        } else if (item instanceof Element) {
+          Element element = (Element) item;
+          if (element.getTagName().equals("DigestMethod")) {
+            digestUri = element.getAttribute("Algorithm");
+          } else if (element.getTagName().equals("MGF")) {
+            mgfUri = element.getAttribute("Algorithm");
+          }
+        }
+      }
+
+      // Parse URIs for OAEP
+      DigestAlgorithm digest = DigestAlgorithm.fromURI(digestUri);
+      MaskGenerationFunction mgf = MaskGenerationFunction.fromURI(mgfUri);
+
+      if (transportAlgorithm == KeyTransportAlgorithm.RSA_OAEP_MGF1P) {
+        // The RSA_OAEP_MGF1P implies the use of SHA-1 for the MGF digest algorithm
+        mgf = MaskGenerationFunction.MGF1_SHA1;
+      }
+
+      // Check we have necessary parameters
+      if (digest == null) {
+        throw new SAMLException("Unable to determine digest algorithm from URI [" + digestUri + "]");
+      }
+      if (mgf == null) {
+        throw new SAMLException("Unable to determine mask generation function from URI [" + mgfUri + "]");
+      }
+
+      // Create cryptographic parameters and initialize the cipher instance
+      OAEPParameterSpec oaepParameters = new OAEPParameterSpec(
+          digest.digest,
+          "MGF1",
+          new MGF1ParameterSpec(mgf.digest),
+          // Use the default (empty byte[])
+          PSpecified.DEFAULT
+      );
+      cipher.init(Cipher.DECRYPT_MODE, transportEncryptionKey, oaepParameters);
+    }
+
+    byte[] encryptedBytes = encryptedKey.getCipherData().getCipherValue();
+
+    // Get the decrypted bytes for the key
+    byte[] decryptedBytes = cipher.doFinal(encryptedBytes);
+    // Create the appropriate symmetric Key based on the algorithm used to encrypt the assertion
+    if (assertionEncryptionAlgorithm == EncryptionAlgorithm.TripleDES) {
+      return SecretKeyFactory.getInstance("DESede")
+                             .generateSecret(new DESedeKeySpec(decryptedBytes));
+    } else {
+      return new SecretKeySpec(decryptedBytes, 0, decryptedBytes.length, "AES");
+    }
+  }
+
+  /**
    * Encrypt the SAML Assertion in the XML document and return a new XML document with the Assertion replaced by
    * EncryptedAssertion
    *
@@ -1170,6 +1365,37 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   /**
+   * Extract the {@code EncryptedKey} element from the {@code EncryptedElement}. The key may be a sibling or child of
+   * the {@code EncryptedData} element.
+   *
+   * @param encryptedAssertion an {@code EncryptedElement} containing the encrypted assertion
+   * @return the {@code EncryptedKey} element containing the encrypted assertion encryption key
+   */
+  private EncryptedKeyType extractEncryptedAssertionEncryptionKey(EncryptedElementType encryptedAssertion) {
+    // Get the EncryptedData element
+    EncryptedDataType encryptedData = encryptedAssertion.getEncryptedData();
+
+    // Extract the encrypted key value
+    EncryptedKeyType encryptedKey = null;
+    var encryptedKeys = encryptedAssertion.getEncryptedKey();
+    if (!encryptedKeys.isEmpty()) {
+      // Check for EncryptedKey as a sibling of EncryptedData
+      encryptedKey = encryptedKeys.get(0);
+    } else {
+      var keyInfo = encryptedData.getKeyInfo();
+      if (keyInfo != null) {
+        var content = keyInfo.getContent();
+        if (!content.isEmpty()) {
+          JAXBElement<?> element = (JAXBElement<?>) content.get(0);
+          encryptedKey = (EncryptedKeyType) element.getValue();
+        }
+      }
+    }
+
+    return encryptedKey;
+  }
+
+  /**
    * Finds the element that the XML signature should be inserted before in the DOM. This method is suitable when the XML
    * schema indicates the Signature should be inserted after the Issuer when the Issuer is the first optional element.
    *
@@ -1233,13 +1459,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   private byte[] generateIV(EncryptionAlgorithm encryptionAlgorithm) {
-    int ivLength = 0;
-    switch (encryptionAlgorithm) {
-      case TripleDES -> ivLength = 8;
-      case AES128, AES192, AES256 -> ivLength = 16;
-      case AES128GCM, AES192GCM, AES256GCM -> ivLength = 12;
-    }
-    byte[] iv = new byte[ivLength];
+    byte[] iv = new byte[encryptionAlgorithm.ivLength];
     new SecureRandom().nextBytes(iv);
     return iv;
   }
@@ -1360,14 +1580,26 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     signature.sign(dsc);
   }
 
-  private void verifyEmbeddedSignature(Document document, KeySelector keySelector, SAMLRequest request)
+  private boolean verifyEmbeddedSignature(Document document, KeySelector keySelector, SAMLRequest request,
+                                          boolean allowEncryptedSignature)
       throws SAMLException {
+    boolean verified = false;
     // Fix the IDs in the entire document per the suggestions at http://stackoverflow.com/questions/17331187/xml-dig-sig-error-after-upgrade-to-java7u25
     fixIDs(document.getDocumentElement());
 
     NodeList nl = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
+    boolean encryptedDataExists = document.getElementsByTagNameNS("http://www.w3.org/2001/04/xmlenc#", "EncryptedData").getLength() != 0;
     if (nl.getLength() == 0) {
-      throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.", request);
+      if (encryptedDataExists && allowEncryptedSignature) {
+        // If there is an encrypted element in the document, and we allow the signature inside the encrypted element, log a message and continue.
+        logger.debug("Could not locate Signature element in XML. It may be present in the EncryptedData.");
+      } else {
+        // If we did not find a signature and either
+        //  1) there was no encrypted data element or
+        //  2) an encrypted signature is not allowed for this case
+        // then throw an exception
+        throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.", request);
+      }
     }
 
     for (int i = 0; i < nl.getLength(); i++) {
@@ -1375,18 +1607,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
       try {
         XMLSignature signature = factory.unmarshalXMLSignature(validateContext);
-        String algorith = signature.getSignedInfo().getSignatureMethod().getAlgorithm();
+        String algorithm = signature.getSignedInfo().getSignatureMethod().getAlgorithm();
 
-        if (algorith.equals(SignatureMethod.ECDSA_SHA1) ||
-            algorith.equals(SignatureMethod.ECDSA_SHA224) ||
-            algorith.equals(SignatureMethod.ECDSA_SHA256) ||
-            algorith.equals(SignatureMethod.ECDSA_SHA384) ||
-            algorith.equals(SignatureMethod.ECDSA_SHA512)) {
+        if (algorithm.equals(SignatureMethod.ECDSA_SHA1) ||
+            algorithm.equals(SignatureMethod.ECDSA_SHA224) ||
+            algorithm.equals(SignatureMethod.ECDSA_SHA256) ||
+            algorithm.equals(SignatureMethod.ECDSA_SHA384) ||
+            algorithm.equals(SignatureMethod.ECDSA_SHA512)) {
           checkFor_CVE_2022_21449(request, signature.getSignatureValue().getValue());
         }
 
         boolean valid = signature.validate(validateContext);
-        if (!valid) {
+        if (valid) {
+          verified = true;
+        } else {
           throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
         }
       } catch (MarshalException e) {
@@ -1395,6 +1629,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         throw new SAMLException("Unable to verify XML signature in the SAML v2.0 XML. The signature was unmarshalled but we couldn't validate it. Possible reasons include a key was not provided that was eligible to verify the signature, or an un-expected exception occurred.", request, e);
       }
     }
+
+    return verified;
   }
 
   private void verifyRequestSignature(SAMLRequestParameters requestParameters,

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2023, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2024, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -965,6 +965,52 @@ public class DefaultSAMLv2ServiceTest {
     }
   }
 
+  @Test
+  public void parseResponse_signatureCheck_missingEncrypted() throws Exception {
+    // Test that a response containing an encrypted assertion fails when an expected signature is missing.
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair encryptionKeyPair = kpg.generateKeyPair();
+
+    // Load response from file
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba, StandardCharsets.UTF_8);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    // Build an encrypted AuthenticationResponse without a signature
+    String encodedXML = service.buildAuthnResponse(
+        response,
+        false,
+        null,
+        null,
+        Algorithm.RS256,
+        CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS,
+        SignatureLocation.Response,
+        false,
+        true,
+        EncryptionAlgorithm.AES128GCM,
+        KeyLocation.Child,
+        KeyTransportAlgorithm.RSA_OAEP,
+        CertificateTools.fromKeyPair(encryptionKeyPair, Algorithm.RS256, "FooBar"),
+        DigestAlgorithm.SHA256,
+        MaskGenerationFunction.MGF1_SHA1
+    );
+
+    try {
+      // Attempt to parse the encrypted response. Expect an exception for missing signature
+      service.parseResponse(
+          encodedXML,
+          true, null,
+          true, encryptionKeyPair.getPrivate()
+      );
+      fail("Should have thrown an exception");
+    } catch (SAMLException e) {
+      // Should throw
+      assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
+    }
+  }
+
   @Test(dataProvider = "bindings")
   public void parse_LogoutRequest(Binding binding) throws Exception {
     byte[] bytes = binding == Binding.HTTP_Redirect
@@ -1134,7 +1180,37 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
+    // Build an encrypted AuthenticationResponse with the signature at the Response level
     String encodedXML = service.buildAuthnResponse(
+        response,
+        true,
+        signingKeyPair.getPrivate(),
+        CertificateTools.fromKeyPair(signingKeyPair, Algorithm.RS256, "FooBar"),
+        Algorithm.RS256,
+        CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS,
+        SignatureLocation.Response,
+        true,
+        true,
+        encryptionAlgorithm,
+        keyLocation,
+        transportAlgorithm,
+        CertificateTools.fromKeyPair(encryptionKeyPair, Algorithm.RS256, "FooBar"),
+        digest,
+        mgf
+    );
+
+    // Parse the encrypted response
+    AuthenticationResponse parsedResponse = service.parseResponse(
+        encodedXML,
+        true, KeySelector.singletonKeySelector(signingKeyPair.getPublic()),
+        true, encryptionKeyPair.getPrivate()
+    );
+
+    // Verify the parsed encrypted response matches the original pulled from file
+    assertEquals(parsedResponse, response);
+
+    // Build an encrypted AuthenticationResponse with the inside the encrypted Assertion
+    encodedXML = service.buildAuthnResponse(
         response,
         true,
         signingKeyPair.getPrivate(),
@@ -1151,6 +1227,45 @@ public class DefaultSAMLv2ServiceTest {
         digest,
         mgf
     );
+
+    // Parse the encrypted response
+    parsedResponse = service.parseResponse(
+        encodedXML,
+        true, KeySelector.singletonKeySelector(signingKeyPair.getPublic()),
+        true, encryptionKeyPair.getPrivate()
+    );
+
+    // Verify the parsed encrypted response matches the original pulled from file
+    assertEquals(parsedResponse, response);
+  }
+
+  @Test(dataProvider = "signatureLocation")
+  public void roundTripResponseFailedRequestSignedAssertion(SignatureLocation signatureLocation,
+                                                            boolean includeKeyInfoInResponse)
+      throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse-authnFailed.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureLocation, includeKeyInfoInResponse);
+    response = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
+
+    // Since the request is failed there should always be a signature in the response because there is no assertion present
+    Document document = parseDocument(encodedXML);
+    Node signature = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature").item(0);
+    assertEquals(signature.getPreviousSibling().getLocalName(), "Issuer");
+    assertEquals(signature.getNextSibling().getLocalName(), "Status");
+    assertEquals(signature.getParentNode().getLocalName(), "Response");
+
+    assertEquals(response.destination, "https://local.fusionauth.io/samlv2/acs");
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertEquals(response.issuer, "https://acme.com/saml/idp");
+    assertEquals(response.status.code, ResponseStatus.AuthenticationFailed);
   }
 
   @Test(dataProvider = "signatureLocation")
@@ -1197,34 +1312,6 @@ public class DefaultSAMLv2ServiceTest {
     assertNotNull(response.assertion.subject.nameIDs);
     assertEquals(response.assertion.subject.nameIDs.size(), 1);
     assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
-  }
-
-  @Test(dataProvider = "signatureLocation")
-  public void roundTripResponseFailedRequestSignedAssertion(SignatureLocation signatureLocation, boolean includeKeyInfoInResponse)
-      throws Exception {
-    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-    kpg.initialize(2048);
-    KeyPair kp = kpg.generateKeyPair();
-
-    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse-authnFailed.txt"));
-    String encodedResponse = new String(ba);
-    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
-
-    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureLocation, includeKeyInfoInResponse);
-    response = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
-
-    // Since the request is failed there should always be a signature in the response because there is no assertion present
-    Document document = parseDocument(encodedXML);
-    Node signature = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature").item(0);
-    assertEquals(signature.getPreviousSibling().getLocalName(), "Issuer");
-    assertEquals(signature.getNextSibling().getLocalName(), "Status");
-    assertEquals(signature.getParentNode().getLocalName(), "Response");
-
-    assertEquals(response.destination, "https://local.fusionauth.io/samlv2/acs");
-    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
-    assertEquals(response.issuer, "https://acme.com/saml/idp");
-    assertEquals(response.status.code, ResponseStatus.AuthenticationFailed);
   }
 
   @DataProvider(name = "signatureLocation")

@@ -19,7 +19,7 @@ jakartaXMLBindVersion = "4.0.0"
 slf4jVersion = "2.0.7"
 testngVersion = "7.8.0"
 
-project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.10.1", licenses: ["ApacheV2_0"]) {
+project(group: "io.fusionauth", name: "fusionauth-samlv2", version: "0.11.0", licenses: ["ApacheV2_0"]) {
   workflow {
     fetch {
       cache()

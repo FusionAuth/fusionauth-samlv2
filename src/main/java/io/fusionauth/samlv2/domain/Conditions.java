@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2024, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,6 +18,7 @@ package io.fusionauth.samlv2.domain;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
 public class Conditions {
   public List<String> audiences = new ArrayList<>();
@@ -25,4 +26,23 @@ public class Conditions {
   public ZonedDateTime notBefore;
 
   public ZonedDateTime notOnOrAfter;
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    Conditions that = (Conditions) o;
+    return Objects.equals(audiences, that.audiences) &&
+        Objects.equals(notBefore, that.notBefore) &&
+        Objects.equals(notOnOrAfter, that.notOnOrAfter);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(audiences, notBefore, notOnOrAfter);
+  }
 }

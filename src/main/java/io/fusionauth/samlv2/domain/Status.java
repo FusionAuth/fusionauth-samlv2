@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2024, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,6 +15,8 @@
  */
 package io.fusionauth.samlv2.domain;
 
+import java.util.Objects;
+
 /**
  * Status object.
  *
@@ -24,4 +26,21 @@ public class Status {
   public ResponseStatus code;
 
   public String message;
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) {
+      return true;
+    }
+    if (o == null || getClass() != o.getClass()) {
+      return false;
+    }
+    Status status = (Status) o;
+    return code == status.code && Objects.equals(message, status.message);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(code, message);
+  }
 }
