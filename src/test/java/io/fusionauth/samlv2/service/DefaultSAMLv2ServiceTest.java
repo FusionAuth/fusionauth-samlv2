@@ -42,6 +42,7 @@ import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.time.ZoneOffset;
@@ -111,21 +112,40 @@ import static org.testng.Assert.fail;
 @SuppressWarnings({"unchecked"})
 @Test(groups = "unit")
 public class DefaultSAMLv2ServiceTest {
-  @DataProvider(name = "assertionEncryption")
-  public Object[][] assertionEncryption() {
-    return new Object[][]{
-        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSAv15, DigestAlgorithm.SHA256, null},
-        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP_MGF1P, DigestAlgorithm.SHA256, null},
-        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA512, MaskGenerationFunction.MGF1_SHA256},
-        {EncryptionAlgorithm.AES192, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES256, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES256, KeyLocation.Sibling, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES128GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES192GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES256GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.TripleDES, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1}
-    };
+  @Test
+  public void assertionDecryptionDefaults() throws Exception {
+    // If RSA-OAEP Digest and Mask Generation Function are not specified by XML, decryption should fall back to the defaults
+
+    // Build a known key pair.
+    KeyFactory factory = KeyFactory.getInstance("RSA");
+    // The public key is not required for this test, but it may be useful to modify or expand this test in the future
+    // PublicKey publicKey = factory.generatePublic(new RSAPublicKeySpec(new BigInteger("21734648244307152755738902242704624429675455693104061482953980655823499524284217582577935962219675181839097134429878676848067944269649003417313253763145613039845156858929146350893510281417425701635390227843218753386852942958087790126591910892081707753005524949329857277363222746280909051526362184081185954039703446436022345307092346517413518280909483768946131477611274390374625720745000173012484689181319542884541163003470909355448313533318136237678943263133529991715284549440616270148923866161198748312992261382455526114770464413102345807150728423473869759031086596301998397561122681012070445972165920288084712186321"), new BigInteger("65537")));
+    PrivateKey privateKey = factory.generatePrivate(
+        new RSAPrivateKeySpec(
+            new BigInteger("21734648244307152755738902242704624429675455693104061482953980655823499524284217582577935962219675181839097134429878676848067944269649003417313253763145613039845156858929146350893510281417425701635390227843218753386852942958087790126591910892081707753005524949329857277363222746280909051526362184081185954039703446436022345307092346517413518280909483768946131477611274390374625720745000173012484689181319542884541163003470909355448313533318136237678943263133529991715284549440616270148923866161198748312992261382455526114770464413102345807150728423473869759031086596301998397561122681012070445972165920288084712186321"),
+            new BigInteger("2627246950446332058699110175423135552922607992443510918533979809198372876869242896214083780043399404771798030104421912476774863886112568550161826087731198353627009668377202151330979270479101063648863411278727725778272563805391938498601722966981572071033305898173415465329072899217806147766785803779409419532480730005663347830294097525463269173509836986107754922630483079886942638729284878709865541937468056706189367357847138095922090696226255189351459450052835991176393120796259048519702721129794393046985282164398590601866202429118551867608688177161937729422431790107723304390299253182892873596285122556471119338537")
+        )
+    );
+
+    // Load an unsigned sample response encrypted using the associated public certificate from above
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse-assertionDecryptionDefaults.txt"));
+    String encodedXML = new String(ba, StandardCharsets.UTF_8);
+
+    // Parse the encrypted sample response
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse parsedResponse = service.parseResponse(
+        encodedXML,
+        false, null,
+        true, privateKey
+    );
+
+    // Load a known encoded sample response from file and parse it
+    ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba, StandardCharsets.UTF_8);
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    // Verify the parsed encrypted response matches the original pulled from file
+    assertEquals(parsedResponse, response);
   }
 
   @BeforeClass
@@ -1376,6 +1396,23 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
     assertEquals(request.version, "2.0");
+  }
+
+  @DataProvider(name = "assertionEncryption")
+  private Object[][] assertionEncryption() {
+    return new Object[][]{
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSAv15, DigestAlgorithm.SHA256, null},
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP_MGF1P, DigestAlgorithm.SHA256, null},
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA512, MaskGenerationFunction.MGF1_SHA256},
+        {EncryptionAlgorithm.AES192, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES256, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES256, KeyLocation.Sibling, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES128GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES192GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES256GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.TripleDES, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1}
+    };
   }
 
   private X509Certificate generateX509Certificate(KeyPair keyPair, String algorithm) throws IllegalArgumentException {
