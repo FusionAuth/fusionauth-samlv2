@@ -1205,12 +1205,13 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         mgf = MaskGenerationFunction.MGF1_SHA1;
       }
 
-      // Check we have necessary parameters
+      // If the parameters could not be resolved, use defaults from RFC 3447
+      // https://www.rfc-editor.org/rfc/rfc3447#appendix-A.2.1
       if (digest == null) {
-        throw new SAMLException("Unable to determine digest algorithm from URI [" + digestUri + "]");
+        digest = DigestAlgorithm.SHA1;
       }
       if (mgf == null) {
-        throw new SAMLException("Unable to determine mask generation function from URI [" + mgfUri + "]");
+        mgf = MaskGenerationFunction.MGF1_SHA1;
       }
 
       // Create cryptographic parameters and initialize the cipher instance
