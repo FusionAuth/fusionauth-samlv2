@@ -148,6 +148,23 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(parsedResponse, response);
   }
 
+  @DataProvider(name = "assertionEncryption")
+  public Object[][] assertionEncryption() {
+    return new Object[][]{
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSAv15, DigestAlgorithm.SHA256, null},
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP_MGF1P, DigestAlgorithm.SHA256, null},
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA512, MaskGenerationFunction.MGF1_SHA256},
+        {EncryptionAlgorithm.AES192, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES256, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES256, KeyLocation.Sibling, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES128GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES192GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.AES256GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
+        {EncryptionAlgorithm.TripleDES, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1}
+    };
+  }
+
   @BeforeClass
   public void beforeClass() {
     System.setProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks", "true");
@@ -1396,23 +1413,6 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(request.issuer, "https://local.fusionauth.io");
     assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
     assertEquals(request.version, "2.0");
-  }
-
-  @DataProvider(name = "assertionEncryption")
-  private Object[][] assertionEncryption() {
-    return new Object[][]{
-        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSAv15, DigestAlgorithm.SHA256, null},
-        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP_MGF1P, DigestAlgorithm.SHA256, null},
-        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES128, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA512, MaskGenerationFunction.MGF1_SHA256},
-        {EncryptionAlgorithm.AES192, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES256, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES256, KeyLocation.Sibling, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES128GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES192GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.AES256GCM, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1},
-        {EncryptionAlgorithm.TripleDES, KeyLocation.Child, KeyTransportAlgorithm.RSA_OAEP, DigestAlgorithm.SHA256, MaskGenerationFunction.MGF1_SHA1}
-    };
   }
 
   private X509Certificate generateX509Certificate(KeyPair keyPair, String algorithm) throws IllegalArgumentException {
