@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2024, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -31,6 +31,17 @@ public class SubjectConfirmation {
   public ZonedDateTime notOnOrAfter;
 
   public String recipient;
+
+  public SubjectConfirmation() {
+  }
+
+  public SubjectConfirmation(SubjectConfirmation subjectConfirmation) {
+    this.address = subjectConfirmation.address;
+    this.inResponseTo = subjectConfirmation.inResponseTo;
+    this.method = subjectConfirmation.method;
+    this.notOnOrAfter = subjectConfirmation.notOnOrAfter;
+    this.recipient = subjectConfirmation.recipient;
+  }
 
   @Override
   public boolean equals(Object o) {

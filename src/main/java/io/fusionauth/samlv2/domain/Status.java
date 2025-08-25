@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2024, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -26,6 +26,14 @@ public class Status {
   public ResponseStatus code;
 
   public String message;
+
+  public Status() {
+  }
+
+  public Status(Status other) {
+    this.code = other.code;
+    this.message = other.message;
+  }
 
   @Override
   public boolean equals(Object o) {

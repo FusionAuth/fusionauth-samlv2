@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2024, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -18,16 +18,42 @@ package io.fusionauth.samlv2.domain;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 public class Assertion {
   public Map<String, List<String>> attributes = new HashMap<>();
 
   public Conditions conditions;
 
+  public String id;
+
   public String issuer;
 
   public Subject subject;
+
+  public Assertion() {
+  }
+
+  public Assertion(Assertion other) {
+    this.attributes = other.attributes
+        .entrySet()
+        .stream()
+        .collect(
+            Collectors.toMap(
+                Entry::getKey,
+                entry -> entry.getValue()
+                              .stream()
+                              .map(String::new)
+                              .toList()
+            )
+        );
+    this.conditions = other.conditions == null ? null : new Conditions(other.conditions);
+    this.id = other.id;
+    this.issuer = other.issuer;
+    this.subject = other.subject == null ? null : new Subject(other.subject);
+  }
 
   @Override
   public boolean equals(Object o) {
@@ -40,12 +66,13 @@ public class Assertion {
     Assertion assertion = (Assertion) o;
     return Objects.equals(attributes, assertion.attributes) &&
         Objects.equals(conditions, assertion.conditions) &&
+        Objects.equals(id, assertion.id) &&
         Objects.equals(issuer, assertion.issuer) &&
         Objects.equals(subject, assertion.subject);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(attributes, conditions, issuer, subject);
+    return Objects.hash(attributes, conditions, id, issuer, subject);
   }
 }

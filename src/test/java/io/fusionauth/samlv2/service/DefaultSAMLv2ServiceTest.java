@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2024, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -42,6 +42,7 @@ import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
+import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPrivateKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.security.spec.X509EncodedKeySpec;
@@ -54,6 +55,7 @@ import java.util.List;
 import java.util.UUID;
 
 import io.fusionauth.samlv2.domain.Algorithm;
+import io.fusionauth.samlv2.domain.Assertion;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.Binding;
@@ -71,6 +73,7 @@ import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.SignatureLocation;
+import io.fusionauth.samlv2.domain.SignatureNotFoundException;
 import io.fusionauth.samlv2.domain.Status;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.AuthnRequestType;
 import io.fusionauth.samlv2.domain.jaxb.oasis.protocol.LogoutRequestType;
@@ -112,6 +115,20 @@ import static org.testng.Assert.fail;
 @SuppressWarnings({"unchecked"})
 @Test(groups = "unit")
 public class DefaultSAMLv2ServiceTest {
+  private String assertionSigned;
+
+  private String assertionUnsigned;
+
+  private String baseXml;
+
+  private String encryptedSigned;
+
+  private String encryptedUnsigned;
+
+  private KeyPair encryptionKeyPair;
+
+  private KeyPair signingKeyPair;
+
   @Test
   public void assertionDecryptionDefaults() throws Exception {
     // If RSA-OAEP Digest and Mask Generation Function are not specified by XML, decryption should fall back to the defaults
@@ -145,6 +162,8 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
     // Verify the parsed encrypted response matches the original pulled from file
+    // The Assertion ID attributes were generated with the sample encoded responses, but the rest of the assertions are identitical.
+    parsedResponse.assertions.get(0).id = response.assertions.get(0).id;
     assertEquals(parsedResponse, response);
   }
 
@@ -166,8 +185,10 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @BeforeClass
-  public void beforeClass() {
+  public void beforeClass() throws Exception {
     System.setProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks", "true");
+    loadKeys();
+    loadAssertionTemplates();
   }
 
   @DataProvider(name = "bindings")
@@ -879,18 +900,19 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, true, KeySelector.singletonKeySelector(key));
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
-    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
-    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(response.assertion.conditions.notOnOrAfter));
     assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
     assertEquals(response.status.code, ResponseStatus.Success);
-    assertEquals(response.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
-    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
-    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
-    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
-    assertNotNull(response.assertion.subject.nameIDs);
-    assertEquals(response.assertion.subject.nameIDs.size(), 1);
-    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
+    Assertion assertion = response.assertions.get(0);
+    assertTrue(assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(assertion.conditions.notOnOrAfter));
+    assertEquals(assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
+    assertEquals(assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
+    assertEquals(assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
+    assertEquals(assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
+    assertNotNull(assertion.subject.nameIDs);
+    assertEquals(assertion.subject.nameIDs.size(), 1);
+    assertEquals(assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
   }
 
   @Test
@@ -901,25 +923,26 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
     assertEquals(response.destination, "http://sp.example.com/demo1/index.php?acs");
-    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "http://idp.example.com/metadata.php");
     assertEquals(response.status.code, ResponseStatus.Success);
-    assertEquals(response.assertion.attributes.get("uid").size(), 1);
-    assertEquals(response.assertion.attributes.get("uid").get(0), "test");
-    assertEquals(response.assertion.attributes.get("mail").size(), 1);
-    assertEquals(response.assertion.attributes.get("mail").get(0), "test@example.com");
-    assertEquals(response.assertion.attributes.get("eduPersonAffiliation").size(), 2);
-    assertEquals(response.assertion.attributes.get("eduPersonAffiliation").get(0), "users");
-    assertEquals(response.assertion.attributes.get("eduPersonAffiliation").get(1), "examplerole1");
-    assertEquals(response.assertion.attributes.get("memberOf").size(), 1);
-    assertEquals(response.assertion.attributes.get("memberOf").get(0), "");
+    Assertion assertion = response.assertions.get(0);
+    assertTrue(assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertEquals(assertion.attributes.get("uid").size(), 1);
+    assertEquals(assertion.attributes.get("uid").get(0), "test");
+    assertEquals(assertion.attributes.get("mail").size(), 1);
+    assertEquals(assertion.attributes.get("mail").get(0), "test@example.com");
+    assertEquals(assertion.attributes.get("eduPersonAffiliation").size(), 2);
+    assertEquals(assertion.attributes.get("eduPersonAffiliation").get(0), "users");
+    assertEquals(assertion.attributes.get("eduPersonAffiliation").get(1), "examplerole1");
+    assertEquals(assertion.attributes.get("memberOf").size(), 1);
+    assertEquals(assertion.attributes.get("memberOf").get(0), "");
     // Ensure we can handle
     //  <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true" xsi:type="xs:string"/>
-    assertEquals(response.assertion.attributes.get("PersonImmutableID").size(), 1);
-    assertNull(response.assertion.attributes.get("PersonImmutableID").get(0));
-    assertNotNull(response.assertion.subject.nameIDs);
-    assertEquals(response.assertion.subject.nameIDs.size(), 1);
-    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.Transient.toSAMLFormat());
+    assertEquals(assertion.attributes.get("PersonImmutableID").size(), 1);
+    assertNull(assertion.attributes.get("PersonImmutableID").get(0));
+    assertNotNull(assertion.subject.nameIDs);
+    assertEquals(assertion.subject.nameIDs.size(), 1);
+    assertEquals(assertion.subject.nameIDs.get(0).format, NameIDFormat.Transient.toSAMLFormat());
   }
 
   @Test(dataProvider = "maxLineLength")
@@ -946,37 +969,166 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(withLineReturns, true, KeySelector.singletonKeySelector(key));
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
-    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
-    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(response.assertion.conditions.notOnOrAfter));
     assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
     assertEquals(response.status.code, ResponseStatus.Success);
-    assertEquals(response.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
-    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
-    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
-    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
-    assertNotNull(response.assertion.subject.nameIDs);
-    assertEquals(response.assertion.subject.nameIDs.size(), 1);
-    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
+    Assertion assertion = response.assertions.get(0);
+    assertTrue(assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(assertion.conditions.notOnOrAfter));
+    assertEquals(assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
+    assertEquals(assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
+    assertEquals(assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
+    assertEquals(assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
+    assertNotNull(assertion.subject.nameIDs);
+    assertEquals(assertion.subject.nameIDs.size(), 1);
+    assertEquals(assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
+  }
+
+  @Test
+  public void parseResponse_multipleAssertions_ignoreSignature() throws Exception {
+    // When signature verification is skipped, unsigned assertions and assertions with invalid signatures are included in the response.
+    String responseXml = baseXml.replace("${assertions}", String.join("", List.of(assertionSigned, assertionUnsigned, encryptedSigned, encryptedUnsigned)));
+    String encodedResponse = Base64.getMimeEncoder().encodeToString(responseXml.getBytes(StandardCharsets.UTF_8));
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+
+    // Parse the response skipping signature verification
+    AuthenticationResponse response = service.parseResponse(
+        encodedResponse,
+        false,
+        // This is the wrong key to verify signatures, but we skip entirely.
+        KeySelector.singletonKeySelector(encryptionKeyPair.getPublic()),
+        false,
+        encryptionKeyPair.getPrivate()
+    );
+
+    // All four assertions are included on the response
+    assertEquals(response.assertions.size(), 4);
+  }
+
+  @Test
+  public void parseResponse_multipleAssertions_verifySignature() throws Exception {
+    // When signature verification is requested, unsigned assertions are excluded from the parsed response.
+    String responseXml = baseXml.replace("${assertions}", String.join("", List.of(assertionSigned, assertionUnsigned, encryptedSigned, encryptedUnsigned)));
+    String encodedResponse = Base64.getMimeEncoder().encodeToString(responseXml.getBytes(StandardCharsets.UTF_8));
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+
+    // Parse the response as unencrypted with signature verification.
+    AuthenticationResponse response = service.parseResponse(
+        encodedResponse,
+        true,
+        KeySelector.singletonKeySelector(signingKeyPair.getPublic()),
+        false,
+        encryptionKeyPair.getPrivate()
+    );
+    // The response should only contain the signed plaintext and signed encrypted assertions.
+    // - Unsigned assertions are excluded from the response.
+    assertEquals(response.assertions.size(), 2);
+    assertEquals(response.assertions.get(0).id, "_b839e63e-4673-43a8-b226-ef73676a70b1");
+    assertEquals(response.assertions.get(1).id, "_604b9303-a5b0-411f-9b3a-5f525fe6887b");
+
+    // Parse the response as encrypted with signature verification.
+    response = service.parseResponse(
+        encodedResponse,
+        true,
+        KeySelector.singletonKeySelector(signingKeyPair.getPublic()),
+        true,
+        encryptionKeyPair.getPrivate()
+    );
+
+    // The response should only contain the one signed encrypted assertion.
+    // - Unsigned encrypted assertions are excluded from the response.
+    // - Plaintext assertions are excluded from the response.
+    assertEquals(response.assertions.size(), 1);
+    assertEquals(response.assertions.get(0).id, "_604b9303-a5b0-411f-9b3a-5f525fe6887b");
+
+    // Build another response containing only unsigned assertions
+    responseXml = baseXml.replace("${assertions}", String.join("", List.of(assertionUnsigned, encryptedUnsigned)));
+    encodedResponse = Base64.getMimeEncoder().encodeToString(responseXml.getBytes(StandardCharsets.UTF_8));
+
+    // Parse the response as plaintext with signature verification. Expect an exception due to no signed elements.
+    try {
+      service.parseResponse(
+          encodedResponse,
+          true,
+          KeySelector.singletonKeySelector(signingKeyPair.getPublic()),
+          false,
+          encryptionKeyPair.getPrivate()
+      );
+      fail("Expected SignatureNotFoundException");
+    } catch (SignatureNotFoundException e) {
+      assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
+    }
+  }
+
+  @Test
+  public void parseResponse_requireEncryptedAssertion_unencrypted() throws Exception {
+    // Test that a response containing an unencrypted assertion fails when encryption is required.
+    // Load response from file
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba, StandardCharsets.UTF_8);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+
+    // Require assertion encryption, but provide an assertion without encryption.
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null, true, null);
+    // Skipped parsing the unencrypted assertion. The assertion was not included in the response.
+    assertTrue(response.assertions.isEmpty());
   }
 
   @Test
   public void parseResponse_signatureCheck_badSignature() throws Exception {
-    CertificateFactory cf = CertificateFactory.getInstance("X.509");
-    PublicKey key;
-    try (InputStream is = Files.newInputStream(Paths.get("src/test/certificates/certificate.cer"))) {
-      Certificate cert = cf.generateCertificate(is);
-      key = cert.getPublicKey();
+    // Test that an exception is thrown when there is a bad signature in the document.
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+
+    // [1] Invalid Signature on Assertion
+    String responseXml = baseXml.replace("${assertions}", assertionSigned);
+    String encodedResponse = Base64.getMimeEncoder().encodeToString(responseXml.getBytes(StandardCharsets.UTF_8));
+    try {
+      service.parseResponse(
+          encodedResponse,
+          true,
+          // This is the wrong key to validate the Signature on the Assertion
+          KeySelector.singletonKeySelector(encryptionKeyPair.getPublic())
+      );
+      fail("Expected SAMLException");
+    } catch (SAMLException e) {
+      assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is invalid.");
     }
 
-    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse-badSignature.txt"));
-    String encodedResponse = new String(ba);
-    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    // [2] Invalid Signature on EncryptedAssertion
+    responseXml = baseXml.replace("${assertions}", encryptedSigned);
+    encodedResponse = Base64.getMimeEncoder().encodeToString(responseXml.getBytes(StandardCharsets.UTF_8));
     try {
-      service.parseResponse(encodedResponse, true, KeySelector.singletonKeySelector(key));
-      fail("Should have thrown an exception");
+      service.parseResponse(
+          encodedResponse,
+          true,
+          // This is the wrong key to validate the Signature on the EncryptedAssertion
+          KeySelector.singletonKeySelector(encryptionKeyPair.getPublic()),
+          true,
+          encryptionKeyPair.getPrivate()
+      );
+      fail("Expected SAMLException");
     } catch (SAMLException e) {
-      // Should throw
+      assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is invalid.");
+    }
+
+    // [3] Invalid Signature on Response
+    responseXml = baseXml.replace("${assertions}", assertionUnsigned);
+    encodedResponse = Base64.getMimeEncoder().encodeToString(responseXml.getBytes(StandardCharsets.UTF_8));
+    // Parse the unsigned Response
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+    // Build a new Response with a signature at the Response level
+    encodedResponse = service.buildAuthnResponse(response, true, signingKeyPair.getPrivate(), CertificateTools.fromKeyPair(signingKeyPair, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, SignatureLocation.Response, false);
+    try {
+      service.parseResponse(
+          encodedResponse,
+          true,
+          // This is the wrong key to validate the Signature on the Response
+          KeySelector.singletonKeySelector(encryptionKeyPair.getPublic())
+      );
+      fail("Expected SAMLException");
+    } catch (SAMLException e) {
       assertEquals(e.getMessage(), "Invalid SAML v2.0 operation. The signature is invalid.");
     }
   }
@@ -1337,18 +1489,19 @@ public class DefaultSAMLv2ServiceTest {
     }
 
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
-    assertTrue(response.assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
-    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(response.assertion.conditions.notOnOrAfter));
     assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
     assertEquals(response.status.code, ResponseStatus.Success);
-    assertEquals(response.assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
-    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
-    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
-    assertEquals(response.assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
-    assertNotNull(response.assertion.subject.nameIDs);
-    assertEquals(response.assertion.subject.nameIDs.size(), 1);
-    assertEquals(response.assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
+    Assertion assertion = response.assertions.get(0);
+    assertTrue(assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(assertion.conditions.notOnOrAfter));
+    assertEquals(assertion.attributes.get("http://schemas.microsoft.com/identity/claims/displayname").get(0), "Brian Pontarelli");
+    assertEquals(assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname").get(0), "Brian");
+    assertEquals(assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname").get(0), "Pontarelli");
+    assertEquals(assertion.attributes.get("http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress").get(0), "brian@inversoft.com");
+    assertNotNull(assertion.subject.nameIDs);
+    assertEquals(assertion.subject.nameIDs.size(), 1);
+    assertEquals(assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
   }
 
   @DataProvider(name = "signatureLocation")
@@ -1433,6 +1586,37 @@ public class DefaultSAMLv2ServiceTest {
       return impl;
     } catch (Exception e) {
       throw new IllegalArgumentException(e);
+    }
+  }
+
+  private void loadAssertionTemplates() throws IOException {
+    baseXml = Files.readString(Paths.get("src/test/xml/assertion/response-template.xml.txt"));
+    assertionSigned = Files.readString(Paths.get("src/test/xml/assertion/assertion-signed.xml.txt"));
+    assertionUnsigned = Files.readString(Paths.get("src/test/xml/assertion/assertion-unsigned.xml.txt"));
+    encryptedSigned = Files.readString(Paths.get("src/test/xml/assertion/encrypted-signed.xml.txt"));
+    encryptedUnsigned = Files.readString(Paths.get("src/test/xml/assertion/encrypted-unsigned.xml.txt"));
+
+  }
+
+  private void loadKeys() throws Exception {
+    try (
+        InputStream isSigCert = Files.newInputStream(Paths.get("src/test/certificates/signature-certificate.pem"));
+        InputStream isSigKey = Files.newInputStream(Paths.get("src/test/certificates/signature-private-pkcs8.der"));
+        InputStream isEncCert = Files.newInputStream(Paths.get("src/test/certificates/encryption-certificate.pem"));
+        InputStream isEncKey = Files.newInputStream(Paths.get("src/test/certificates/encryption-private-pkcs8.der"))
+    ) {
+      KeyFactory kf = KeyFactory.getInstance("RSA");
+      PKCS8EncodedKeySpec sigKeySpec = new PKCS8EncodedKeySpec(isSigKey.readAllBytes());
+      PrivateKey sigKey = kf.generatePrivate(sigKeySpec);
+      CertificateFactory cf = CertificateFactory.getInstance("X.509");
+      Certificate sigCert = cf.generateCertificate(isSigCert);
+      signingKeyPair = new KeyPair(sigCert.getPublicKey(), sigKey);
+
+      PKCS8EncodedKeySpec encKeySpec = new PKCS8EncodedKeySpec(isEncKey.readAllBytes());
+      PrivateKey encKey = kf.generatePrivate(encKeySpec);
+      cf = CertificateFactory.getInstance("X.509");
+      Certificate encCert = cf.generateCertificate(isEncCert);
+      encryptionKeyPair = new KeyPair(encCert.getPublicKey(), encKey);
     }
   }
 

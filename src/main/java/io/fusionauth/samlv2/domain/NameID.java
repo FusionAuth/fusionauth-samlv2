@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2024, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -21,6 +21,15 @@ public class NameID {
   public String format;
 
   public String id;
+
+  public NameID() {
+
+  }
+
+  public NameID(NameID other) {
+    this.format = other.format;
+    this.id = other.id;
+  }
 
   @Override
   public boolean equals(Object o) {

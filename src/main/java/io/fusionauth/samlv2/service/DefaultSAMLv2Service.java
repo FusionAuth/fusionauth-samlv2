@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2024, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -68,9 +68,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -79,6 +81,7 @@ import io.fusionauth.der.DerInputStream;
 import io.fusionauth.der.DerValue;
 import io.fusionauth.der.Tag;
 import io.fusionauth.samlv2.domain.Algorithm;
+import io.fusionauth.samlv2.domain.Assertion;
 import io.fusionauth.samlv2.domain.AuthenticationRequest;
 import io.fusionauth.samlv2.domain.AuthenticationResponse;
 import io.fusionauth.samlv2.domain.Binding;
@@ -99,6 +102,7 @@ import io.fusionauth.samlv2.domain.NameIDFormat;
 import io.fusionauth.samlv2.domain.ResponseStatus;
 import io.fusionauth.samlv2.domain.SAMLException;
 import io.fusionauth.samlv2.domain.SAMLRequest;
+import io.fusionauth.samlv2.domain.SAMLResponse;
 import io.fusionauth.samlv2.domain.SignatureLocation;
 import io.fusionauth.samlv2.domain.SignatureNotFoundException;
 import io.fusionauth.samlv2.domain.Subject;
@@ -208,6 +212,10 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
                                    EncryptionAlgorithm encryptionAlgorithm, KeyLocation keyLocation,
                                    KeyTransportAlgorithm transportAlgorithm, X509Certificate encryptionCertificate,
                                    DigestAlgorithm digest, MaskGenerationFunction mgf) throws SAMLException {
+    if (response.assertions != null && response.assertions.size() > 1) {
+      throw new SAMLException("This library does not currently support building a SAML Response containing multiple assertions.");
+    }
+
     ResponseType jaxbResponse = new ResponseType();
 
     // Status (element)
@@ -234,21 +242,23 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
     // The main assertion (element)
     AssertionType assertionType = new AssertionType();
-    if (response.assertion != null && response.status.code == ResponseStatus.Success) {
+    if (response.assertions != null && response.status.code == ResponseStatus.Success) {
+      // Only responses with a single Assertion are supported. Grab the first.
+      Assertion assertion = response.assertions.get(0);
       ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
-      String id = "_" + UUID.randomUUID();
+      String id = assertion.id != null ? assertion.id : "_" + UUID.randomUUID();
       assertionType.setID(id);
       assertionType.setIssuer(jaxbResponse.getIssuer());
       assertionType.setIssueInstant(toXMLGregorianCalendar(now));
       assertionType.setVersion(response.version);
 
       // Subject (element)
-      if (response.assertion.subject != null) {
+      if (assertion.subject != null) {
         SubjectType subjectType = new SubjectType();
 
         // NameId (element)
-        if (response.assertion.subject.nameIDs != null) {
-          for (NameID nameId : response.assertion.subject.nameIDs) {
+        if (assertion.subject.nameIDs != null) {
+          for (NameID nameId : assertion.subject.nameIDs) {
             NameIDType nameIdType = new NameIDType();
             nameIdType.setValue(nameId.id);
             nameIdType.setFormat(nameId.format);
@@ -257,17 +267,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         }
 
         // Subject confirmation (element)
-        if (response.assertion.subject.subjectConfirmation != null) {
+        if (assertion.subject.subjectConfirmation != null) {
           SubjectConfirmationDataType dataType = new SubjectConfirmationDataType();
-          dataType.setInResponseTo(response.assertion.subject.subjectConfirmation.inResponseTo);
+          dataType.setInResponseTo(assertion.subject.subjectConfirmation.inResponseTo);
           // SAML Profiles 4.1.4.2 <Response> Usage
           // - Subject Confirmation MUST NOT contain NotBefore.
-          dataType.setNotOnOrAfter(toXMLGregorianCalendar(response.assertion.subject.subjectConfirmation.notOnOrAfter));
-          dataType.setRecipient(response.assertion.subject.subjectConfirmation.recipient);
+          dataType.setNotOnOrAfter(toXMLGregorianCalendar(assertion.subject.subjectConfirmation.notOnOrAfter));
+          dataType.setRecipient(assertion.subject.subjectConfirmation.recipient);
           SubjectConfirmationType subjectConfirmationType = new SubjectConfirmationType();
           subjectConfirmationType.setSubjectConfirmationData(dataType);
-          if (response.assertion.subject.subjectConfirmation.method != null) {
-            subjectConfirmationType.setMethod(response.assertion.subject.subjectConfirmation.method.toSAMLFormat());
+          if (assertion.subject.subjectConfirmation.method != null) {
+            subjectConfirmationType.setMethod(assertion.subject.subjectConfirmation.method.toSAMLFormat());
           }
           subjectType.getContent().add(ASSERTION_OBJECT_FACTORY.createSubjectConfirmation(subjectConfirmationType));
         }
@@ -277,23 +287,23 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       }
 
       // Conditions (element)
-      if (response.assertion.conditions != null) {
+      if (assertion.conditions != null) {
         ConditionsType conditionsType = new ConditionsType();
-        conditionsType.setNotBefore(toXMLGregorianCalendar(response.assertion.conditions.notBefore));
-        conditionsType.setNotOnOrAfter(toXMLGregorianCalendar(response.assertion.conditions.notOnOrAfter));
+        conditionsType.setNotBefore(toXMLGregorianCalendar(assertion.conditions.notBefore));
+        conditionsType.setNotOnOrAfter(toXMLGregorianCalendar(assertion.conditions.notOnOrAfter));
         assertionType.setConditions(conditionsType);
 
         // Audiences (element)
-        if (!response.assertion.conditions.audiences.isEmpty()) {
+        if (!assertion.conditions.audiences.isEmpty()) {
           AudienceRestrictionType audienceRestrictionType = new AudienceRestrictionType();
-          audienceRestrictionType.getAudience().addAll(response.assertion.conditions.audiences);
+          audienceRestrictionType.getAudience().addAll(assertion.conditions.audiences);
           conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse().add(audienceRestrictionType);
         }
       }
 
       // Attributes (elements)
       AttributeStatementType attributeStatementType = new AttributeStatementType();
-      response.assertion.attributes.forEach((k, v) -> {
+      assertion.attributes.forEach((k, v) -> {
         AttributeType attributeType = new AttributeType();
         attributeType.setName(k);
         attributeType.getAttributeValue().addAll(v);
@@ -490,7 +500,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     LogoutRequestParseResult result = parseLogoutRequest(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request, false);
+      verifyEmbeddedSignaturesRequired(result.document, signatureHelper.keySelector(), result.request);
     }
 
     return result.request;
@@ -518,7 +528,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     LogoutResponseParseResult result = parseLogoutResponse(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.response);
     if (signatureHelper.verifySignature()) {
-      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.response, false);
+      verifyEmbeddedSignaturesRequired(result.document, signatureHelper.keySelector(), result.response);
     }
 
     return result.response;
@@ -615,7 +625,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     AuthnRequestParseResult result = parseRequest(xml);
     PostBindingSignatureHelper signatureHelper = signatureHelperFunction.apply(result.request);
     if (signatureHelper.verifySignature()) {
-      verifyEmbeddedSignature(result.document, signatureHelper.keySelector(), result.request, false);
+      verifyEmbeddedSignaturesRequired(result.document, signatureHelper.keySelector(), result.request);
     }
 
     return result.request;
@@ -652,9 +662,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     response.rawResponse = new String(decodedResponse, StandardCharsets.UTF_8);
 
     Document document = newDocumentFromBytes(decodedResponse);
-    boolean signatureVerified = false;
+    Set<String> verifiedElementIds = new HashSet<>();
     if (verifySignature) {
-      signatureVerified = verifyEmbeddedSignature(document, signatureKeySelector, null, encryptionKey != null);
+      verifiedElementIds = verifyEmbeddedSignatures(document, signatureKeySelector, null);
     }
 
     ResponseType jaxbResponse = unmarshallFromDocument(document, ResponseType.class);
@@ -666,39 +676,50 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     response.destination = jaxbResponse.getDestination();
     response.version = jaxbResponse.getVersion();
 
+    // If the Response element has a verified signature, all Assertions are also verified.
+    boolean responseVerified = verifiedElementIds.contains(response.id);
+
     List<Object> assertions = jaxbResponse.getAssertionOrEncryptedAssertion();
-    for (Object assertion : assertions) {
-      if (assertion instanceof EncryptedElementType) {
+    for (Object jaxbAssertion : assertions) {
+      if (jaxbAssertion instanceof EncryptedElementType) {
         if (encryptionKey == null) {
-          logger.warn("SAML response contained encrypted attribute, but no encryption key was provided. It was ignored.");
+          logger.warn("SAML response contained encrypted assertion, but no encryption key was provided. It was ignored.");
           continue;
         } else {
-          assertion = decryptAssertion((EncryptedElementType) assertion, encryptionKey, verifySignature && !signatureVerified, signatureKeySelector);
+          jaxbAssertion = decryptAssertion((EncryptedElementType) jaxbAssertion, encryptionKey, verifySignature, signatureKeySelector, verifiedElementIds);
         }
       } else if (requireEncryptedAssertion) {
-        logger.warn("Assertion encryption is required, but the SAML response contained an unencrypted attribute. It was ignored.");
+        logger.warn("Assertion encryption is required, but the SAML response contained an unencrypted assertion. It was ignored.");
+        continue;
       }
 
-      AssertionType assertionType = (AssertionType) assertion;
+      AssertionType assertionType = (AssertionType) jaxbAssertion;
+      if (verifySignature && !responseVerified && !verifiedElementIds.contains(assertionType.getID())) {
+        logger.warn("SAML response contained an unsigned assertion when signature verification was requested. It was ignored.");
+        continue;
+      }
+      Assertion assertion = new Assertion();
+      assertion.id = assertionType.getID();
+      assertion.issuer = assertionType.getIssuer().getValue();
 
       // Handle the subject
       SubjectType subject = assertionType.getSubject();
       if (subject != null) {
-        response.assertion.subject = new Subject();
+        assertion.subject = new Subject();
 
         List<JAXBElement<?>> elements = subject.getContent();
         for (JAXBElement<?> element : elements) {
           Class<?> type = element.getDeclaredType();
           if (type == NameIDType.class) {
-            if (response.assertion.subject.nameIDs == null) {
-              response.assertion.subject.nameIDs = new ArrayList<>();
+            if (assertion.subject.nameIDs == null) {
+              assertion.subject.nameIDs = new ArrayList<>();
             }
 
             // Extract the name
-            response.assertion.subject.nameIDs.add(parseNameId((NameIDType) element.getValue()));
+            assertion.subject.nameIDs.add(parseNameId((NameIDType) element.getValue()));
           } else if (type == SubjectConfirmationType.class) {
             // Extract the confirmation
-            response.assertion.subject.subjectConfirmation = parseConfirmation((SubjectConfirmationType) element.getValue());
+            assertion.subject.subjectConfirmation = parseConfirmation((SubjectConfirmationType) element.getValue());
           } else if (type == EncryptedElementType.class) {
             throw new SAMLException("This library currently doesn't handle encrypted assertions");
           }
@@ -708,9 +729,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       // Handle conditions to pull out audience restriction
       ConditionsType conditionsType = assertionType.getConditions();
       if (conditionsType != null) {
-        response.assertion.conditions = new Conditions();
-        response.assertion.conditions.notBefore = convertToZonedDateTime(conditionsType.getNotBefore());
-        response.assertion.conditions.notOnOrAfter = convertToZonedDateTime(conditionsType.getNotOnOrAfter());
+        assertion.conditions = new Conditions();
+        assertion.conditions.notBefore = convertToZonedDateTime(conditionsType.getNotBefore());
+        assertion.conditions.notOnOrAfter = convertToZonedDateTime(conditionsType.getNotOnOrAfter());
 
         List<ConditionAbstractType> conditionAbstractTypes = conditionsType.getConditionOrAudienceRestrictionOrOneTimeUse();
         // Only handling the AudienceRestriction.
@@ -721,7 +742,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
         //   http://docs.oasis-open.org/security/saml/v2.0/saml-core-2.0-os.pdf
         for (ConditionAbstractType conditionAbstractType : conditionAbstractTypes) {
           if (conditionAbstractType instanceof AudienceRestrictionType restrictionType) {
-            response.assertion.conditions.audiences.addAll(restrictionType.getAudience());
+            assertion.conditions.audiences.addAll(restrictionType.getAudience());
           }
         }
       }
@@ -736,13 +757,22 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
               String name = attributeType.getName();
               List<Object> attributeValues = attributeType.getAttributeValue();
               List<String> values = attributeValues.stream().map(SAMLTools::attributeToString).toList();
-              response.assertion.attributes.computeIfAbsent(name, k -> new ArrayList<>()).addAll(values);
+              assertion.attributes.computeIfAbsent(name, k -> new ArrayList<>()).addAll(values);
             } else {
               throw new SAMLException("This library currently doesn't support encrypted attributes");
             }
           }
         }
       }
+
+      // Add to the response
+      response.assertions.add(assertion);
+    }
+
+    if (verifySignature && verifiedElementIds.isEmpty()) {
+      // If signature verification was requested, and we don't have any verified element IDs, throw an Exception. The Response could not be verified.
+      // We need to check this after processing all Assertions because the Signature could have been part of an EncryptedAssertion
+      throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.");
     }
 
     return response;
@@ -1066,16 +1096,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
    *
    * @param encryptedAssertion     an {@code EncryptedElement} containing an encrypted assertion
    * @param transportEncryptionKey a private key used to decrypt the symmetric key used to decrypt the assertion
-   * @param verifySignature        if {@code true}, the method will verify an embedded signature. Failure to locate or
-   *                               verify the signature will result in an exception.
-   * @param signatureKeySelector   a key
+   * @param verifySignature        if {@code true}, the method will attempt to verify an embedded signature if it is
+   *                               present
+   * @param signatureKeySelector   The key selector that is used to find the correct key to verify a signature inside
+   *                               the encrypted assertion.
+   * @param verifiedElementIds     collection of document element IDs that have had their signatures verified. This
+   *                               method will add verified element IDs to the set.
    * @return the decrypted {@code Assertion} element
    * @throws SAMLException if there was an issue decrypting the {@code EncryptedElement}, parsing the SAML
    *                       {@code Assertion} element, or verifying the signature embedded in the
    *                       {@code EncryptedElement} when {@code verifySignature} is {@code true}
    */
   private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey transportEncryptionKey,
-                                         boolean verifySignature, KeySelector signatureKeySelector)
+                                         boolean verifySignature, KeySelector signatureKeySelector,
+                                         Set<String> verifiedElementIds)
       throws SAMLException {
     // Extract the encrypted assertion encryption key from the XML
     EncryptedKeyType encryptedKey = extractEncryptedAssertionEncryptionKey(encryptedAssertion);
@@ -1109,11 +1143,11 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     // Parse the bytes into an XML document
     Document doc = newDocumentFromBytes(assertionBytes);
 
-    // Verify the signature if requested. The code assumes this Document contains the signature. Verification will fail if it does not.
+    // Verify the signature if requested. Add the verified element Ids to the set for the full Response.
     // The signature must be verified here because unmarshalling to a Java type can add namespace prefixes and other data that was not
     // present when the signature was generated.
     if (verifySignature) {
-      verifyEmbeddedSignature(doc, signatureKeySelector, null, false);
+      verifiedElementIds.addAll(verifyEmbeddedSignatures(doc, signatureKeySelector, null));
     }
 
     // Unmarshall the Document into AssertionType.
@@ -1591,27 +1625,24 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     signature.sign(dsc);
   }
 
-  private boolean verifyEmbeddedSignature(Document document, KeySelector keySelector, SAMLRequest request,
-                                          boolean allowEncryptedSignature)
+  /**
+   * Verify embedded Signatures within the Document and return the set of verified element IDs
+   *
+   * @param document    the XML document to verify
+   * @param keySelector The key selector that is used to find the correct key to verify the signature in the response.
+   * @param request     the {@link SAMLRequest} or {@link SAMLResponse} being verified or {@code null} if not
+   *                    applicable
+   * @return the Set of element IDs with verified Signatures
+   * @throws SAMLException if there was a problem verifying any Signature in the Document
+   */
+  private Set<String> verifyEmbeddedSignatures(Document document, KeySelector keySelector, SAMLRequest request)
       throws SAMLException {
-    boolean verified = false;
+    Set<String> verifiedElementIds = new HashSet<>();
     // Fix the IDs in the entire document per the suggestions at http://stackoverflow.com/questions/17331187/xml-dig-sig-error-after-upgrade-to-java7u25
     fixIDs(document.getDocumentElement());
 
+    // Verify each Signature present in the Document. Encrypted elements containing signatures must be verified separately after the element is decrypted.
     NodeList nl = document.getElementsByTagNameNS(XMLSignature.XMLNS, "Signature");
-    boolean encryptedDataExists = document.getElementsByTagNameNS("http://www.w3.org/2001/04/xmlenc#", "EncryptedData").getLength() != 0;
-    if (nl.getLength() == 0) {
-      if (encryptedDataExists && allowEncryptedSignature) {
-        // If there is an encrypted element in the document, and we allow the signature inside the encrypted element, log a message and continue.
-        logger.debug("Could not locate Signature element in XML. It may be present in the EncryptedData.");
-      } else {
-        // If we did not find a signature and either
-        //  1) there was no encrypted data element or
-        //  2) an encrypted signature is not allowed for this case
-        // then throw an exception
-        throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.", request);
-      }
-    }
 
     for (int i = 0; i < nl.getLength(); i++) {
       DOMValidateContext validateContext = new DOMValidateContext(keySelector, nl.item(i));
@@ -1630,7 +1661,19 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
         boolean valid = signature.validate(validateContext);
         if (valid) {
-          verified = true;
+          // Loop through the SignedInfo References. Add URIs referencing IDs in the Document to the return list.
+          // It is possible for a single Signature to include References to multiple elements, which protects the entire set from tampering.
+          verifiedElementIds.addAll(
+              signature.getSignedInfo()
+                       .getReferences()
+                       .stream()
+                       .map(Reference::getURI)
+                       // Local IDs start with a #
+                       .filter(uri -> uri.startsWith("#"))
+                       // Store the IDs without the leading #
+                       .map(uri -> uri.substring(1))
+                       .toList()
+          );
         } else {
           throw new SAMLException("Invalid SAML v2.0 operation. The signature is invalid.", request);
         }
@@ -1641,7 +1684,20 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       }
     }
 
-    return verified;
+    return verifiedElementIds;
+  }
+
+  /**
+   * @throws SignatureNotFoundException if the Document did not contain any Signature elements
+   * @see DefaultSAMLv2Service#verifyEmbeddedSignatures(Document, KeySelector, SAMLRequest)
+   */
+  private void verifyEmbeddedSignaturesRequired(Document document, KeySelector keySelector, SAMLRequest request)
+      throws SAMLException {
+    Set<String> verifiedElementIds = verifyEmbeddedSignatures(document, keySelector, request);
+    if (verifiedElementIds.isEmpty()) {
+      // This method expects to find at least one valid Signature element
+      throw new SignatureNotFoundException("Invalid SAML v2.0 operation. The signature is missing from the XML but is required.", request);
+    }
   }
 
   private void verifyRequestSignature(SAMLRequestParameters requestParameters,

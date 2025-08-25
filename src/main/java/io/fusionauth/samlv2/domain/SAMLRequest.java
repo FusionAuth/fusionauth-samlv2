@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2021-2024, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2021-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -35,6 +35,18 @@ public class SAMLRequest {
   public String version;
 
   public String xml;
+
+  public SAMLRequest() {
+  }
+
+  public SAMLRequest(SAMLRequest other) {
+    this.destination = other.destination;
+    this.id = other.id;
+    this.issueInstant = other.issueInstant;
+    this.issuer = other.issuer;
+    this.version = other.version;
+    this.xml = other.xml;
+  }
 
   @Override
   public boolean equals(Object o) {

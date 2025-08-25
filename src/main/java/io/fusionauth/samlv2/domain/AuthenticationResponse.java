@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2013-2024, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2013-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,6 +16,8 @@
 package io.fusionauth.samlv2.domain;
 
 import java.time.ZonedDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -24,13 +26,24 @@ import java.util.Objects;
  * @author Brian Pontarelli
  */
 public class AuthenticationResponse extends SAMLResponse {
-  public Assertion assertion = new Assertion();
+  public List<Assertion> assertions = new ArrayList<>();
 
   public String rawResponse;
 
   public ZonedDateTime sessionExpiry;
 
   public String sessionIndex;
+
+  public AuthenticationResponse() {
+  }
+
+  public AuthenticationResponse(AuthenticationResponse other) {
+    super(other);
+    this.assertions.addAll(other.assertions.stream().map(Assertion::new).toList());
+    this.rawResponse = other.rawResponse;
+    this.sessionExpiry = other.sessionExpiry;
+    this.sessionIndex = other.sessionIndex;
+  }
 
   @Override
   public boolean equals(Object o) {
@@ -46,13 +59,13 @@ public class AuthenticationResponse extends SAMLResponse {
     AuthenticationResponse that = (AuthenticationResponse) o;
     // The comparison does not include the rawResponse because different raw encoded responses can be parsed into
     // identical domain objects. This is mainly true for responses containing an encrypted assertion
-    return Objects.equals(assertion, that.assertion) &&
+    return Objects.equals(assertions, that.assertions) &&
         Objects.equals(sessionExpiry, that.sessionExpiry) &&
         Objects.equals(sessionIndex, that.sessionIndex);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), assertion, rawResponse, sessionExpiry, sessionIndex);
+    return Objects.hash(super.hashCode(), assertions, rawResponse, sessionExpiry, sessionIndex);
   }
 }

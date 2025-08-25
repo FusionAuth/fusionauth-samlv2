@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2024, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,6 +22,14 @@ public class Subject {
   public List<NameID> nameIDs;
 
   public SubjectConfirmation subjectConfirmation;
+
+  public Subject() {
+  }
+
+  public Subject(Subject other) {
+    this.nameIDs = other.nameIDs == null ? null : other.nameIDs.stream().map(NameID::new).toList();
+    this.subjectConfirmation = other.subjectConfirmation == null ? null : new SubjectConfirmation(other.subjectConfirmation);
+  }
 
   @Override
   public boolean equals(Object o) {
