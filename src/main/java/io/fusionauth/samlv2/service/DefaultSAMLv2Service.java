@@ -313,7 +313,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
       // AuthnStatement (element)
       AuthnStatementType authnStatement = new AuthnStatementType();
-      authnStatement.setAuthnInstant(toXMLGregorianCalendar(now));
+      authnStatement.setAuthnInstant(toXMLGregorianCalendar(response.authnInstant));
       authnStatement.setAuthnContext(new AuthnContextType());
       authnStatement.getAuthnContext().getContent().add(ASSERTION_OBJECT_FACTORY.createAuthnContextClassRef("urn:oasis:names:tc:SAML:2.0:ac:classes:Password"));
       authnStatement.setSessionIndex(response.sessionIndex);
@@ -862,7 +862,9 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   AuthnRequestType toAuthnRequest(AuthenticationRequest request, String version) throws SAMLException {
     // SAML Web SSO profile requirements (section 4.1.4.1)
     AuthnRequestType authnRequest = new AuthnRequestType();
+
     authnRequest.setAssertionConsumerServiceURL(request.acsURL);
+    authnRequest.setForceAuthn(request.forceAuthn);
     authnRequest.setDestination(request.destination);
     authnRequest.setIssuer(new NameIDType());
     authnRequest.getIssuer().setValue(request.issuer);
@@ -1579,6 +1581,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     result.authnRequest = unmarshallFromDocument(result.document, AuthnRequestType.class);
     result.request = new AuthenticationRequest();
     result.request.acsURL = result.authnRequest.getAssertionConsumerServiceURL();
+    result.request.forceAuthn = result.authnRequest.isForceAuthn();
     result.request.id = result.authnRequest.getID();
     result.request.issuer = result.authnRequest.getIssuer().getValue();
     result.request.issueInstant = result.authnRequest.getIssueInstant().toGregorianCalendar().toZonedDateTime();

@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2019-2023, Inversoft Inc., All Rights Reserved
+ * Copyright (c) 2019-2025, Inversoft Inc., All Rights Reserved
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -24,6 +24,8 @@ public class AuthenticationRequest extends SAMLRequest {
   public String acsURL;
 
   public Boolean allowCreate = false;
+
+  public Boolean forceAuthn;
 
   public String nameIdFormat;
 }

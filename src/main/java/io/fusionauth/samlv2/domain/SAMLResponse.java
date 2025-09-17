@@ -15,6 +15,7 @@
  */
 package io.fusionauth.samlv2.domain;
 
+import java.time.ZonedDateTime;
 import java.util.Objects;
 
 /**
@@ -23,6 +24,8 @@ import java.util.Objects;
  * @author Daniel DeGroff
  */
 public class SAMLResponse extends SAMLRequest {
+  public ZonedDateTime authnInstant;
+
   public String inResponseTo;
 
   public Status status = new Status();
@@ -32,6 +35,7 @@ public class SAMLResponse extends SAMLRequest {
 
   public SAMLResponse(SAMLResponse other) {
     super(other);
+    this.authnInstant = other.authnInstant;
     this.inResponseTo = other.inResponseTo;
     this.status = new Status(other.status);
   }
@@ -48,12 +52,13 @@ public class SAMLResponse extends SAMLRequest {
       return false;
     }
     SAMLResponse that = (SAMLResponse) o;
-    return Objects.equals(inResponseTo, that.inResponseTo) &&
+    return Objects.equals(authnInstant, that.authnInstant) &&
+        Objects.equals(inResponseTo, that.inResponseTo) &&
         Objects.equals(status, that.status);
   }
 
   @Override
   public int hashCode() {
-    return Objects.hash(super.hashCode(), inResponseTo, status);
+    return Objects.hash(super.hashCode(), authnInstant, inResponseTo, status);
   }
 }
