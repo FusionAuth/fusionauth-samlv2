@@ -15,6 +15,8 @@
  */
 package io.fusionauth.samlv2.domain;
 
+import java.util.Objects;
+
 /**
  * The SAML v2.0 authentication request object that is sent from the SP.
  *
@@ -28,4 +30,20 @@ public class AuthenticationRequest extends SAMLRequest {
   public Boolean forceAuthn;
 
   public String nameIdFormat;
+
+  @Override
+  public boolean equals(Object o) {
+    if (!(o instanceof AuthenticationRequest that)) {
+      return false;
+    }
+    if (!super.equals(o)) {
+      return false;
+    }
+    return Objects.equals(acsURL, that.acsURL) && Objects.equals(allowCreate, that.allowCreate) && Objects.equals(forceAuthn, that.forceAuthn) && Objects.equals(nameIdFormat, that.nameIdFormat);
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hash(super.hashCode(), acsURL, allowCreate, forceAuthn, nameIdFormat);
+  }
 }
