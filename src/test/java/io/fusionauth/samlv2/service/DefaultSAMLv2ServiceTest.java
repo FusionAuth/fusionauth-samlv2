@@ -389,6 +389,39 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
+  public void buildPostAuthnRequest_forceAuthn() throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+    PrivateKey privateKey = kp.getPrivate();
+    X509Certificate certificate = generateX509Certificate(kp, "SHA256withRSA");
+
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "https://local.fusionauth.io";
+    // Set forceAuthn=true
+    request.forceAuthn = true;
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+
+    // Build a post request
+    String postRequest = service.buildPostAuthnRequest(request, true, privateKey, certificate, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+    assertNotNull(postRequest);
+
+    // Parse it and ensure we still have foreAuthn=true
+    AuthenticationRequest actualPostRequest = service.parseRequestPostBinding(postRequest, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(certificate.getPublicKey()), true));
+    assertEquals(actualPostRequest.forceAuthn, true);
+
+    // Build a redirect request
+    String redirectRequest = service.buildRedirectAuthnRequest(request, "Relay-State", true, privateKey, Algorithm.RS256);
+    assertNotNull(redirectRequest);
+
+    // Parse it as a redirect request to ensure we still have ForceAuthn=true
+    AuthenticationRequest actualRedirectRequest = service.parseRequestRedirectBinding(redirectRequest, authRequest -> new TestRedirectBindingSignatureHelper(certificate.getPublicKey(), true));
+    assertEquals(actualRedirectRequest.forceAuthn, true);
+  }
+
+  @Test
   public void buildPostAuthnRequest_signatureFollowsIssuer() throws Exception {
     KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
     kpg.initialize(2048);
@@ -716,6 +749,26 @@ public class DefaultSAMLv2ServiceTest {
         Files.deleteIfExists(tempFile);
       }
     }
+  }
+
+  @Test(dataProvider = "bindings")
+  public void parseRequest_forceAuthn(Binding binding) throws Exception {
+    byte[] bytes = Files.readAllBytes(Paths.get("src/test/xml/authn-request-forceAuthn.xml"));
+
+    String encodedXML = binding == Binding.HTTP_Redirect
+        ? SAMLTools.deflateAndEncode(bytes)
+        : SAMLTools.encode(bytes);
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationRequest request = binding == Binding.HTTP_Redirect
+        ? service.parseRequestRedirectBinding("SAMLRequest=" + URLEncoder.encode(encodedXML, StandardCharsets.UTF_8), authRequest -> new TestRedirectBindingSignatureHelper())
+        : service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper());
+
+    assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
+    assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
+    assertEquals(request.version, "2.0");
+    assertEquals(request.forceAuthn, Boolean.TRUE);
   }
 
   @Test
