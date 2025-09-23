@@ -217,6 +217,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     ResponseType jaxbResponse = new ResponseType();
+    ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
 
     // Status (element)
     StatusType status = new StatusType();
@@ -235,7 +236,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     jaxbResponse.setInResponseTo(response.inResponseTo);
 
     // Instant (attribute)
-    jaxbResponse.setIssueInstant(toXMLGregorianCalendar(response.issueInstant));
+    ZonedDateTime issueInstant = response.issueInstant != null ? response.issueInstant : now;
+    jaxbResponse.setIssueInstant(toXMLGregorianCalendar(issueInstant));
 
     // Destination (Attribute)
     jaxbResponse.setDestination(response.destination);
@@ -245,7 +247,6 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     if (response.assertions != null && response.status.code == ResponseStatus.Success) {
       // Only responses with a single Assertion are supported. Grab the first.
       Assertion assertion = response.assertions.get(0);
-      ZonedDateTime now = ZonedDateTime.now(ZoneOffset.UTC);
       String id = assertion.id != null ? assertion.id : "_" + UUID.randomUUID();
       assertionType.setID(id);
       assertionType.setIssuer(jaxbResponse.getIssuer());
@@ -313,7 +314,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
 
       // AuthnStatement (element)
       AuthnStatementType authnStatement = new AuthnStatementType();
-      authnStatement.setAuthnInstant(toXMLGregorianCalendar(response.authnInstant));
+      ZonedDateTime authnInstant = response.authnInstant != null ? response.authnInstant : issueInstant;
+      authnStatement.setAuthnInstant(toXMLGregorianCalendar(authnInstant));
       authnStatement.setAuthnContext(new AuthnContextType());
       authnStatement.getAuthnContext().getContent().add(ASSERTION_OBJECT_FACTORY.createAuthnContextClassRef("urn:oasis:names:tc:SAML:2.0:ac:classes:Password"));
       authnStatement.setSessionIndex(response.sessionIndex);
@@ -762,6 +764,8 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
               throw new SAMLException("This library currently doesn't support encrypted attributes");
             }
           }
+        } else if (statement instanceof AuthnStatementType authnStatementType) {
+          response.authnInstant = toZonedDateTime(authnStatementType.getAuthnInstant());
         }
       }
 
