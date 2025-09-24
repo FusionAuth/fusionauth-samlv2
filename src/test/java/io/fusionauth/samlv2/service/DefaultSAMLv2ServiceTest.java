@@ -1009,6 +1009,9 @@ public class DefaultSAMLv2ServiceTest {
     assertNotNull(assertion.subject.nameIDs);
     assertEquals(assertion.subject.nameIDs.size(), 1);
     assertEquals(assertion.subject.nameIDs.get(0).format, NameIDFormat.Transient.toSAMLFormat());
+    // Make sure our copy constructor handles nulls properly
+    var copy = new Assertion(assertion);
+    assertEquals(copy, assertion);
   }
 
   @Test(dataProvider = "maxLineLength")
