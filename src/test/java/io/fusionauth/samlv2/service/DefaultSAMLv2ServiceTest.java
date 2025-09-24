@@ -982,7 +982,7 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
-  public void parseResponse_handleNilAttribute() throws Exception {
+  public void parseResponse_handleNilAttribute_UnsupportedType_NoValue() throws Exception {
     byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/deflated/example-response.txt"));
     String encodedResponse = new String(ba);
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
@@ -1006,6 +1006,13 @@ public class DefaultSAMLv2ServiceTest {
     //  <saml:AttributeValue xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:nil="true" xsi:type="xs:string"/>
     assertEquals(assertion.attributes.get("PersonImmutableID").size(), 1);
     assertNull(assertion.attributes.get("PersonImmutableID").get(0));
+    // Boolean types are not supported and will return null
+    //  <saml:AttributeValue xsi:type="xs:boolean">false</saml:AttributeValue>
+    assertEquals(assertion.attributes.get("isAdmin").size(), 1);
+    assertNull(assertion.attributes.get("isAdmin").get(0));
+    // Ensure we can handle an Attribute with no AttributeValue
+    //  <saml:Attribute NameFormat="urn:oasis:names:tc:SAML:2.0:attrname-format:basic" Name="noValue"/>
+    assertEquals(assertion.attributes.get("noValue").size(), 0);
     assertNotNull(assertion.subject.nameIDs);
     assertEquals(assertion.subject.nameIDs.size(), 1);
     assertEquals(assertion.subject.nameIDs.get(0).format, NameIDFormat.Transient.toSAMLFormat());
