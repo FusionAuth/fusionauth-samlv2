@@ -129,6 +129,15 @@ public class DefaultSAMLv2ServiceTest {
 
   private KeyPair signingKeyPair;
 
+  @DataProvider(name = "BooleanTriState")
+  public Object[][] BooleanTriState() {
+    return new Object[][]{
+        {Boolean.TRUE},
+        {Boolean.FALSE},
+        {null}
+    };
+  }
+
   @Test
   public void assertionDecryptionDefaults() throws Exception {
     // If RSA-OAEP Digest and Mask Generation Function are not specified by XML, decryption should fall back to the defaults
@@ -162,8 +171,13 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
     // Verify the parsed encrypted response matches the original pulled from file
-    // The Assertion ID attributes were generated with the sample encoded responses, but the rest of the assertions are identitical.
+    // The Assertion ID attributes were generated with the sample encoded responses, but the rest of the assertions are identical.
     parsedResponse.assertions.get(0).id = response.assertions.get(0).id;
+
+    // Sync up the authnInstant since it is not in the encodedResponse
+    parsedResponse.authnInstant = response.authnInstant;
+
+    // Assert the two values are equal
     assertEquals(parsedResponse, response);
   }
 
@@ -386,6 +400,38 @@ public class DefaultSAMLv2ServiceTest {
     Element issuer = (Element) doc.getElementsByTagName("Issuer").item(0);
     Element signature = (Element) issuer.getNextSibling();
     assertEquals(signature.getTagName(), "Signature");
+  }
+
+  @Test(dataProvider = "BooleanTriState")
+  public void buildPostAuthnRequest_forceAuthn(Boolean forceAuthN) throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+    PrivateKey privateKey = kp.getPrivate();
+    X509Certificate certificate = generateX509Certificate(kp, "SHA256withRSA");
+
+    AuthenticationRequest request = new AuthenticationRequest();
+    request.id = "foobarbaz";
+    request.issuer = "https://local.fusionauth.io";
+    request.forceAuthn = forceAuthN;
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+
+    // Build a post request
+    String postRequest = service.buildPostAuthnRequest(request, true, privateKey, certificate, Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS);
+    assertNotNull(postRequest);
+
+    // Parse it and ensure it matches the input
+    AuthenticationRequest actualPostRequest = service.parseRequestPostBinding(postRequest, authRequest -> new TestPostBindingSignatureHelper(KeySelector.singletonKeySelector(certificate.getPublicKey()), true));
+    assertEquals(actualPostRequest.forceAuthn, forceAuthN);
+
+    // Build a redirect request
+    String redirectRequest = service.buildRedirectAuthnRequest(request, "Relay-State", true, privateKey, Algorithm.RS256);
+    assertNotNull(redirectRequest);
+
+    // Parse it as a redirect request to ensure it matches the input
+    AuthenticationRequest actualRedirectRequest = service.parseRequestRedirectBinding(redirectRequest, authRequest -> new TestRedirectBindingSignatureHelper(certificate.getPublicKey(), true));
+    assertEquals(actualRedirectRequest.forceAuthn, forceAuthN);
   }
 
   @Test
@@ -716,6 +762,26 @@ public class DefaultSAMLv2ServiceTest {
         Files.deleteIfExists(tempFile);
       }
     }
+  }
+
+  @Test(dataProvider = "bindings")
+  public void parseRequest_forceAuthn(Binding binding) throws Exception {
+    byte[] bytes = Files.readAllBytes(Paths.get("src/test/xml/authn-request-forceAuthn.xml"));
+
+    String encodedXML = binding == Binding.HTTP_Redirect
+        ? SAMLTools.deflateAndEncode(bytes)
+        : SAMLTools.encode(bytes);
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationRequest request = binding == Binding.HTTP_Redirect
+        ? service.parseRequestRedirectBinding("SAMLRequest=" + URLEncoder.encode(encodedXML, StandardCharsets.UTF_8), authRequest -> new TestRedirectBindingSignatureHelper())
+        : service.parseRequestPostBinding(encodedXML, authRequest -> new TestPostBindingSignatureHelper());
+
+    assertEquals(request.id, "_809707f0030a5d00620c9d9df97f627afe9dcc24");
+    assertEquals(request.issuer, "http://sp.example.com/demo1/metadata.php");
+    assertEquals(request.nameIdFormat, NameIDFormat.EmailAddress.toSAMLFormat());
+    assertEquals(request.version, "2.0");
+    assertEquals(request.forceAuthn, Boolean.TRUE);
   }
 
   @Test
@@ -1457,6 +1523,38 @@ public class DefaultSAMLv2ServiceTest {
     assertEquals(response.status.code, ResponseStatus.AuthenticationFailed);
   }
 
+  @Test
+  public void authnInstant() throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    ZonedDateTime expectedAuthnInstant = ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1);
+    response.authnInstant = expectedAuthnInstant;
+
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, SignatureLocation.Response, true);
+    AuthenticationResponse builtResponse = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
+
+    assertEquals(builtResponse.status.code, ResponseStatus.Success);
+    // Expected to be the value we set, convert back and forth to sync up the formats
+    assertEquals(builtResponse.authnInstant, SAMLTools.toZonedDateTime(SAMLTools.toXMLGregorianCalendar(expectedAuthnInstant)));
+    assertTrue(builtResponse.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+
+    response.authnInstant = null;
+    response.issueInstant = ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(2);
+    encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, SignatureLocation.Response, true);
+    builtResponse = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
+
+    assertEquals(builtResponse.status.code, ResponseStatus.Success);
+    assertEquals(builtResponse.authnInstant, builtResponse.issueInstant);
+    assertTrue(builtResponse.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+  }
+
   @Test(dataProvider = "signatureLocation")
   public void roundTripResponseSignedAssertion(SignatureLocation signatureLocation, boolean includeKeyInfoInResponse)
       throws Exception {
@@ -1469,6 +1567,8 @@ public class DefaultSAMLv2ServiceTest {
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
 
+    ZonedDateTime expectedAuthnInstant = ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1);
+    response.authnInstant = expectedAuthnInstant;
     String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, signatureLocation, includeKeyInfoInResponse);
     // System.out.println(new String(Base64.getMimeDecoder().decode(encodedXML)));
     response = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
@@ -1488,6 +1588,7 @@ public class DefaultSAMLv2ServiceTest {
       assertEquals(signature.getPreviousSibling().getLocalName(), "Issuer");
     }
 
+    assertEquals(response.authnInstant, SAMLTools.toZonedDateTime(SAMLTools.toXMLGregorianCalendar(expectedAuthnInstant)));
     assertEquals(response.destination, "https://local.fusionauth.io/oauth2/callback");
     assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "https://sts.windows.net/c2150111-3c44-4508-9f08-790cb4032a23/");
