@@ -15,6 +15,7 @@
  */
 package io.fusionauth.samlv2.domain;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -43,10 +44,7 @@ public class Assertion {
         .collect(
             Collectors.toMap(
                 Entry::getKey,
-                entry -> entry.getValue()
-                              .stream()
-                              .map(String::new)
-                              .toList()
+                entry ->  new ArrayList<>(entry.getValue())
             )
         );
     this.conditions = other.conditions == null ? null : new Conditions(other.conditions);
