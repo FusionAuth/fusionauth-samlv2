@@ -198,6 +198,38 @@ public class DefaultSAMLv2ServiceTest {
     };
   }
 
+  @Test
+  public void authnInstant() throws Exception {
+    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
+    kpg.initialize(2048);
+    KeyPair kp = kpg.generateKeyPair();
+
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
+    String encodedResponse = new String(ba);
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
+
+    ZonedDateTime expectedAuthnInstant = ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1);
+    response.authnInstant = expectedAuthnInstant;
+
+    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, SignatureLocation.Response, true);
+    AuthenticationResponse builtResponse = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
+
+    assertEquals(builtResponse.status.code, ResponseStatus.Success);
+    // Expected to be the value we set, convert back and forth to sync up the formats
+    assertEquals(builtResponse.authnInstant, SAMLTools.toZonedDateTime(SAMLTools.toXMLGregorianCalendar(expectedAuthnInstant)));
+    assertTrue(builtResponse.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+
+    response.authnInstant = null;
+    response.issueInstant = ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(2);
+    encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, SignatureLocation.Response, true);
+    builtResponse = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
+
+    assertEquals(builtResponse.status.code, ResponseStatus.Success);
+    assertEquals(builtResponse.authnInstant, builtResponse.issueInstant);
+    assertTrue(builtResponse.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+  }
+
   @BeforeClass
   public void beforeClass() throws Exception {
     System.setProperty("com.sun.org.apache.xml.internal.security.ignoreLineBreaks", "true");
@@ -982,6 +1014,78 @@ public class DefaultSAMLv2ServiceTest {
   }
 
   @Test
+  public void parseResponse_detachedSignature() throws Exception {
+    // Test that a detached signature (separate from the element that it's signing) works properly
+
+    // Load response with detached signature from file
+    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse-detachedSignature.txt"));
+    String encodedResponse = new String(ba, StandardCharsets.UTF_8);
+
+    // Parse the response with signature validation
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(encodedResponse, true, KeySelector.singletonKeySelector(encryptionKeyPair.getPublic()));
+
+    // Assert on parsed response and assertion
+    assertEquals(response.destination, "https://local.fusionauth.io/samlv2/acs");
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertEquals(response.issuer, "https://example.com/saml");
+    assertEquals(response.status.code, ResponseStatus.Success);
+    Assertion assertion = response.assertions.get(0);
+    assertTrue(assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(assertion.conditions.notOnOrAfter));
+    assertEquals(assertion.attributes.get("sub").get(0), "41");
+    assertEquals(assertion.attributes.get("email").get(0), "test@example.com");
+    assertEquals(assertion.attributes.get("username").get(0), "guitarchargejobs");
+    assertNotNull(assertion.subject.nameIDs);
+    assertEquals(assertion.subject.nameIDs.size(), 2);
+    assertEquals(assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
+    assertEquals(assertion.subject.nameIDs.get(1).format, NameIDFormat.Persistent.toSAMLFormat());
+  }
+
+  @Test
+  public void parseResponse_duplicateIds() throws Exception {
+    // Parsing fails when the response contains elements with duplicate IDs.
+    // Two unsigned plaintext assertions with the same ID
+    String responseXml = baseXml.replace("${assertions}", String.join("", List.of(assertionUnsigned, assertionUnsigned)));
+    String encodedResponse = Base64.getMimeEncoder().encodeToString(responseXml.getBytes(StandardCharsets.UTF_8));
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+
+    // Parse the response skipping signature verification
+    try {
+      service.parseResponse(
+          encodedResponse,
+          false,
+          // This is the wrong key to verify signatures, but we skip entirely.
+          KeySelector.singletonKeySelector(encryptionKeyPair.getPublic()),
+          false,
+          encryptionKeyPair.getPrivate()
+      );
+      fail("Expected SAMLException");
+    } catch (SAMLException e) {
+      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 XML. The document contains duplicate element IDs.");
+    }
+
+    // Two unsigned encrypted assertions with the same ID
+    responseXml = baseXml.replace("${assertions}", String.join("", List.of(encryptedUnsigned, encryptedUnsigned)));
+    encodedResponse = Base64.getMimeEncoder().encodeToString(responseXml.getBytes(StandardCharsets.UTF_8));
+
+    try {
+      service.parseResponse(
+          encodedResponse,
+          false,
+          // This is the wrong key to verify signatures, but we skip entirely.
+          KeySelector.singletonKeySelector(encryptionKeyPair.getPublic()),
+          false,
+          encryptionKeyPair.getPrivate()
+      );
+      fail("Expected SAMLException");
+    } catch (SAMLException e) {
+      assertEquals(e.getMessage(), "Unable to parse SAML v2.0 XML. The document contains duplicate element IDs.");
+    }
+  }
+
+  @Test
   public void parseResponse_handleNilAttribute_UnsupportedType_NoValue() throws Exception {
     byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/deflated/example-response.txt"));
     String encodedResponse = new String(ba);
@@ -1531,38 +1635,6 @@ public class DefaultSAMLv2ServiceTest {
     assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "https://acme.com/saml/idp");
     assertEquals(response.status.code, ResponseStatus.AuthenticationFailed);
-  }
-
-  @Test
-  public void authnInstant() throws Exception {
-    KeyPairGenerator kpg = KeyPairGenerator.getInstance("RSA");
-    kpg.initialize(2048);
-    KeyPair kp = kpg.generateKeyPair();
-
-    byte[] ba = Files.readAllBytes(Paths.get("src/test/xml/encodedResponse.txt"));
-    String encodedResponse = new String(ba);
-    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
-    AuthenticationResponse response = service.parseResponse(encodedResponse, false, null);
-
-    ZonedDateTime expectedAuthnInstant = ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(1);
-    response.authnInstant = expectedAuthnInstant;
-
-    String encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, SignatureLocation.Response, true);
-    AuthenticationResponse builtResponse = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
-
-    assertEquals(builtResponse.status.code, ResponseStatus.Success);
-    // Expected to be the value we set, convert back and forth to sync up the formats
-    assertEquals(builtResponse.authnInstant, SAMLTools.toZonedDateTime(SAMLTools.toXMLGregorianCalendar(expectedAuthnInstant)));
-    assertTrue(builtResponse.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
-
-    response.authnInstant = null;
-    response.issueInstant = ZonedDateTime.now(ZoneOffset.UTC).minusMinutes(2);
-    encodedXML = service.buildAuthnResponse(response, true, kp.getPrivate(), CertificateTools.fromKeyPair(kp, Algorithm.RS256, "FooBar"), Algorithm.RS256, CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, SignatureLocation.Response, true);
-    builtResponse = service.parseResponse(encodedXML, true, new TestKeySelector(kp.getPublic()));
-
-    assertEquals(builtResponse.status.code, ResponseStatus.Success);
-    assertEquals(builtResponse.authnInstant, builtResponse.issueInstant);
-    assertTrue(builtResponse.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
   }
 
   @Test(dataProvider = "signatureLocation")
