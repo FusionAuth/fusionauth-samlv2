@@ -18,7 +18,16 @@ package io.fusionauth.samlv2.service;
 import javax.xml.XMLConstants;
 import javax.xml.crypto.KeySelector;
 import javax.xml.crypto.dsig.CanonicalizationMethod;
+import javax.xml.crypto.dsig.DigestMethod;
+import javax.xml.crypto.dsig.Reference;
+import javax.xml.crypto.dsig.SignedInfo;
 import javax.xml.crypto.dsig.XMLSignature;
+import javax.xml.crypto.dsig.XMLSignatureFactory;
+import javax.xml.crypto.dsig.dom.DOMSignContext;
+import javax.xml.crypto.dsig.keyinfo.KeyInfo;
+import javax.xml.crypto.dsig.keyinfo.KeyInfoFactory;
+import javax.xml.crypto.dsig.keyinfo.X509Data;
+import javax.xml.crypto.dsig.spec.C14NMethodParameterSpec;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.parsers.ParserConfigurationException;
@@ -50,6 +59,7 @@ import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Base64;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.UUID;
@@ -1150,6 +1160,60 @@ public class DefaultSAMLv2ServiceTest {
     AuthenticationResponse response = service.parseResponse(encodedResponse, false, null, true, null);
     // Skipped parsing the unencrypted assertion. The assertion was not included in the response.
     assertTrue(response.assertions.isEmpty());
+  }
+
+  @Test
+  public void parseResponse_detached_signature() throws Exception {
+    // Test that a detached signature (separate from the element that it's signing) works properly
+
+    // arrange
+    String responseXml = baseXml.replace("${assertions}", String.join("", List.of(assertionUnsigned)));
+    Document document = SAMLTools.newDocumentFromBytes(responseXml.getBytes());
+
+    // the equivalent of DefaultSAMLv2Service#signXML, but with a detached signature
+    Element toSign = (Element) document.getElementsByTagName("Assertion").item(0);
+    toSign.setIdAttributeNode(toSign.getAttributeNode("ID"), true);
+    XMLSignatureFactory factory = XMLSignatureFactory.getInstance("DOM");
+
+    CanonicalizationMethod c14n = factory.newCanonicalizationMethod(CanonicalizationMethod.EXCLUSIVE_WITH_COMMENTS, (C14NMethodParameterSpec) null);
+    Reference ref = factory.newReference("#" + toSign.getAttribute("ID"),
+        factory.newDigestMethod(DigestMethod.SHA256, null));
+
+    Algorithm algorithm = Algorithm.RS256;
+
+    SignedInfo si = factory.newSignedInfo(c14n,
+        factory.newSignatureMethod(algorithm.uri, null),
+        Collections.singletonList(ref));
+    KeyInfoFactory kif = factory.getKeyInfoFactory();
+    X509Data data = kif.newX509Data(Collections.singletonList(CertificateTools.fromKeyPair(signingKeyPair, Algorithm.RS256, "FooBar")));
+    KeyInfo ki = kif.newKeyInfo(Collections.singletonList(data));
+    XMLSignature signature = factory.newXMLSignature(si, ki);
+
+    // put the signature at the top level, underneath the document element
+    DOMSignContext dsc = new DOMSignContext(encryptionKeyPair.getPrivate(), document.getDocumentElement());
+    signature.sign(dsc);
+
+    String xml = SAMLTools.marshallToString(document);
+    System.out.println("Built XML with detached signature:\n" + xml);
+    String builtResponse = new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
+
+    DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    AuthenticationResponse response = service.parseResponse(builtResponse, true, KeySelector.singletonKeySelector(encryptionKeyPair.getPublic()));
+
+    assertEquals(response.destination, "https://local.fusionauth.io/samlv2/acs");
+    assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertEquals(response.issuer, "https://example.com/saml");
+    assertEquals(response.status.code, ResponseStatus.Success);
+    Assertion assertion = response.assertions.get(0);
+    assertTrue(assertion.conditions.notBefore.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
+    assertTrue(ZonedDateTime.now(ZoneOffset.UTC).isAfter(assertion.conditions.notOnOrAfter));
+    assertEquals(assertion.attributes.get("sub").get(0), "41");
+    assertEquals(assertion.attributes.get("email").get(0), "test@example.com");
+    assertEquals(assertion.attributes.get("username").get(0), "guitarchargejobs");
+    assertNotNull(assertion.subject.nameIDs);
+    assertEquals(assertion.subject.nameIDs.size(), 2);
+    assertEquals(assertion.subject.nameIDs.get(0).format, NameIDFormat.EmailAddress.toSAMLFormat());
+    assertEquals(assertion.subject.nameIDs.get(1).format, NameIDFormat.Persistent.toSAMLFormat());
   }
 
   @Test
