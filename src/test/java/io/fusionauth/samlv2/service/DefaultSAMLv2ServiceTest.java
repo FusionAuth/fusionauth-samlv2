@@ -1189,7 +1189,8 @@ public class DefaultSAMLv2ServiceTest {
     KeyInfo ki = kif.newKeyInfo(Collections.singletonList(data));
     XMLSignature signature = factory.newXMLSignature(si, ki);
 
-    // put the signature for the assertion at the top level, underneath the document element
+    // put the signature for the assertion at the top level, underneath the document element, rather than inside
+    // the element we are signing
     DOMSignContext dsc = new DOMSignContext(encryptionKeyPair.getPrivate(), document.getDocumentElement());
     signature.sign(dsc);
 
@@ -1198,8 +1199,10 @@ public class DefaultSAMLv2ServiceTest {
     String builtResponse = new String(Base64.getEncoder().encode(xml.getBytes(StandardCharsets.UTF_8)), StandardCharsets.UTF_8);
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
+    // act
     AuthenticationResponse response = service.parseResponse(builtResponse, true, KeySelector.singletonKeySelector(encryptionKeyPair.getPublic()));
 
+    // assert
     assertEquals(response.destination, "https://local.fusionauth.io/samlv2/acs");
     assertTrue(response.issueInstant.isBefore(ZonedDateTime.now(ZoneOffset.UTC)));
     assertEquals(response.issuer, "https://example.com/saml");
