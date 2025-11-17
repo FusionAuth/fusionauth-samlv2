@@ -1189,7 +1189,7 @@ public class DefaultSAMLv2ServiceTest {
     KeyInfo ki = kif.newKeyInfo(Collections.singletonList(data));
     XMLSignature signature = factory.newXMLSignature(si, ki);
 
-    // put the signature at the top level, underneath the document element
+    // put the signature for the assertion at the top level, underneath the document element
     DOMSignContext dsc = new DOMSignContext(encryptionKeyPair.getPrivate(), document.getDocumentElement());
     signature.sign(dsc);
 
