@@ -664,6 +664,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     response.rawResponse = new String(decodedResponse, StandardCharsets.UTF_8);
 
     Document document = newDocumentFromBytes(decodedResponse);
+    Set<String> allElementIds = checkDuplicateIDs(document.getDocumentElement());
     Set<String> verifiedElementIds = new HashSet<>();
     if (verifySignature) {
       verifiedElementIds = verifyEmbeddedSignatures(document, signatureKeySelector, null);
@@ -688,7 +689,26 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           logger.warn("SAML response contained encrypted assertion, but no encryption key was provided. It was ignored.");
           continue;
         } else {
-          jaxbAssertion = decryptAssertion((EncryptedElementType) jaxbAssertion, encryptionKey, verifySignature, signatureKeySelector, verifiedElementIds);
+          var assertionDoc = decryptAssertion((EncryptedElementType) jaxbAssertion, encryptionKey);
+          // Unmarshall the Document into AssertionType.
+          jaxbAssertion = unmarshallFromDocument(assertionDoc, AssertionType.class);
+
+          if (!allElementIds.add(((AssertionType) jaxbAssertion).getID())) {
+            throw new SAMLException("Unable to parse SAML v2.0 XML. The document contains duplicate element IDs.");
+          }
+
+          // Verify the signature if requested. Add the verified element Ids to the set for the full Response.
+          // The signature must be verified before unmarshalling because unmarshalling to a Java type can add namespace prefixes and other data that was not
+          // present when the signature was generated.
+          if (verifySignature) {
+            var verifiedAssertionIds = verifyEmbeddedSignatures(assertionDoc, signatureKeySelector, null);
+            if (!responseVerified && !verifiedAssertionIds.contains(((AssertionType) jaxbAssertion).getID())) {
+              logger.warn("SAML response contained an encrypted, unsigned assertion when signature verification was requested. It was ignored.");
+              continue;
+            } else {
+              verifiedElementIds.addAll(verifiedAssertionIds);
+            }
+          }
         }
       } else if (requireEncryptedAssertion) {
         logger.warn("Assertion encryption is required, but the SAML response contained an unencrypted assertion. It was ignored.");
@@ -1030,6 +1050,34 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     return encryptedKey;
   }
 
+  private Set<String> checkDuplicateIDs(Element element) throws SAMLException {
+    Set<String> ids = new HashSet<>();
+    NamedNodeMap attributes = element.getAttributes();
+    for (int i = 0; i < attributes.getLength(); i++) {
+      Attr attribute = (Attr) attributes.item(i);
+      if (attribute.getLocalName().equalsIgnoreCase("id")) {
+        if (!ids.add(attribute.getValue())) {
+          throw new SAMLException("Unable to parse SAML v2.0 XML. The document contains duplicate element IDs.");
+        }
+      }
+    }
+
+    NodeList children = element.getChildNodes();
+    for (int i = 0; i < children.getLength(); i++) {
+      Node child = children.item(i);
+      if (child.getNodeType() == Node.ELEMENT_NODE) {
+        Set<String> childIds = checkDuplicateIDs((Element) child);
+        for (String id : childIds) {
+          if (!ids.add(id)) {
+            throw new SAMLException("Unable to parse SAML v2.0 XML. The document contains duplicate element IDs.");
+          }
+        }
+      }
+    }
+
+    return ids;
+  }
+
   private void checkFor_CVE_2022_21449(SAMLRequest request, byte[] signature) throws SAMLException {
     if (signature.length == 0) {
       return;
@@ -1098,24 +1146,17 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
   }
 
   /**
-   * Decrypt an encrypted XML element according to the XML Encryption spec and optionally verify the signature.
+   * Decrypt an encrypted XML element according to the XML Encryption spec.
+   * <p>
+   * NOTE: This method does not perform signature validation.
    *
    * @param encryptedAssertion     an {@code EncryptedElement} containing an encrypted assertion
    * @param transportEncryptionKey a private key used to decrypt the symmetric key used to decrypt the assertion
-   * @param verifySignature        if {@code true}, the method will attempt to verify an embedded signature if it is
-   *                               present
-   * @param signatureKeySelector   The key selector that is used to find the correct key to verify a signature inside
-   *                               the encrypted assertion.
-   * @param verifiedElementIds     collection of document element IDs that have had their signatures verified. This
-   *                               method will add verified element IDs to the set.
-   * @return the decrypted {@code Assertion} element
-   * @throws SAMLException if there was an issue decrypting the {@code EncryptedElement}, parsing the SAML
-   *                       {@code Assertion} element, or verifying the signature embedded in the
-   *                       {@code EncryptedElement} when {@code verifySignature} is {@code true}
+   * @return the decrypted {@code Assertion} parsed to an XML document
+   * @throws SAMLException if there was an issue decrypting the {@code EncryptedElement} or parsing the SAML
+   *                       {@code Assertion} element
    */
-  private AssertionType decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey transportEncryptionKey,
-                                         boolean verifySignature, KeySelector signatureKeySelector,
-                                         Set<String> verifiedElementIds)
+  private Document decryptAssertion(EncryptedElementType encryptedAssertion, PrivateKey transportEncryptionKey)
       throws SAMLException {
     // Extract the encrypted assertion encryption key from the XML
     EncryptedKeyType encryptedKey = extractEncryptedAssertionEncryptionKey(encryptedAssertion);
@@ -1147,17 +1188,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
     }
 
     // Parse the bytes into an XML document
-    Document doc = newDocumentFromBytes(assertionBytes);
-
-    // Verify the signature if requested. Add the verified element Ids to the set for the full Response.
-    // The signature must be verified here because unmarshalling to a Java type can add namespace prefixes and other data that was not
-    // present when the signature was generated.
-    if (verifySignature) {
-      verifiedElementIds.addAll(verifyEmbeddedSignatures(doc, signatureKeySelector, null));
-    }
-
-    // Unmarshall the Document into AssertionType.
-    return unmarshallFromDocument(doc, AssertionType.class);
+    return newDocumentFromBytes(assertionBytes);
   }
 
   /**
