@@ -693,8 +693,12 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
           // Unmarshall the Document into AssertionType.
           jaxbAssertion = unmarshallFromDocument(assertionDoc, AssertionType.class);
 
-          if (!allElementIds.add(((AssertionType) jaxbAssertion).getID())) {
-            throw new SAMLException("Unable to parse SAML v2.0 XML. The document contains duplicate element IDs.");
+          // Ensure decrypted element IDs were not already present elsewhere in the document
+          Set<String> decryptedElementIds = checkDuplicateIDs(assertionDoc.getDocumentElement());
+          for (String decryptedElementId : decryptedElementIds) {
+            if (!allElementIds.add(decryptedElementId)) {
+              throw new SAMLException("Unable to parse SAML v2.0 XML. The document contains duplicate element IDs.");
+            }
           }
 
           // Verify the signature if requested. Add the verified element Ids to the set for the full Response.
