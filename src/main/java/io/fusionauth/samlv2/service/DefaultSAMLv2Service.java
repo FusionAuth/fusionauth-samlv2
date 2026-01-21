@@ -433,7 +433,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       }
 
       if (metaData.sp.nameIDFormat != null) {
-        sp.getNameIDFormat().add(metaData.sp.nameIDFormat.toSAMLFormat());
+        sp.getNameIDFormat().add(metaData.sp.nameIDFormat);
       }
 
       // Add certificates
@@ -609,7 +609,7 @@ public class DefaultSAMLv2Service implements SAMLv2Service {
       metaData.sp = new SPMetaData();
       metaData.sp.acsEndpoint = !sp.getAssertionConsumerService().isEmpty() ? sp.getAssertionConsumerService().get(0).getLocation() : null;
       try {
-        metaData.sp.nameIDFormat = !sp.getNameIDFormat().isEmpty() ? NameIDFormat.fromSAMLFormat(sp.getNameIDFormat().get(0)) : null;
+        metaData.sp.nameIDFormat = !sp.getNameIDFormat().isEmpty() ? sp.getNameIDFormat().get(0) : null;
       } catch (Exception e) {
         // fromSAMLFormat may throw an exception if the Name ID Format is not defined by our NameIDFormat enum.
         throw new SAMLException(e.getCause());
