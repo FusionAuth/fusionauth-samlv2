@@ -583,7 +583,7 @@ public class DefaultSAMLv2ServiceTest {
     metaData.entityId = "https://fusionauth.io/samlv2/sp/" + metaData.id;
     metaData.sp = new SPMetaData();
     metaData.sp.acsEndpoint = "https://fusionauth.io/oauth2/callback";
-    metaData.sp.nameIDFormat = NameIDFormat.EmailAddress;
+    metaData.sp.nameIDFormat = NameIDFormat.EmailAddress.toSAMLFormat();
 
     DefaultSAMLv2Service service = new DefaultSAMLv2Service();
     String xml = service.buildMetadataResponse(metaData);
@@ -591,7 +591,7 @@ public class DefaultSAMLv2ServiceTest {
     assertTrue(xml.contains("_" + metaData.id));
     assertTrue(xml.contains(metaData.entityId));
     assertTrue(xml.contains(metaData.sp.acsEndpoint));
-    assertTrue(xml.contains(metaData.sp.nameIDFormat.toSAMLFormat()));
+    assertTrue(xml.contains(metaData.sp.nameIDFormat));
     assertTrue(xml.contains("<ns2:SPSSODescriptor AuthnRequestsSigned=\"false\" WantAssertionsSigned=\"false\" protocolSupportEnumeration=\"urn:oasis:names:tc:SAML:2.0:protocol\">"));
 
     // Now parse it

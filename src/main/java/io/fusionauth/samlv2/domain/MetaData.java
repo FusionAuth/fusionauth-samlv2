@@ -49,7 +49,7 @@ public class MetaData {
 
     public List<Certificate> certificates = new ArrayList<>();
 
-    public NameIDFormat nameIDFormat;
+    public String nameIDFormat;
 
     public boolean wantAssertionsSigned;
   }
